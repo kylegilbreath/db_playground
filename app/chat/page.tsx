@@ -1017,7 +1017,7 @@ function PreviewPanel({
         ) : activeTab === "Assets" && openAssets.length > 0 ? (
           <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-md border border-border bg-background-primary">
             {/* Figma-style soft tab bar */}
-            <div className="flex h-8 shrink-0 items-center overflow-x-auto border-b border-border bg-background-secondary pr-1">
+            <div className="flex h-8 shrink-0 items-center overflow-x-auto bg-background-secondary pr-1">
               {openAssets.map((asset) => {
                 const isActive = asset.id === activeAssetId;
                 const iconName = asset.kind === "notebook" ? "notebookIcon" : asset.kind === "dashboard" ? "dashboardIcon" : "fileCodeIcon";
