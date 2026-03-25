@@ -866,27 +866,25 @@ function PreviewPanel({
   activeThreadId,
   initialWidth = DEFAULT_PREVIEW_WIDTH,
   reviewAssets,
+  openAssets,
+  setOpenAssets,
+  activeAssetId,
+  setActiveAssetId,
+  activeTab,
+  setActiveTab,
 }: {
   onClose: () => void;
   selectedAsset: ReviewAsset | null;
   activeThreadId: string | null;
   initialWidth?: number;
   reviewAssets?: ReviewAsset[];
+  openAssets: ReviewAsset[];
+  setOpenAssets: (updater: ReviewAsset[] | ((prev: ReviewAsset[]) => ReviewAsset[])) => void;
+  activeAssetId: string | null;
+  setActiveAssetId: (id: string | null) => void;
+  activeTab: PreviewTab;
+  setActiveTab: (tab: PreviewTab) => void;
 }) {
-  const [activeTab, setActiveTab] = React.useState<PreviewTab>("Assets");
-  // Multi-tab asset state
-  const prevThreadId = React.useRef(activeThreadId);
-  const [openAssets, setOpenAssets] = React.useState<ReviewAsset[]>(selectedAsset ? [selectedAsset] : []);
-  const [activeAssetId, setActiveAssetId] = React.useState<string | null>(selectedAsset?.id ?? null);
-
-  // Reset when thread changes
-  React.useEffect(() => {
-    if (activeThreadId !== prevThreadId.current) {
-      prevThreadId.current = activeThreadId;
-      setOpenAssets([]);
-      setActiveAssetId(null);
-    }
-  }, [activeThreadId]);
 
   // Open or switch to asset tab when selectedAsset changes
   React.useEffect(() => {
@@ -904,7 +902,7 @@ function PreviewPanel({
     setOpenAssets((prev) => {
       const next = prev.filter((a) => a.id !== id);
       if (activeAssetId === id) {
-        setActiveAssetId(next.length > 0 ? next[next.length - 1].id : null);
+        setActiveAssetId(next.length > 0 ? next[next.length - 1]!.id : null);
       }
       return next;
     });
@@ -1107,11 +1105,43 @@ export default function ChatPage() {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [initialPreviewWidth, setInitialPreviewWidth] = React.useState(DEFAULT_PREVIEW_WIDTH);
 
+  // Per-thread panel state: keyed by threadId
+  const [threadOpenAssets, setThreadOpenAssets] = React.useState<Record<string, ReviewAsset[]>>({});
+  const [threadActiveAssetId, setThreadActiveAssetId] = React.useState<Record<string, string | null>>({});
+  const [threadActiveTab, setThreadActiveTab] = React.useState<Record<string, PreviewTab>>({});
+
+  const threadId = state.activeThreadId ?? "__none__";
+  const openAssets = threadOpenAssets[threadId] ?? [];
+  const activeAssetId = threadActiveAssetId[threadId] ?? null;
+  const activeTab = threadActiveTab[threadId] ?? "Assets";
+
+  const setOpenAssets = React.useCallback((updater: ReviewAsset[] | ((prev: ReviewAsset[]) => ReviewAsset[])) => {
+    setThreadOpenAssets((prev) => {
+      const current = prev[threadId] ?? [];
+      return { ...prev, [threadId]: typeof updater === "function" ? updater(current) : updater };
+    });
+  }, [threadId]);
+
+  const setActiveAssetId = React.useCallback((id: string | null) => {
+    setThreadActiveAssetId((prev) => ({ ...prev, [threadId]: id }));
+  }, [threadId]);
+
+  const setActiveTab = React.useCallback((tab: PreviewTab) => {
+    setThreadActiveTab((prev) => ({ ...prev, [threadId]: tab }));
+  }, [threadId]);
+
   const reviewAssets = React.useMemo(() => {
     if (state.runStatus !== "done") return undefined;
     const summary = state.steps.find((s) => s.type === "assets-summary") as { assets: ReviewAsset[] } | undefined;
     return summary?.assets;
   }, [state.steps, state.runStatus]);
+
+  // Auto-switch to Review tab when assets become available
+  React.useEffect(() => {
+    if (reviewAssets && reviewAssets.length > 0 && previewOpen) {
+      setActiveTab("Review");
+    }
+  }, [reviewAssets, previewOpen]);
 
   const handleAssetClick = React.useCallback((asset: ReviewAsset) => {
     setSelectedAsset(asset);
@@ -1157,6 +1187,12 @@ export default function ChatPage() {
             activeThreadId={state.activeThreadId}
             initialWidth={initialPreviewWidth}
             reviewAssets={reviewAssets}
+            openAssets={openAssets}
+            setOpenAssets={setOpenAssets}
+            activeAssetId={activeAssetId}
+            setActiveAssetId={setActiveAssetId}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
           />
         )}
       </div>
