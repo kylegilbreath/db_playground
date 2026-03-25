@@ -317,7 +317,7 @@ function ChatLeftNav({
             onClick={() => setCollapsed(true)}
           />
         </Tooltip>
-        <span className="flex-1 text-paragraph font-medium text-text-primary">Genie Code</span>
+        <span className="flex-1 text-paragraph font-medium text-text-primary">Genie Chat</span>
         <Tooltip label="Tools" align="right">
           <IconButton
             aria-label="Tools"
