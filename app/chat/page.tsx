@@ -322,14 +322,14 @@ function ChatLeftNav({
             <button
               type="button"
               onClick={onNewChat}
-              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-paragraph text-text-primary hover:bg-background-secondary"
+              className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-paragraph text-text-primary hover:bg-background-secondary"
             >
               <Icon name="newChatIcon" size={14} className="shrink-0 text-text-secondary" />
               New chat
             </button>
             <button
               type="button"
-              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-paragraph text-text-secondary hover:bg-background-secondary"
+              className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-paragraph text-text-secondary hover:bg-background-secondary"
             >
               <Icon name="searchIcon" size={14} className="shrink-0" />
               Search chats
@@ -423,7 +423,7 @@ function EmptyChartGraphic() {
 
 function NotebookPreview({ asset }: { asset: ReviewAsset }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col">
       {/* Notebook toolbar */}
       <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border px-3">
         <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -446,9 +446,10 @@ function NotebookPreview({ asset }: { asset: ReviewAsset }) {
       </div>
 
       {/* Cells */}
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
-        {/* Text cell */}
-        <div className="rounded-md border border-[#c084fc] bg-background-primary p-4">
+      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        <div className="flex flex-col gap-3">
+          {/* Text cell */}
+          <div className="shrink-0 rounded-md border border-border bg-background-primary p-4">
           <p className="mb-2 text-[15px] font-semibold leading-6 text-text-primary">{asset.name} - Last 3 Months</p>
           <p className="mb-2 text-paragraph text-text-secondary">This notebook analyzes Databricks Assistant usage metrics including:</p>
           <ul className="mb-2 flex flex-col gap-0.5 pl-4 text-paragraph text-text-secondary">
@@ -464,8 +465,8 @@ function NotebookPreview({ asset }: { asset: ReviewAsset }) {
           </p>
         </div>
 
-        {/* Code cell */}
-        <div className="overflow-hidden rounded-md border border-[#818cf8] bg-background-primary">
+          {/* Code cell */}
+          <div className="shrink-0 overflow-hidden rounded-md border border-border bg-background-primary">
           {/* Cell toolbar */}
           <div className="flex h-8 items-center gap-2 border-b border-border px-2">
             <IconButton aria-label="Run" icon={<Icon name="playIcon" size={12} />} size="small" tone="neutral" className="text-green-600" />
@@ -517,7 +518,71 @@ function NotebookPreview({ asset }: { asset: ReviewAsset }) {
             ))}
           </div>
         </div>
+        </div>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Dashboard preview
+// ---------------------------------------------------------------------------
+
+function DashboardPreview() {
+  const PlaceholderBlock = ({ className = "" }: { className?: string }) => (
+    <div className={`shrink-0 rounded-lg bg-[#f6f7f9] ${className}`} />
+  );
+
+  return (
+    <div className="relative flex min-h-0 flex-1 flex-col">
+      {/* Scrollable body */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 pb-20">
+        <div className="flex flex-col gap-4">
+          {/* Row 1: full-width */}
+          <PlaceholderBlock className="h-[180px] w-full" />
+          {/* Row 2: two equal columns */}
+          <div className="flex gap-4">
+            <PlaceholderBlock className="h-[180px] flex-1" />
+            <PlaceholderBlock className="h-[180px] flex-1" />
+          </div>
+          {/* Row 3: full-width */}
+          <PlaceholderBlock className="h-[180px] w-full" />
+          {/* Row 4: three equal columns */}
+          <div className="flex gap-4">
+            <PlaceholderBlock className="h-[180px] flex-1" />
+            <PlaceholderBlock className="h-[180px] flex-1" />
+            <PlaceholderBlock className="h-[180px] flex-1" />
+          </div>
+        </div>
+      </div>
+
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Review tab empty state
+// ---------------------------------------------------------------------------
+
+function MissingBranchGraphic() {
+  return (
+    <div className="flex items-center justify-center p-6">
+      <svg width="80" height="96" viewBox="0 0 80 96" fill="none" aria-hidden>
+        {/* Main trunk — vertical line */}
+        <line x1="20" y1="16" x2="20" y2="80" stroke="#cbcbcb" strokeWidth="2" strokeLinecap="round" />
+        {/* Branch curve up to right */}
+        <path d="M 20 32 C 20 50, 60 50, 60 32" stroke="#cbcbcb" strokeWidth="2" strokeLinecap="round" fill="none" />
+        {/* Bottom commit node */}
+        <circle cx="20" cy="80" r="5" fill="white" stroke="#cbcbcb" strokeWidth="2" />
+        {/* Middle commit node on trunk */}
+        <circle cx="20" cy="52" r="5" fill="white" stroke="#cbcbcb" strokeWidth="2" />
+        {/* Top commit node on trunk */}
+        <circle cx="20" cy="16" r="5" fill="white" stroke="#cbcbcb" strokeWidth="2" />
+        {/* Branch tip node — red X instead of commit */}
+        <circle cx="60" cy="32" r="7" fill="#fff5f5" stroke="#fed7d7" strokeWidth="1.5" />
+        <line x1="56.5" y1="28.5" x2="63.5" y2="35.5" stroke="#e53e3e" strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="63.5" y1="28.5" x2="56.5" y2="35.5" stroke="#e53e3e" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
     </div>
   );
 }
@@ -532,30 +597,53 @@ function PreviewPanel({
   onClose,
   selectedAsset,
   activeThreadId,
+  initialWidth = DEFAULT_PREVIEW_WIDTH,
 }: {
   onClose: () => void;
   selectedAsset: ReviewAsset | null;
   activeThreadId: string | null;
+  initialWidth?: number;
 }) {
   const [activeTab, setActiveTab] = React.useState<PreviewTab>("Assets");
-  // Reset to empty state when thread changes
+  // Multi-tab asset state
   const prevThreadId = React.useRef(activeThreadId);
-  const [assetForThread, setAssetForThread] = React.useState<ReviewAsset | null>(selectedAsset);
+  const [openAssets, setOpenAssets] = React.useState<ReviewAsset[]>(selectedAsset ? [selectedAsset] : []);
+  const [activeAssetId, setActiveAssetId] = React.useState<string | null>(selectedAsset?.id ?? null);
 
+  // Reset when thread changes
   React.useEffect(() => {
     if (activeThreadId !== prevThreadId.current) {
       prevThreadId.current = activeThreadId;
-      setAssetForThread(null);
+      setOpenAssets([]);
+      setActiveAssetId(null);
     }
   }, [activeThreadId]);
 
+  // Open or switch to asset tab when selectedAsset changes
   React.useEffect(() => {
-    if (selectedAsset) setAssetForThread(selectedAsset);
+    if (!selectedAsset) return;
+    setOpenAssets((prev) => {
+      if (prev.find((a) => a.id === selectedAsset.id)) return prev;
+      return [...prev, selectedAsset];
+    });
+    setActiveAssetId(selectedAsset.id);
   }, [selectedAsset]);
-  const [width, setWidth] = React.useState(DEFAULT_PREVIEW_WIDTH);
+
+  const activeAsset = openAssets.find((a) => a.id === activeAssetId) ?? null;
+
+  const closeAssetTab = (id: string) => {
+    setOpenAssets((prev) => {
+      const next = prev.filter((a) => a.id !== id);
+      if (activeAssetId === id) {
+        setActiveAssetId(next.length > 0 ? next[next.length - 1].id : null);
+      }
+      return next;
+    });
+  };
+  const [width, setWidth] = React.useState(initialWidth);
   const isDragging = React.useRef(false);
   const startX = React.useRef(0);
-  const startWidth = React.useRef(DEFAULT_PREVIEW_WIDTH);
+  const startWidth = React.useRef(initialWidth);
 
   const handleMouseDown = React.useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -582,7 +670,7 @@ function PreviewPanel({
   }, [width]);
 
   return (
-    <div className="relative flex h-full shrink-0 flex-col bg-background-primary" style={{ width }}>
+    <div className="relative flex h-full min-h-0 shrink-0 flex-col overflow-hidden bg-background-primary" style={{ width }}>
       {/* Drag handle on left edge */}
       <div
         onMouseDown={handleMouseDown}
@@ -628,7 +716,7 @@ function PreviewPanel({
             aria-label="Close preview panel"
             icon={
               <span className="inline-flex rotate-180">
-                <Icon name="sidebarClosedIcon" size={16} />
+                <Icon name="sidebarOpenIcon" size={16} />
               </span>
             }
             size="small"
@@ -640,26 +728,53 @@ function PreviewPanel({
       </div>
 
       {/* Pane */}
-      <div className="flex min-h-0 flex-1 pb-3 pr-3">
-        {activeTab === "Assets" && assetForThread ? (
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden pb-3 pr-3">
+        {activeTab === "Review" ? (
+          <div className="flex w-full flex-1 flex-col items-center justify-center overflow-clip rounded-md border border-border bg-background-primary">
+            <MissingBranchGraphic />
+            <div className="flex flex-col items-center gap-2 px-6 pb-6 text-center">
+              <p className="text-[18px] font-semibold leading-6 text-text-primary">
+                No changes to display
+              </p>
+              <p className="text-paragraph text-text-secondary">
+                All the changes made by a thread will display here
+              </p>
+            </div>
+          </div>
+        ) : activeTab === "Assets" && openAssets.length > 0 ? (
           <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-md border border-border bg-background-primary">
             {/* Figma-style soft tab bar */}
-            <div className="flex h-8 shrink-0 items-center border-b border-border bg-background-secondary pr-1">
-              {/* Active tab */}
-              <div className="flex h-full items-center gap-1 border-r border-border bg-background-primary px-1 text-paragraph text-text-primary">
-                <div className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-sm">
-                  <Icon name={assetForThread.kind === "notebook" ? "notebookIcon" : "fileCodeIcon"} size={14} className="text-text-secondary" />
-                </div>
-                <span className="max-w-[160px] truncate">{assetForThread.name}</span>
-                <button
-                  type="button"
-                  aria-label="Close tab"
-                  onClick={() => setAssetForThread(null)}
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-text-secondary hover:bg-background-tertiary hover:text-text-primary"
-                >
-                  <Icon name="closeIcon" size={10} />
-                </button>
-              </div>
+            <div className="flex h-8 shrink-0 items-center overflow-x-auto border-b border-border bg-background-secondary pr-1">
+              {openAssets.map((asset) => {
+                const isActive = asset.id === activeAssetId;
+                const iconName = asset.kind === "notebook" ? "notebookIcon" : asset.kind === "dashboard" ? "dashboardIcon" : "fileCodeIcon";
+                return (
+                  <button
+                    key={asset.id}
+                    type="button"
+                    onClick={() => setActiveAssetId(asset.id)}
+                    className={cx(
+                      "flex h-full shrink-0 items-center gap-1 border-r border-border px-1 text-paragraph",
+                      isActive ? "bg-background-primary text-text-primary" : "text-text-secondary hover:bg-background-tertiary",
+                    )}
+                  >
+                    <div className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-sm">
+                      <Icon name={iconName} size={14} className="text-text-secondary" />
+                    </div>
+                    <span className="max-w-[140px] truncate">{asset.name}</span>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      aria-label="Close tab"
+                      onClick={(e) => { e.stopPropagation(); closeAssetTab(asset.id); }}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); closeAssetTab(asset.id); } }}
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-text-secondary hover:bg-background-tertiary hover:text-text-primary"
+                    >
+                      <Icon name="closeIcon" size={10} />
+                    </span>
+                  </button>
+                );
+              })}
               {/* Add tab */}
               <button
                 type="button"
@@ -669,10 +784,14 @@ function PreviewPanel({
                 <Icon name="plusIcon" size={14} />
               </button>
             </div>
-            <NotebookPreview asset={assetForThread} />
+            {activeAsset?.kind === "dashboard" ? (
+              <DashboardPreview />
+            ) : activeAsset ? (
+              <NotebookPreview asset={activeAsset} />
+            ) : null}
           </div>
         ) : (
-          <div className="flex w-full flex-col items-center justify-center overflow-clip rounded-md border border-border bg-background-primary">
+          <div className="flex w-full flex-1 flex-col items-center justify-center overflow-clip rounded-md border border-border bg-background-primary">
             <EmptyChartGraphic />
             <div className="flex flex-col items-center gap-2 px-6 pb-6 text-center">
               <p className="text-[18px] font-semibold leading-6 text-text-primary">
@@ -698,15 +817,27 @@ export default function ChatPage() {
   const [navCollapsed, setNavCollapsed] = React.useState(false);
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [selectedAsset, setSelectedAsset] = React.useState<ReviewAsset | null>(null);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const [initialPreviewWidth, setInitialPreviewWidth] = React.useState(DEFAULT_PREVIEW_WIDTH);
 
   const handleAssetClick = React.useCallback((asset: ReviewAsset) => {
     setSelectedAsset(asset);
+    if (containerRef.current) {
+      setInitialPreviewWidth(Math.round(containerRef.current.offsetWidth / 2));
+    }
     setPreviewOpen(true);
   }, []);
 
+  const handleTogglePreview = React.useCallback(() => {
+    if (!previewOpen && containerRef.current) {
+      setInitialPreviewWidth(Math.round(containerRef.current.offsetWidth / 2));
+    }
+    setPreviewOpen((v) => !v);
+  }, [previewOpen]);
+
   return (
     <main className="relative flex h-full min-h-0 w-full p-0">
-      <div className="flex h-full min-h-0 w-full overflow-hidden rounded-md">
+      <div ref={containerRef} className="flex h-full min-h-0 w-full overflow-hidden rounded-md">
         <ChatLeftNav
           threads={state.threads}
           activeThreadId={state.activeThreadId}
@@ -720,7 +851,7 @@ export default function ChatPage() {
           state={state}
           size="full"
           hideThreadToggle
-          onToggleNav={() => setPreviewOpen((v) => !v)}
+          onToggleNav={handleTogglePreview}
           previewOpen={previewOpen}
           onAssetClick={handleAssetClick}
         />
@@ -730,6 +861,7 @@ export default function ChatPage() {
             onClose={() => setPreviewOpen(false)}
             selectedAsset={selectedAsset}
             activeThreadId={state.activeThreadId}
+            initialWidth={initialPreviewWidth}
           />
         )}
       </div>

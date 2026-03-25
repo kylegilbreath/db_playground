@@ -27,7 +27,7 @@ export const SEED_THREADS: GenieThread[] = [
 ];
 
 export const GENIE_EXAMPLE_PROMPTS = [
-  "What can Genie Code do?",
+  "Do EDA on my ski_resort data",
   "Run exploratory data analysis",
   "Find data",
 ];
@@ -101,6 +101,7 @@ export function useGenieChatState() {
 
   const stepsForPrompt = React.useCallback((prompt: string): [ChatStep[], number[]] => {
     if (prompt.toLowerCase().includes("find data")) return [FIND_DATA_STEPS, FIND_DATA_DELAYS];
+    if (prompt.toLowerCase().includes("ski_resort") || prompt.toLowerCase().includes("ski resort")) return [SKI_RESORT_STEPS, SKI_RESORT_DELAYS];
     if (prompt.toLowerCase().includes("exploratory") || prompt.toLowerCase().includes("eda")) return [EDA_STEPS, EDA_DELAYS];
     return [SKI_RESORT_STEPS, SKI_RESORT_DELAYS];
   }, []);
@@ -194,7 +195,7 @@ function GenieChatEmptyState({
 }: {
   text: string;
   onTextChange: (v: string) => void;
-  onSubmit: () => void;
+  onSubmit: (promptOverride?: string) => void;
   size?: "compact" | "full";
 }) {
   const iconSize = size === "full" ? 64 : 40;
@@ -213,7 +214,7 @@ function GenieChatEmptyState({
         </div>
         <div className="mb-4 flex flex-wrap items-center justify-center gap-2">
           {GENIE_EXAMPLE_PROMPTS.map((prompt) => (
-            <DefaultButton key={prompt} radius="full" onClick={() => { onTextChange(prompt); onSubmit(); }}>
+            <DefaultButton key={prompt} radius="full" onClick={() => onSubmit(prompt)}>
               {prompt}
             </DefaultButton>
           ))}
@@ -290,12 +291,11 @@ export function GenieChatThreadList({
                 type="button"
                 onClick={() => onSelect(t.id)}
                 className={cx(
-                  "flex w-full items-center gap-1 rounded-md py-2 pr-2 text-left text-paragraph leading-5 text-text-primary hover:bg-background-secondary",
-                  hasIcon ? "pl-2" : "pl-[26px]",
+                  "flex w-full items-center gap-1 rounded-md py-2 pr-2 pl-2 text-left text-paragraph leading-5 text-text-primary hover:bg-background-secondary",
                   activeThreadId === t.id && "bg-background-secondary",
                 )}
               >
-                {hasIcon && <ThreadStatusIcon status={t.status} />}
+                {hasIcon ? <ThreadStatusIcon status={t.status} /> : <span className="inline-block w-[14px] shrink-0" />}
                 <span className="min-w-0 flex-1 truncate">{t.label}</span>
               </button>
             );
@@ -412,7 +412,7 @@ export function GenieChatBody({
   const composerMaxW = size === "full" ? "max-w-[790px]" : undefined;
 
   return (
-    <div className="flex min-w-0 flex-1 overflow-hidden">
+    <div className="flex h-full min-w-0 flex-1 overflow-hidden">
       {/* Main area */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Header */}
@@ -462,12 +462,11 @@ export function GenieChatBody({
               aria-label="Toggle preview panel"
               icon={
                 <span className="inline-flex rotate-180">
-                  <Icon name={previewOpen ? "sidebarOpenIcon" : "sidebarClosedIcon"} size={16} />
+                  <Icon name="sidebarClosedIcon" size={16} />
                 </span>
               }
               size="small"
               tone="neutral"
-              className={cx(previewOpen && "!bg-background-tertiary")}
               onClick={onToggleNav}
             />
           )}
@@ -514,6 +513,7 @@ export function GenieChatBody({
                   reviewAssets={hasAssets && runStatus === "done"
                     ? (steps.find((s) => s.type === "assets-summary") as any)?.assets as ReviewAsset[]
                     : undefined}
+                  onAssetClick={onAssetClick}
                 />
               </div>
             </div>

@@ -21,7 +21,7 @@ export function AgentChat({
   onAssetClick?: (asset: ReviewAsset) => void;
 }) {
   return (
-    <>
+    <div className="flex flex-col gap-md">
       {steps.map((step) => {
         switch (step.type) {
           case "user":
@@ -31,13 +31,14 @@ export function AgentChat({
           case "thinking":
             return <ThinkingBlock key={step.id} step={step} />;
           case "action-group":
-            return <ActionGroup key={step.id} step={step} />;
+            return <ActionGroup key={step.id} step={step} onAssetClick={onAssetClick} />;
           case "tool-confirmation":
             return (
               <ToolConfirmationCard
                 key={step.id}
                 step={step}
                 onAllow={onToolAllow ? () => onToolAllow(step.id) : undefined}
+                onAssetClick={onAssetClick}
               />
             );
           case "assets-summary":
@@ -50,6 +51,6 @@ export function AgentChat({
             return null;
         }
       })}
-    </>
+    </div>
   );
 }

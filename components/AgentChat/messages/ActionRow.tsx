@@ -3,11 +3,11 @@ import { Icon } from "@/components/icons";
 import { AssetChip } from "../primitives/AssetChip";
 import type { AgentAction } from "../types";
 
-export function ActionRow({ action }: { action: AgentAction }) {
+export function ActionRow({ action, onAssetClick }: { action: AgentAction; onAssetClick?: (asset: AgentAction["asset"]) => void }) {
   return (
     <div className="flex items-center gap-xs text-paragraph leading-5">
       <span className="text-text-secondary">{action.verb}</span>
-      <AssetChip asset={action.asset} />
+      <AssetChip asset={action.asset} onClick={onAssetClick} />
       {action.status === "done" && (
         <Icon name="checkIcon" size={14} className="ml-auto text-green-500" />
       )}

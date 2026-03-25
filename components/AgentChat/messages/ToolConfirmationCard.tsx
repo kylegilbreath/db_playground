@@ -4,7 +4,7 @@ import { Icon } from "@/components/icons";
 import { DefaultButton } from "@/components/DefaultButton";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { AssetChip } from "../primitives/AssetChip";
-import type { ToolConfirmationMessage } from "../types";
+import type { ToolConfirmationMessage, ReviewAsset } from "../types";
 
 type CardStatus = "asking" | "running" | "done" | "declined";
 
@@ -32,9 +32,11 @@ function Spinner() {
 export function ToolConfirmationCard({
   step,
   onAllow,
+  onAssetClick,
 }: {
   step: ToolConfirmationMessage;
   onAllow?: () => void;
+  onAssetClick?: (asset: ReviewAsset) => void;
 }) {
   const [status, setStatus] = React.useState<CardStatus>("asking");
   const [expanded, setExpanded] = React.useState(false);
@@ -44,6 +46,12 @@ export function ToolConfirmationCard({
   const handleAllow = () => { setStatus("running"); onAllow?.(); };
   const handleDecline = () => setStatus("declined");
   const handleCancel = () => setStatus("asking");
+
+  React.useEffect(() => {
+    if (status !== "running") return;
+    const t = setTimeout(() => setStatus("done"), 2400);
+    return () => clearTimeout(t);
+  }, [status]);
 
   const isAsking = status === "asking";
 
@@ -59,13 +67,13 @@ export function ToolConfirmationCard({
       <button
         type="button"
         onClick={() => isAsking && setExpanded((e) => !e)}
-        className="flex w-full cursor-pointer items-center p-1 text-left"
+        className="flex w-full cursor-pointer items-center px-3 py-2 text-left"
         disabled={!isAsking}
       >
         {/* Left: expand chevron + label */}
         <div className="flex min-w-0 flex-1 items-center">
           {isAsking && (
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center text-text-secondary">
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center text-text-secondary">
               <Icon
                 name={expanded ? "chevronDownIcon" : "chevronRightIcon"}
                 size={12}
@@ -90,7 +98,7 @@ export function ToolConfirmationCard({
 
       {/* Footer */}
       {isAsking && (
-        <div className="flex items-center justify-between border-t border-border p-1">
+        <div className="flex items-center justify-between border-t border-border px-3 py-2">
           {/* Permission dropdown */}
           <button
             type="button"
@@ -114,7 +122,7 @@ export function ToolConfirmationCard({
       )}
 
       {status === "running" && (
-        <div className="flex items-center justify-end border-t border-border p-1">
+        <div className="flex items-center justify-end border-t border-border px-3 py-2">
           <DefaultButton size="small" onClick={handleCancel}>
             Cancel
           </DefaultButton>

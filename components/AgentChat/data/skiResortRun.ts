@@ -82,7 +82,7 @@ export const SKI_RESORT_STEPS: ChatStep[] = [
         ],
       },
       { id: "f1", name: "ski_resort_eda.py", kind: "file", diffCount: 10 },
-      { id: "dash1", name: "Ski Resort Dashboard 2026-03-10", kind: "model" },
+      { id: "dash1", name: "Ski Resort Dashboard 2026-03-10", kind: "dashboard" },
     ],
   },
   {

@@ -1,4 +1,4 @@
-export type AssetKind = "notebook" | "file" | "model" | "table";
+export type AssetKind = "notebook" | "file" | "model" | "table" | "dashboard";
 
 export interface Asset {
   id: string;

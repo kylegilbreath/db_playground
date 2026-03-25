@@ -9,6 +9,7 @@ function iconForKind(kind: Asset["kind"]): string {
     case "file": return "fileCodeIcon";
     case "model": return "fileDocumentIcon";
     case "table": return "tableIcon";
+    case "dashboard": return "dashboardIcon";
   }
 }
 

@@ -33,7 +33,7 @@ export function CollapsibleSection({
         />
         {label}
       </button>
-      {open && <div className="flex flex-col gap-xs pl-sm">{children}</div>}
+      {open && <div className="flex flex-col gap-sm pl-sm">{children}</div>}
     </div>
   );
 }

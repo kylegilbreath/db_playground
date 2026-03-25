@@ -15,10 +15,12 @@ function ReviewPanel({
   assets,
   onRejectAll,
   onAcceptAll,
+  onAssetClick,
 }: {
   assets: ReviewAsset[];
   onRejectAll?: () => void;
   onAcceptAll?: () => void;
+  onAssetClick?: (asset: ReviewAsset) => void;
 }) {
   const [open, setOpen] = React.useState(true);
   const label = `${assets.length} asset${assets.length !== 1 ? "s" : ""}`;
@@ -48,7 +50,7 @@ function ReviewPanel({
       {open && (
         <div className="flex flex-col border-t border-border pb-1">
           {assets.map((asset) => (
-            <AssetRow key={asset.id} asset={asset} />
+            <AssetRow key={asset.id} asset={asset} onAssetClick={onAssetClick} />
           ))}
         </div>
       )}
@@ -70,6 +72,7 @@ export type PromptBarProps = {
   reviewAssets?: ReviewAsset[];
   onRejectAll?: () => void;
   onAcceptAll?: () => void;
+  onAssetClick?: (asset: ReviewAsset) => void;
 };
 
 export function PromptBar({
@@ -81,6 +84,7 @@ export function PromptBar({
   reviewAssets,
   onRejectAll,
   onAcceptAll,
+  onAssetClick,
 }: PromptBarProps) {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const isRunning = runStatus === "running";
@@ -106,6 +110,7 @@ export function PromptBar({
             assets={reviewAssets}
             onRejectAll={onRejectAll}
             onAcceptAll={onAcceptAll}
+            onAssetClick={onAssetClick}
           />
         )}
 

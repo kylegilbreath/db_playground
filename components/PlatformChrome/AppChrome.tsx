@@ -498,7 +498,7 @@ function AppChromeInner({ className, children }: AppChromeProps) {
           ) : (
             <div className="min-w-0 flex-1 p-sm">
               <div className="h-full overflow-hidden rounded-md shadow-[var(--elevation-shadow-md)]">
-                <div className="app-scroll h-full overflow-y-auto bg-background-primary">
+                <div className={cx("h-full bg-background-primary", pathname === "/chat" ? "overflow-hidden" : "app-scroll overflow-y-auto")}>
                   {children}
                 </div>
               </div>
