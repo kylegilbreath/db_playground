@@ -353,7 +353,7 @@ function ChatLeftNav({
               onClick={onNewChat}
               className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-paragraph text-text-primary hover:bg-background-secondary"
             >
-              <Icon name="newChatIcon" size={14} className="shrink-0 text-text-secondary" />
+              <Icon name="newThreadIcon" size={14} className="shrink-0 text-text-secondary" />
               New chat
             </button>
             <button

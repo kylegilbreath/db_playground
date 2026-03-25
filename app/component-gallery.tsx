@@ -114,7 +114,7 @@ export async function ComponentGallery() {
               "discoverIcon",
               "homeIcon",
               "speechBubbleIcon",
-              "newChatIcon",
+              "newThreadIcon",
               "sidebarClosedIcon",
               "sidebarOpenIcon",
               "threadAttentionIcon",
