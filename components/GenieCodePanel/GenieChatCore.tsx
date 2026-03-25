@@ -18,12 +18,12 @@ import { Icon } from "@/components/icons";
 // ---------------------------------------------------------------------------
 
 export type ThreadStatus = "running" | "attention" | "input" | "done";
-export type GenieThread = { id: string; label: string; status: ThreadStatus };
+export type GenieThread = { id: string; label: string; status: ThreadStatus; time?: string; subtitle?: string };
 
 export const SEED_THREADS: GenieThread[] = [
-  { id: "thread-eda", label: "EDA on ski resort properties with a 6 month forecast", status: "done" },
-  { id: "thread-revenue", label: "What is my dumpling sales revenue by category", status: "attention" },
-  { id: "thread-input", label: "Cluster resorts into groups based on price, size, and snowfall", status: "done" },
+  { id: "thread-eda", label: "EDA on ski resort properties with a 6 month forecast", status: "done", time: "2h", subtitle: "Created Ski Resort EDA notebook, ran forecast model" },
+  { id: "thread-revenue", label: "What is my dumpling sales revenue by category", status: "attention", time: "1d", subtitle: "Needs your input to continue" },
+  { id: "thread-input", label: "Cluster resorts into groups based on price, size, and snowfall", status: "done", time: "3d", subtitle: "Opened ski_resort_eda.py, ran clustering analysis" },
 ];
 
 export const GENIE_EXAMPLE_PROMPTS = [
@@ -87,11 +87,11 @@ export function useGenieChatState() {
             // Pause — store remaining steps, set thread to "input"
             pendingStepsRef.current = { steps: runSteps.slice(pauseAt + 1), threadId };
             setRunStatus("done");
-            setThreads((prev) => prev.map((t) => t.id === threadId ? { ...t, status: "input" as ThreadStatus } : t));
+            setThreads((prev) => prev.map((t) => t.id === threadId ? { ...t, status: "input" as ThreadStatus, time: "now", subtitle: "Waiting for your approval" } : t));
           } else {
             // No confirmation or confirmation is last step — done
             setRunStatus("done");
-            setThreads((prev) => prev.map((t) => t.id === threadId ? { ...t, status: "attention" as ThreadStatus } : t));
+            setThreads((prev) => prev.map((t) => t.id === threadId ? { ...t, status: "attention" as ThreadStatus, time: "now", subtitle: "Completed" } : t));
           }
         }
       }, delays[i]);
@@ -99,7 +99,9 @@ export function useGenieChatState() {
     });
   }, []);
 
-  const stepsForPrompt = React.useCallback((prompt: string): [ChatStep[], number[]] => {
+  const stepsForPrompt = React.useCallback((prompt: string, runHint?: string): [ChatStep[], number[]] => {
+    if (runHint === "eda") return [EDA_STEPS, EDA_DELAYS];
+    if (runHint === "ski") return [SKI_RESORT_STEPS, SKI_RESORT_DELAYS];
     if (prompt.toLowerCase().includes("find data")) return [FIND_DATA_STEPS, FIND_DATA_DELAYS];
     if (prompt.toLowerCase().includes("ski_resort") || prompt.toLowerCase().includes("ski resort")) return [SKI_RESORT_STEPS, SKI_RESORT_DELAYS];
     if (prompt.toLowerCase().includes("exploratory") || prompt.toLowerCase().includes("eda")) return [EDA_STEPS, EDA_DELAYS];
@@ -114,16 +116,16 @@ export function useGenieChatState() {
     setSteps(threadStepsRef.current.get(id) ?? []);
   }, []);
 
-  const handleSubmit = React.useCallback((promptOverride?: string) => {
+  const handleSubmit = React.useCallback((promptOverride?: string, runHint?: string) => {
     const trimmed = (typeof promptOverride === "string" ? promptOverride : text).trim();
     if (!trimmed || runStatus === "running") return;
     const newId = `thread-${Date.now()}`;
     setText("");
     setRunStatus("running");
     setActiveThreadId(newId);
-    setThreads((prev) => [{ id: newId, label: trimmed, status: "running" }, ...prev]);
+    setThreads((prev) => [{ id: newId, label: trimmed, status: "running", time: "now", subtitle: "Running…" }, ...prev]);
     setSteps([{ type: "user", id: "user-msg", text: trimmed }]);
-    const [runSteps, delays] = stepsForPrompt(trimmed);
+    const [runSteps, delays] = stepsForPrompt(trimmed, runHint);
     streamRun(runSteps, delays, newId);
   }, [text, runStatus, stepsForPrompt, streamRun]);
 
@@ -204,22 +206,24 @@ function GenieChatEmptyState({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-8">
-      <div className={cx("w-full", maxW)}>
-        <div className={cx("mb-6 flex flex-col items-center", gap)}>
+      <div className={cx("flex w-full flex-col items-center", maxW, size === "full" ? "gap-8" : "gap-6")}>
+        <div className={cx("flex flex-col items-center", gap)}>
           <GenieChatIcon size={iconSize} />
           <div className="flex flex-col items-center gap-1">
             <h2 className="text-heading-m font-semibold text-text-primary">Genie Code</h2>
             <p className="text-paragraph text-text-secondary">Run multi-step data and AI tasks</p>
           </div>
         </div>
-        <div className="mb-4 flex flex-wrap items-center justify-center gap-2">
+        <div className="flex w-full flex-wrap items-center justify-center gap-2">
           {GENIE_EXAMPLE_PROMPTS.map((prompt) => (
             <DefaultButton key={prompt} radius="full" onClick={() => onSubmit(prompt)}>
               {prompt}
             </DefaultButton>
           ))}
         </div>
-        <PromptBar value={text} onValueChange={onTextChange} onSubmit={onSubmit} />
+        <div className="w-full">
+          <PromptBar value={text} onValueChange={onTextChange} onSubmit={onSubmit} />
+        </div>
       </div>
     </div>
   );
@@ -291,12 +295,20 @@ export function GenieChatThreadList({
                 type="button"
                 onClick={() => onSelect(t.id)}
                 className={cx(
-                  "flex w-full items-center gap-1 rounded-md py-2 pr-2 pl-2 text-left text-paragraph leading-5 text-text-primary hover:bg-background-secondary",
+                  "flex w-full items-start gap-2 rounded-md py-2 pr-2 pl-2 text-left hover:bg-background-secondary",
                   activeThreadId === t.id && "bg-background-secondary",
                 )}
               >
-                {hasIcon ? <ThreadStatusIcon status={t.status} /> : <span className="inline-block w-[14px] shrink-0" />}
-                <span className="min-w-0 flex-1 truncate">{t.label}</span>
+                <span className="mt-[3px] shrink-0">
+                  {hasIcon ? <ThreadStatusIcon status={t.status} /> : <span className="inline-block w-[14px]" />}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-baseline gap-1">
+                    <span className="min-w-0 flex-1 truncate text-paragraph leading-5 text-text-primary">{t.label}</span>
+                    {t.time && <span className="shrink-0 text-hint text-text-secondary">{t.time}</span>}
+                  </span>
+                  {t.subtitle && <span className="block truncate text-hint text-text-secondary">{t.subtitle}</span>}
+                </span>
               </button>
             );
           })}
@@ -306,7 +318,7 @@ export function GenieChatThreadList({
   );
 }
 
-function GenieChatThreadSidebar({
+export function GenieChatThreadSidebar({
   threads,
   activeThreadId,
   onSelect,
@@ -322,7 +334,7 @@ function GenieChatThreadSidebar({
   return (
     <div className="flex h-full w-[180px] shrink-0 flex-col border-l border-border">
       <div className="flex h-10 shrink-0 items-center px-3">
-        <span className="flex-1 text-paragraph font-medium text-text-primary">Chat</span>
+        <span className="flex-1 text-paragraph font-medium text-text-primary">Chat history</span>
         <IconButton
           aria-label="Collapse sidebar"
           icon={<Icon name="sidebarCollapseIcon" size={14} />}
@@ -373,7 +385,125 @@ export type GenieChatBodyProps = {
   previewOpen?: boolean;
   /** Called when the user clicks an asset chip in the chat. */
   onAssetClick?: (asset: ReviewAsset) => void;
+  /** Controlled thread sidebar open state (optional — uncontrolled if omitted). */
+  threadSidebarOpen?: boolean;
+  /** Called when the thread sidebar should open or close. */
+  onThreadSidebarChange?: (open: boolean) => void;
+  /** Called to close/toggle the chat side panel (compact mode). */
+  onClosePanel?: () => void;
 };
+
+// ---------------------------------------------------------------------------
+// Tooltip
+// ---------------------------------------------------------------------------
+
+function Tip({ label, children, align = "right" }: { label: string; children: React.ReactNode; align?: "center" | "left" | "right" }) {
+  const posClass = align === "left" ? "left-0" : align === "right" ? "right-0" : "left-1/2 -translate-x-1/2";
+  const caretClass = align === "left" ? "left-2" : align === "right" ? "right-2" : "left-1/2 -translate-x-1/2";
+  return (
+    <div className="group relative">
+      {children}
+      <div className={`pointer-events-none absolute top-full z-50 mt-1.5 whitespace-nowrap rounded bg-[#161616] px-2 py-1 text-hint text-white opacity-0 transition-opacity group-hover:opacity-100 ${posClass}`}>
+        <span className={`absolute bottom-full border-4 border-transparent border-b-[#161616] ${caretClass}`} />
+        {label}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// More-options dropdown menu
+// ---------------------------------------------------------------------------
+
+const MORE_OPTIONS_ITEMS = [
+  { icon: "gearOutlinedIcon", label: "Settings" },
+  { icon: "shareIcon", label: "Share chat thread" },
+  { icon: "BranchIcon", label: "Clone chat thread" },
+  { icon: "questionMarkOutlinedIcon", label: "Help" },
+  { icon: "speechBubbleIcon", label: "Send feedback to Databricks" },
+] as const;
+
+function MoreOptionsMenu({
+  onClose,
+  onTogglePanel,
+  onFullScreen,
+  isFullScreen,
+}: {
+  onClose: () => void;
+  onTogglePanel?: () => void;
+  onFullScreen?: () => void;
+  isFullScreen?: boolean;
+}) {
+  const ref = React.useRef<HTMLDivElement>(null);
+  const [incognito, setIncognito] = React.useState(false);
+
+  React.useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [onClose]);
+
+  return (
+    <div
+      ref={ref}
+      className="absolute right-2 top-9 z-50 min-w-[220px] overflow-hidden rounded border border-border bg-background-primary py-1 shadow-[0px_2px_16px_0px_rgba(0,0,0,0.08)]"
+    >
+      {/* Top actions */}
+      <div className="pb-1">
+        {!isFullScreen && onTogglePanel && (
+          <button
+            type="button"
+            onClick={() => { onTogglePanel(); onClose(); }}
+            className="flex w-full items-center justify-between px-2 py-1 text-left text-paragraph text-text-primary hover:bg-background-secondary"
+          >
+            <span>Close chat pane</span>
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => { onFullScreen?.(); onClose(); }}
+          className="flex w-full items-center justify-between px-2 py-1 text-left text-paragraph text-text-primary hover:bg-background-secondary"
+        >
+          <span>{isFullScreen ? "Minimize chat" : "Maximize chat"}</span>
+          <span className="text-hint text-text-secondary">⌥⌘M</span>
+        </button>
+      </div>
+      <div className="mb-1 border-t border-border" />
+      {MORE_OPTIONS_ITEMS.map(({ icon, label }) => (
+        <button
+          key={label}
+          type="button"
+          onClick={onClose}
+          className="flex w-full items-center gap-sm px-2 py-1 text-left text-paragraph text-text-primary hover:bg-background-secondary"
+        >
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center py-1">
+            <Icon name={icon} size={16} className="text-text-secondary" />
+          </span>
+          <span className="py-0.5">{label}</span>
+        </button>
+      ))}
+      {/* Divider + Incognito toggle */}
+      <div className="mt-1 border-t border-border px-2 pb-1 pt-2">
+        <div className="flex items-center justify-between">
+          <span className="text-paragraph text-text-primary">Incognito</span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={incognito}
+            onClick={() => setIncognito((v) => !v)}
+            className={`relative inline-flex h-[18px] w-[32px] shrink-0 cursor-pointer rounded-full transition-colors ${incognito ? "bg-action-default-background-press" : "bg-background-tertiary"}`}
+          >
+            <span
+              className={`absolute top-[2px] h-[14px] w-[14px] rounded-full bg-white shadow-sm transition-transform ${incognito ? "translate-x-[16px]" : "translate-x-[2px]"}`}
+            />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function GenieChatBody({
   state,
@@ -383,6 +513,9 @@ export function GenieChatBody({
   onToggleNav,
   previewOpen = false,
   onAssetClick,
+  threadSidebarOpen: threadSidebarOpenProp,
+  onThreadSidebarChange,
+  onClosePanel,
 }: GenieChatBodyProps) {
   const {
     text,
@@ -401,7 +534,14 @@ export function GenieChatBody({
     timersRef: timers,
   } = state;
 
-  const [threadSidebarOpen, setThreadSidebarOpen] = React.useState(false);
+  const [threadSidebarOpenInternal, setThreadSidebarOpenInternal] = React.useState(false);
+  const threadSidebarOpen = threadSidebarOpenProp ?? threadSidebarOpenInternal;
+  const [moreMenuOpen, setMoreMenuOpen] = React.useState(false);
+
+  const setThreadSidebar = React.useCallback((open: boolean) => {
+    setThreadSidebarOpenInternal(open);
+    onThreadSidebarChange?.(open);
+  }, [onThreadSidebarChange]);
 
   const handleStop = React.useCallback(() => {
     timers.current.forEach(clearTimeout);
@@ -416,7 +556,7 @@ export function GenieChatBody({
       {/* Main area */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Header */}
-        <div className={cx("flex h-10 shrink-0 items-center gap-xs px-3", size === "compact" && "border-b border-border")}>
+        <div className={cx("relative flex h-10 shrink-0 items-center gap-xs px-3", size === "compact" && "border-b border-border")}>
           {(size === "compact" || activeThreadTitle) && (
             <span className="min-w-0 flex-1 truncate text-paragraph font-medium text-text-primary">
               {activeThreadTitle ?? "Genie Code"}
@@ -424,61 +564,91 @@ export function GenieChatBody({
           )}
           {size === "full" && !activeThreadTitle && <div className="flex-1" />}
           {!previewOpen && (
-            <IconButton
-              aria-label="Status"
-              icon={<span className="inline-block h-2.5 w-2.5 rounded-full bg-green-500" />}
-              size="small"
-              tone="neutral"
-            />
+            <Tip label="Connected to Serverless compute">
+              <IconButton
+                aria-label="Status"
+                icon={<span className="inline-block h-2.5 w-2.5 rounded-full bg-green-500" />}
+                size="small"
+                tone="neutral"
+              />
+            </Tip>
           )}
           {size === "compact" && (
-            <IconButton
-              aria-label="New chat"
-              icon={<Icon name="newChatIcon" size={14} />}
-              size="small"
-              tone="neutral"
-              onClick={handleNewChat}
-            />
+            <Tip label="New chat">
+              <IconButton
+                aria-label="New chat"
+                icon={<Icon name="newChatIcon" size={14} />}
+                size="small"
+                tone="neutral"
+                onClick={handleNewChat}
+              />
+            </Tip>
           )}
-          {!hideThreadToggle && !threadSidebarOpen && (
-            <IconButton
-              aria-label="Open chat history"
-              icon={<Icon name="historyIcon" size={14} />}
-              size="small"
-              tone="neutral"
-              onClick={() => setThreadSidebarOpen(true)}
-            />
+          {!hideThreadToggle && (
+            <Tip label="Chat history" align="right">
+              <IconButton
+                aria-label={threadSidebarOpen ? "Close chat history" : "Open chat history"}
+                icon={<Icon name="historyIcon" size={14} className={threadSidebarOpen ? "text-text-primary" : ""} />}
+                size="small"
+                tone="neutral"
+                className={threadSidebarOpen ? "!bg-background-tertiary" : ""}
+                onClick={() => setThreadSidebar(!threadSidebarOpen)}
+              />
+            </Tip>
           )}
           {!previewOpen && (
-            <IconButton
-              aria-label="More options"
-              icon={<Icon name="overflowIcon" size={14} />}
-              size="small"
-              tone="neutral"
-            />
+            <>
+              <IconButton
+                aria-label="More options"
+                icon={<Icon name="overflowIcon" size={14} />}
+                size="small"
+                tone="neutral"
+                onClick={() => setMoreMenuOpen((v) => !v)}
+              />
+              {moreMenuOpen && (
+                <MoreOptionsMenu
+                  onClose={() => setMoreMenuOpen(false)}
+                  onTogglePanel={onClosePanel}
+                  onFullScreen={onFullScreen}
+                  isFullScreen={size === "full"}
+                />
+              )}
+            </>
           )}
           {size === "full" && onToggleNav && !previewOpen && (
-            <IconButton
-              aria-label="Toggle preview panel"
-              icon={
-                <span className="inline-flex rotate-180">
-                  <Icon name="sidebarClosedIcon" size={16} />
-                </span>
-              }
-              size="small"
-              tone="neutral"
-              onClick={onToggleNav}
-            />
+            <div className="group relative">
+              <IconButton
+                aria-label="Toggle preview panel"
+                icon={
+                  <span className="inline-flex rotate-180">
+                    <Icon name="sidebarClosedIcon" size={16} />
+                  </span>
+                }
+                size="small"
+                tone="neutral"
+                onClick={onToggleNav}
+              />
+              <div className="pointer-events-none absolute right-0 top-full z-50 mt-1.5 whitespace-nowrap rounded bg-[#161616] px-2 py-1 text-hint text-white opacity-0 transition-opacity group-hover:opacity-100">
+                <span className="absolute bottom-full right-2 border-4 border-transparent border-b-[#161616]" />
+                Toggle preview panel
+              </div>
+            </div>
           )}
-          {onFullScreen && (
-            <IconButton
-              aria-label="Open full screen"
-              icon={<Icon name="fullscreenIcon" size={14} />}
-              tone="neutral"
-              size="small"
-              className="border border-border"
-              onClick={onFullScreen}
-            />
+          {onFullScreen && size !== "full" && (
+            <div className="group relative">
+              <IconButton
+                aria-label="Maximize chat"
+                icon={<Icon name="fullscreenIcon" size={14} />}
+                tone="neutral"
+                size="small"
+                onClick={onFullScreen}
+              />
+              {/* Tooltip */}
+              <div className="pointer-events-none absolute right-0 top-full z-50 mt-1.5 whitespace-nowrap rounded bg-[#161616] px-2 py-1 text-hint text-white opacity-0 transition-opacity group-hover:opacity-100">
+                <span className="absolute bottom-full right-2 border-4 border-transparent border-b-[#161616]" />
+                Maximize chat
+              </div>
+            </div>
           )}
         </div>
 
@@ -521,16 +691,6 @@ export function GenieChatBody({
         )}
       </div>
 
-      {/* Thread sidebar (compact mode only — full-screen uses the left nav) */}
-      {!hideThreadToggle && threadSidebarOpen && (
-        <GenieChatThreadSidebar
-          threads={threads}
-          activeThreadId={activeThreadId}
-          onSelect={handleSelectThread}
-          onNewChat={handleNewChat}
-          onClose={() => setThreadSidebarOpen(false)}
-        />
-      )}
     </div>
   );
 }

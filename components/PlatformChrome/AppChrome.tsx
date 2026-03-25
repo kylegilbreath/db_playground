@@ -80,6 +80,15 @@ function AppChromeInner({ className, children }: AppChromeProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  React.useEffect(() => {
+    if (pathname === "/chat") {
+      setGenieCodeOpen(false);
+    } else if (sessionStorage.getItem("openGeniePanel") === "1") {
+      sessionStorage.removeItem("openGeniePanel");
+      setGenieCodeOpen(true);
+    }
+  }, [pathname]);
+
   const appConfig = resolveAppConfig(pathname);
 
   const [theme, setTheme] = React.useState<"light" | "dark">("dark");
@@ -506,7 +515,7 @@ function AppChromeInner({ className, children }: AppChromeProps) {
           )}
 
           {genieCodeOpen && !isEditorRoute && (
-            <div className="h-full shrink-0 py-sm pr-sm" style={{ width: panelWidth }}>
+            <div className="h-full shrink-0 py-sm pr-sm">
               <GenieCodeSidePanel
                 onClose={() => setGenieCodeOpen(false)}
                 width={panelWidth}

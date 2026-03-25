@@ -148,6 +148,7 @@ function QuickChipsRow({
 export default function Home() {
   const router = useRouter();
   const [query, setQuery] = React.useState("");
+  const [mode, setMode] = React.useState<"search" | "ask">("search");
   const GOLDEN_DEMO_QUERY = "customer churn";
 
   const quickChips: QuickChip[] = [
@@ -392,10 +393,15 @@ export default function Home() {
             defaultMode="search"
             value={query}
             onValueChange={setQuery}
+            onModeChange={setMode}
             onSubmit={() => {
               if (!query.trim()) return;
-              setQuery(GOLDEN_DEMO_QUERY);
-              router.push(`/search?q=${encodeURIComponent(GOLDEN_DEMO_QUERY)}`);
+              if (mode === "ask") {
+                router.push(`/chat?prompt=${encodeURIComponent(query.trim())}`);
+              } else {
+                setQuery(GOLDEN_DEMO_QUERY);
+                router.push(`/search?q=${encodeURIComponent(GOLDEN_DEMO_QUERY)}`);
+              }
             }}
           />
         </div>

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { Icon } from "@/components/icons";
 
-import { useGenieChatState, GenieChatBody } from "./GenieChatCore";
+import { useGenieChatState, GenieChatBody, GenieChatThreadSidebar } from "./GenieChatCore";
 
 function cx(...parts: Array<string | undefined | false>) {
   return parts.filter(Boolean).join(" ");
@@ -87,8 +87,12 @@ export function GenieCodeSidePanel({
 }: GenieCodeSidePanelProps) {
   const router = useRouter();
   const state = useGenieChatState();
+  const [threadSidebarOpen, setThreadSidebarOpen] = React.useState(false);
 
-  const containerStyle = width !== undefined ? { width } : undefined;
+  const SIDEBAR_WIDTH = 180;
+  const containerStyle = width !== undefined
+    ? { width: width + (threadSidebarOpen ? SIDEBAR_WIDTH : 0) }
+    : undefined;
 
   return (
     <div
@@ -107,7 +111,19 @@ export function GenieCodeSidePanel({
         state={state}
         size="compact"
         onFullScreen={() => { onClose(); router.push("/chat"); }}
+        threadSidebarOpen={threadSidebarOpen}
+        onThreadSidebarChange={setThreadSidebarOpen}
+        onClosePanel={onClose}
       />
+      {threadSidebarOpen && (
+        <GenieChatThreadSidebar
+          threads={state.threads}
+          activeThreadId={state.activeThreadId}
+          onSelect={state.handleSelectThread}
+          onNewChat={state.handleNewChat}
+          onClose={() => setThreadSidebarOpen(false)}
+        />
+      )}
 
       {/* Right rail */}
       {showRightRail && (

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Icon } from "@/components/icons";
+import { GenieChatIcon } from "@/components/GenieChatIcon";
 
 export type AnythingBoxMode = "search" | "ask";
 
@@ -25,6 +26,7 @@ function SegmentButton({
   label,
   iconName,
   showIcon,
+  leadingNode,
   onClick,
 }: {
   selected: boolean;
@@ -32,6 +34,7 @@ function SegmentButton({
   label: string;
   iconName: string;
   showIcon: boolean;
+  leadingNode?: React.ReactNode;
   onClick: () => void;
 }) {
   return (
@@ -48,7 +51,7 @@ function SegmentButton({
       onClick={locked ? undefined : onClick}
       type="button"
     >
-      {showIcon ? <Icon name={iconName} size={16} /> : null}
+      {leadingNode ?? (showIcon ? <Icon name={iconName} size={16} /> : null)}
       <span>{label}</span>
     </button>
   );
@@ -71,20 +74,21 @@ export function AnythingBoxModeToggle({
       aria-label="Mode"
     >
       <SegmentButton
-        selected={mode === "ask"}
-        locked={locked}
-        label="Ask"
-        iconName="SparkleIcon"
-        showIcon={showIcons}
-        onClick={() => onModeChange?.("ask")}
-      />
-      <SegmentButton
         selected={mode === "search"}
         locked={locked}
         label="Search"
         iconName="searchIcon"
         showIcon={showIcons}
         onClick={() => onModeChange?.("search")}
+      />
+      <SegmentButton
+        selected={mode === "ask"}
+        locked={locked}
+        label="Ask"
+        iconName="SparkleIcon"
+        showIcon={showIcons}
+        leadingNode={<GenieChatIcon size={16} />}
+        onClick={() => onModeChange?.("ask")}
       />
     </div>
   );

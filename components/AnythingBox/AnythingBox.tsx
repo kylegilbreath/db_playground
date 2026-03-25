@@ -259,7 +259,7 @@ export function AnythingBox({
         </div>
         <div className="flex-1" />
         <AnythingBoxSubmitButton
-          direction={mode === "ask" ? "up" : "right"}
+          direction="right"
           disabled={!value.trim()}
           loading={loading}
           onClick={onSubmit}

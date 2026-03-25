@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { DefaultButton } from "@/components/DefaultButton";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { Icon } from "@/components/icons";
@@ -18,7 +19,7 @@ function cx(...parts: Array<string | undefined | false>) {
   return parts.filter(Boolean).join(" ");
 }
 
-const DEFAULT_NAV_WIDTH = 220;
+const DEFAULT_NAV_WIDTH = 320;
 const MIN_NAV_WIDTH = 160;
 const MAX_NAV_WIDTH = 480;
 
@@ -31,6 +32,26 @@ type SidePanel = "tools" | "connections";
 // ---------------------------------------------------------------------------
 // Toggle switch (inline, no external component needed)
 // ---------------------------------------------------------------------------
+
+function Tooltip({ label, children, align = "center" }: { label: string; children: React.ReactNode; align?: "center" | "left" | "right" }) {
+  const posClass =
+    align === "left" ? "left-0" :
+    align === "right" ? "right-0" :
+    "left-1/2 -translate-x-1/2";
+  const caretClass =
+    align === "left" ? "left-2" :
+    align === "right" ? "right-2" :
+    "left-1/2 -translate-x-1/2";
+  return (
+    <div className="group relative">
+      {children}
+      <div className={`pointer-events-none absolute top-full z-50 mt-1.5 whitespace-nowrap rounded bg-[#161616] px-2 py-1 text-hint text-white opacity-0 transition-opacity group-hover:opacity-100 ${posClass}`}>
+        <span className={`absolute bottom-full border-4 border-transparent border-b-[#161616] ${caretClass}`} />
+        {label}
+      </div>
+    </div>
+  );
+}
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -270,13 +291,15 @@ function ChatLeftNav({
   if (collapsed) {
     return (
       <div className="flex h-full w-9 shrink-0 flex-col items-center border-r border-border py-2">
-        <IconButton
-          aria-label="Expand thread panel"
-          icon={<Icon name="sidebarClosedIcon" size={16} />}
-          size="small"
-          tone="neutral"
-          onClick={() => setCollapsed(false)}
-        />
+        <Tooltip label="Open sidebar" align="left">
+          <IconButton
+            aria-label="Expand thread panel"
+            icon={<Icon name="sidebarClosedIcon" size={16} />}
+            size="small"
+            tone="neutral"
+            onClick={() => setCollapsed(false)}
+          />
+        </Tooltip>
       </div>
     );
   }
@@ -285,30 +308,36 @@ function ChatLeftNav({
     <div className="relative flex h-full shrink-0 flex-col border-r border-border" style={{ width }}>
       {/* Header */}
       <div className="flex h-10 shrink-0 items-center gap-xs px-3">
-        <IconButton
-          aria-label="Collapse thread panel"
-          icon={<Icon name="sidebarOpenIcon" size={16} />}
-          size="small"
-          tone="neutral"
-          onClick={() => setCollapsed(true)}
-        />
+        <Tooltip label="Close sidebar" align="left">
+          <IconButton
+            aria-label="Collapse thread panel"
+            icon={<Icon name="sidebarOpenIcon" size={16} />}
+            size="small"
+            tone="neutral"
+            onClick={() => setCollapsed(true)}
+          />
+        </Tooltip>
         <span className="flex-1 text-paragraph font-medium text-text-primary">Genie Code</span>
-        <IconButton
-          aria-label="Tools"
-          icon={<Icon name="WrenchIcon" size={14} />}
-          size="small"
-          tone="neutral"
-          className={cx(activePanel === "tools" && "!bg-background-tertiary text-text-primary")}
-          onClick={() => togglePanel("tools")}
-        />
-        <IconButton
-          aria-label="Connections"
-          icon={<Icon name="plugIcon" size={14} />}
-          size="small"
-          tone="neutral"
-          className={cx(activePanel === "connections" && "!bg-background-tertiary text-text-primary")}
-          onClick={() => togglePanel("connections")}
-        />
+        <Tooltip label="Tools" align="right">
+          <IconButton
+            aria-label="Tools"
+            icon={<Icon name="WrenchIcon" size={14} />}
+            size="small"
+            tone="neutral"
+            className={cx(activePanel === "tools" && "!bg-background-tertiary text-text-primary")}
+            onClick={() => togglePanel("tools")}
+          />
+        </Tooltip>
+        <Tooltip label="Connections" align="right">
+          <IconButton
+            aria-label="Connections"
+            icon={<Icon name="plugIcon" size={14} />}
+            size="small"
+            tone="neutral"
+            className={cx(activePanel === "connections" && "!bg-background-tertiary text-text-primary")}
+            onClick={() => togglePanel("connections")}
+          />
+        </Tooltip>
       </div>
 
       {activePanel === "tools" ? (
@@ -411,6 +440,73 @@ function EmptyChartGraphic() {
           {/* Bottom dot */}
           <circle cx="96.5" cy="53.25" r="2" fill="#F7F7F7" stroke="#A2A2A2" strokeWidth="1" />
         </svg>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Python file preview
+// ---------------------------------------------------------------------------
+
+const PYTHON_FILE_LINES = [
+  "import pandas as pd",
+  "import matplotlib.pyplot as plt",
+  "from pyspark.sql import SparkSession",
+  "",
+  "spark = SparkSession.builder.getOrCreate()",
+  "",
+  "# Load ski resort data",
+  "df = spark.table('wbschema1.ski_resorts').toPandas()",
+  "",
+  "# Basic EDA",
+  "print(df.shape)",
+  "print(df.dtypes)",
+  "print(df.describe())",
+  "",
+  "# Price distribution by country",
+  "price_by_country = (",
+  "    df.groupby('country')['price_per_night']",
+  "    .agg(['mean', 'median', 'std'])",
+  "    .sort_values('mean', ascending=False)",
+  ")",
+  "print(price_by_country)",
+  "",
+  "# Plot",
+  "fig, ax = plt.subplots(figsize=(10, 5))",
+  "price_by_country['mean'].plot(kind='bar', ax=ax)",
+  "ax.set_title('Average Price per Night by Country')",
+  "ax.set_ylabel('USD')",
+  "plt.tight_layout()",
+  "plt.show()",
+];
+
+function PythonFilePreview({ asset }: { asset: ReviewAsset }) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* Toolbar */}
+      <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border px-3">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="text-hint text-text-secondary">{asset.name}</span>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <DefaultButton size="small" leadingIcon={<Icon name="playIcon" size={12} />}>Run</DefaultButton>
+          <PrimaryButton size="small">Save</PrimaryButton>
+        </div>
+      </div>
+      {/* Code */}
+      <div className="min-h-0 flex-1 overflow-y-auto bg-background-primary p-4 font-mono text-[12px] leading-5">
+        {PYTHON_FILE_LINES.map((line, i) => (
+          <div key={i} className="flex gap-4">
+            <span className="w-6 shrink-0 select-none text-right text-text-secondary opacity-40">{i + 1}</span>
+            <span className={cx(
+              "min-w-0 flex-1 whitespace-pre text-text-primary",
+              line.startsWith("#") && "text-text-secondary",
+              (line.startsWith("import") || line.startsWith("from")) && "text-[#7c3aed]",
+              line === "" && "opacity-0",
+            )}>{line || "\u00a0"}</span>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -963,6 +1059,8 @@ function PreviewPanel({
             </div>
             {activeAsset?.kind === "dashboard" ? (
               <DashboardPreview />
+            ) : activeAsset?.kind === "file" ? (
+              <PythonFilePreview asset={activeAsset} />
             ) : activeAsset ? (
               <NotebookPreview asset={activeAsset} />
             ) : null}
@@ -990,8 +1088,20 @@ function PreviewPanel({
 // ---------------------------------------------------------------------------
 
 export default function ChatPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const state = useGenieChatState();
   const [navCollapsed, setNavCollapsed] = React.useState(false);
+
+  const initialPrompt = searchParams.get("prompt");
+  const handleSubmitRef = React.useRef(state.handleSubmit);
+  handleSubmitRef.current = state.handleSubmit;
+  React.useEffect(() => {
+    if (!initialPrompt) return;
+    const t = setTimeout(() => handleSubmitRef.current(initialPrompt, "ski"), 200);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [selectedAsset, setSelectedAsset] = React.useState<ReviewAsset | null>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -1037,6 +1147,7 @@ export default function ChatPage() {
           onToggleNav={handleTogglePreview}
           previewOpen={previewOpen}
           onAssetClick={handleAssetClick}
+          onFullScreen={() => { sessionStorage.setItem("openGeniePanel", "1"); router.back(); }}
         />
 
         {previewOpen && (
