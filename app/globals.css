@@ -1,0 +1,484 @@
+@import "tailwindcss";
+@config "../tailwind.config.ts";
+
+:root {
+  /* =========================================================
+   * Semantic tokens (from your table)
+   * ========================================================= */
+  --background-primary: #ffffff; /* neutral.white */
+  --background-secondary: #f7f7f7; /* neutral.50 */
+  --background-tertiary: #ebebeb; /* neutral.100 */
+  --background-warning: #fff9eb; /* yellow.100 */
+  --background-danger: #fff5f7; /* red.100 */
+  --background-success: #f3fcf6; /* green.100 */
+  /* App chrome shell (defaults to background.secondary). */
+  --background-shell: var(--background-secondary);
+
+  /* Text */
+  --text-primary: #161616; /* neutral.800 */
+  --text-secondary: #6f6f6f; /* neutral.500 */
+  --text-placeholder: #6f6f6f; /* neutral.500 */
+  --text-validation-danger: #c82d4c; /* red.600 */
+  --text-validation-warning: #be501e; /* yellow.600 */
+  --text-validation-success: #277c43; /* green.600 */
+
+  /* Action / Link */
+  --action-link-default: #2272b4; /* blue.600 */
+  --action-link-hover: #0e538b; /* blue.700 */
+  --action-link-press: #04355d; /* blue.800 */
+
+  /* Action / Primary / Text */
+  --action-primary-text-default: #ffffff; /* neutral.white */
+  --action-primary-text-hover: #ffffff; /* neutral.white */
+  --action-primary-text-press: #ffffff; /* neutral.white */
+
+  /* Action / Primary / Icon */
+  --action-primary-icon: #ffffff; /* neutral.white */
+
+  /* Action / Primary / Background */
+  --action-primary-background-default: #2272b4; /* blue.600 */
+  --action-primary-background-hover: #0e538b; /* blue.700 */
+  --action-primary-background-press: #04355d; /* blue.800 */
+
+  /* Action / Default / Text */
+  --action-default-text-default: #11171c; /* grey.800 */
+  --action-default-text-hover: #0e538b; /* blue.700 */
+  --action-default-text-press: #04355d; /* blue.800 */
+
+  /* Action / Default / Icon */
+  --action-default-icon-default: #525252; /* neutral.600 */
+  --action-default-icon-hover: #0e538b; /* blue.700 */
+  --action-default-icon-press: #04355d; /* blue.800 */
+
+  /* Action / Default / Background (0%, 8%, 16%) */
+  --action-default-background-default: #2272b400; /* blue.600 @ 0% */
+  --action-default-background-hover: #2272b414; /* blue.600 @ 8% */
+  --action-default-background-press: #2272b429; /* blue.600 @ 16% */
+
+  /* Action / Default / Border */
+  --action-default-border-default: #cbcbcb; /* neutral.300 */
+  --action-default-border-hover: #2272b4; /* blue.600 */
+  --action-default-border-focus: #2272b4; /* blue.600 */
+  --action-default-border-press: #04355d; /* blue.800 */
+
+  /* Action / Icon / Background (0%, 8%, 16%) */
+  --action-icon-background-default: #2272b400; /* blue.600 @ 0% */
+  --action-icon-background-hover: #2272b414; /* blue.600 @ 8% */
+  --action-icon-background-press: #2272b429; /* blue.600 @ 16% */
+
+  /* Action / Icon / Icon */
+  --action-icon-icon-default: #525252; /* neutral.600 */
+  --action-icon-icon-hover: #0e538b; /* blue.700 */
+  --action-icon-icon-press: #04355d; /* blue.800 */
+
+  /* Action / Tertiary / Background (0%, 8%, 16%) */
+  --action-tertiary-background-default: #2272b400; /* blue.600 @ 0% */
+  --action-tertiary-background-hover: #2272b414; /* blue.600 @ 8% */
+  --action-tertiary-background-press: #2272b429; /* blue.600 @ 16% */
+
+  /* Action / Tertiary / Text */
+  --action-tertiary-text-default: #2272b4; /* blue.600 */
+  --action-tertiary-text-hover: #0e538b; /* blue.700 */
+  --action-tertiary-text-press: #04355d; /* blue.800 */
+
+  /* Action / Tertiary / Icon */
+  --action-tertiary-icon-default: #2272b4; /* blue.600 */
+  --action-tertiary-icon-hover: #0e538b; /* blue.700 */
+  --action-tertiary-icon-press: #04355d; /* blue.800 */
+
+  /* Action / Danger / Default / Text */
+  --action-danger-default-text-default: #c82d4c; /* red.600 */
+  --action-danger-default-text-hover: #9e102c; /* red.700 */
+  --action-danger-default-text-press: #630316; /* red.800 */
+
+  /* Action / Danger / Default / Background (0%, 8%, 16%) */
+  --action-danger-default-background-default: #c82d4c00; /* red.600 @ 0% */
+  --action-danger-default-background-hover: #c82d4c14; /* red.600 @ 8% */
+  --action-danger-default-background-press: #c82d4c29; /* red.600 @ 16% */
+
+  /* Action / Danger / Default / Border */
+  --action-danger-default-border-default: #c82d4c; /* red.600 */
+  --action-danger-default-border-hover: #9e102c; /* red.700 */
+  --action-danger-default-border-press: #630316; /* red.800 */
+
+  /* Action / Danger / Primary / Background */
+  --action-danger-primary-background-default: #c82d4c; /* red.600 */
+  --action-danger-primary-background-hover: #9e102c; /* red.700 */
+  --action-danger-primary-background-press: #630316; /* red.800 */
+
+  /* Action / Danger / Primary / Text */
+  --action-danger-primary-text: #ffffff; /* neutral.white */
+
+  /* Action / Disabled */
+  --action-disabled-text: #a2a2a2; /* neutral.350 */
+  --action-disabled-background: #ebebeb; /* neutral.100 */
+  --action-disabled-border: #d8d8d8; /* neutral.200 */
+
+  /* Border */
+  --border: #ebebeb; /* neutral.100 */
+  --border-accessible: #6f6f6f; /* neutral.500 */
+  --border-danger: #fbd0d8; /* red.300 */
+  --border-warning: #f8d4a5; /* yellow.300 */
+  --border-success: #b1ecc5; /* green.300 */
+
+  /* Skeleton */
+  --skeleton: #a2a2a229; /* #A2A2A2 @ 16% */
+
+  /* Overlay */
+  --overlay-overlay: #00000042; /* #000000 @ 26% */
+
+  /* Elevation */
+  --elevation-shadow-xs: 0px 2px 8px 0px rgba(0, 0, 0, 0.04);
+  --elevation-shadow-md: 0px 3px 6px 0px rgba(0, 0, 0, 0.05);
+  --elevation-shadow-lg: 0px 2px 16px 0px rgba(0, 0, 0, 0.08);
+
+  /* Tooltip */
+  --tooltip-background: #161616; /* neutral.800 */
+
+  /* Code */
+  --code-background: #52525214; /* neutral.600 @ 8% */
+
+  /* Brand (primitive) */
+  --brand-blue: #2272b4; /* blue.600 */
+  --brand-yellow: #ffab00;
+  --brand-red: #ff3621;
+  --brand-red-8: #ff362114; /* brand.red @ 8% */
+  --brand-red-16: #ff362129; /* brand.red @ 16% */
+  --brand-red-24: #ff36213d; /* brand.red @ 24% */
+
+  /* AI (brand) */
+  --ai-gradient-blue: #4299e0;
+  --ai-gradient-purple: #ca42e0;
+  --ai-gradient-coral: #ff5f46;
+  --ai-gradient: linear-gradient(
+    45deg,
+    var(--ai-gradient-blue) 24%,
+    var(--ai-gradient-purple) 47%,
+    var(--ai-gradient-coral) 76%
+  );
+
+  /* Signal icon (semantic) */
+  --signal-icon-certified: var(--brand-blue);
+  --signal-icon-favorited: var(--brand-yellow);
+  --signal-icon-trending: var(--brand-red);
+  --signal-icon-shared: var(--text-secondary);
+  --signal-icon-pinned: var(--text-secondary);
+
+  /* Tag */
+  --tag-inverse: #161616; /* neutral.800 */
+  --tag-hover: #2272b414; /* blue.600 @ 8% */
+  --tag-press: #2272b429; /* blue.600 @ 16% */
+  --tag-icon-hover: #525252; /* neutral.600 */
+  --tag-icon-press: #525252; /* neutral.600 */
+
+  /* Tag / Background */
+  --tag-background-default: #00003b0d; /* #00003B @ 5% */
+  --tag-background-charcoal: #424242; /* neutral.650 */
+  --tag-background-lemon: #fbf0f12e; /* #FBF0F1 @ 18% */
+  --tag-background-lime: #02b30214; /* #02B302 @ 8% */
+  --tag-background-teal: #02c09617; /* #02C096 @ 9% */
+  --tag-background-turquoise: #02c0d517; /* #02C0D5 @ 9% */
+  --tag-background-indigo: #0144ff0f; /* #0144FF @ 6% */
+  --tag-background-purple: #3b00ff0d; /* #3B00FF @ 5% */
+  --tag-background-pink: #f001960f; /* #F00196 @ 6% */
+  --tag-background-coral: #f000400f; /* #F00040 @ 6% */
+  --tag-background-brown: #ab560214; /* #AB5602 @ 8% */
+
+  /* Tag / Text */
+  --tag-text-default: #161616; /* neutral.800 */
+  --tag-text-charcoal: #ebebeb; /* neutral.100 */
+  --tag-text-lemon: #4f3422;
+  --tag-text-lime: #203c25;
+  --tag-text-teal: #0d3d38;
+  --tag-text-turquoise: #0d3c48;
+  --tag-text-indigo: #101d46;
+  --tag-text-purple: #2f265f;
+  --tag-text-pink: #651249;
+  --tag-text-coral: #64172b;
+  --tag-text-brown: #3e332e;
+
+  /* Tag / Icon */
+  --tag-icon-default: #525252; /* neutral.600 */
+  --tag-icon-charcoal: #a2a2a2; /* neutral.350 */
+  --tag-icon-lemon: #915830;
+  --tag-icon-lime: #227534;
+  --tag-icon-teal: #00776b;
+  --tag-icon-turquoise: #00708d;
+  --tag-icon-indigo: #3451b2;
+  --tag-icon-purple: #5746af;
+  --tag-icon-pink: #c41c87;
+  --tag-icon-coral: #ca244e;
+  --tag-icon-brown: #815e46;
+
+  /* Table / Background / Unselected */
+  --table-background-unselected-default: #ffffff; /* neutral.white */
+  --table-background-unselected-alt: #5252520a; /* neutral.600 @ 4% */
+
+  /* Table / Background / Selected */
+  --table-background-selected-8: #52525214; /* neutral.600 @ 8% */
+  --table-background-selected-12: #5252521f; /* neutral.600 @ 12% */
+
+  /* Progress */
+  --progress-fill: #cbcbcb; /* neutral.300 */
+  --progress-track: #ebebeb; /* neutral.100 */
+  --progress-fill-primary: #4299e0; /* blue.500 */
+
+  /* App base tokens (legacy / existing usage) */
+  --background: var(--background-primary);
+  --foreground: #171717;
+}
+
+/* Scrollbars (scoped; apply via `className="app-scroll"`). */
+.app-scroll {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: rgba(82, 82, 82, 0.45) transparent; /* thumb, track */
+}
+
+.dark .app-scroll {
+  /* Lighter thumb for contrast on dark backgrounds. */
+  scrollbar-color: rgba(232, 236, 240, 0.35) transparent;
+}
+
+.app-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.app-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.app-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(82, 82, 82, 0.45);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+.dark .app-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(232, 236, 240, 0.35);
+}
+
+.dark .app-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(232, 236, 240, 0.5);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* Dark theme is controlled via the `.dark` class (Tailwind `darkMode: "class"`). */
+.dark {
+  --background-primary: #11171c; /* grey.800 */
+  --background-secondary: #1f272d; /* grey.700 */
+  --background-tertiary: #161c22; /* grey.750 */
+  --background-warning: #be501e29; /* yellow.600 @ 16% */
+  --background-danger: #c82d4c29; /* red.600 @ 16% */
+  --background-success: #277c4329; /* green.600 @ 16% */
+  --background-shell: var(--background-secondary);
+
+  /* Text */
+  --text-primary: #e8ecf0; /* grey.100 */
+  --text-secondary: #92a4b3; /* grey.350 */
+  --text-placeholder: #8396a5; /* grey.400 */
+  --text-validation-danger: #e65b77; /* red.500 */
+  --text-validation-warning: #de7921; /* yellow.500 */
+  --text-validation-success: #3ba65e; /* green.500 */
+
+  /* Action / Link */
+  --action-link-default: #4299e0; /* blue.500 */
+  --action-link-hover: #8acaff; /* blue.400 */
+  --action-link-press: #bae1fc; /* blue.300 */
+
+  /* Action / Primary / Text */
+  --action-primary-text-default: #11171c; /* grey.800 */
+  --action-primary-text-hover: #11171c; /* grey.800 */
+  --action-primary-text-press: #11171c; /* grey.800 */
+
+  /* Action / Primary / Icon */
+  --action-primary-icon: #11171c; /* grey.800 */
+
+  /* Action / Primary / Background */
+  --action-primary-background-default: #4299e0; /* blue.500 */
+  --action-primary-background-hover: #8acaff; /* blue.400 */
+  --action-primary-background-press: #bae1fc; /* blue.300 */
+
+  /* Action / Default / Text */
+  --action-default-text-default: #e8ecf0; /* grey.100 */
+  --action-default-text-hover: #8acaff; /* blue.400 */
+  --action-default-text-press: #bae1fc; /* blue.300 */
+
+  /* Action / Default / Icon */
+  --action-default-icon-default: #92a4b3; /* grey.350 */
+  --action-default-icon-hover: #8acaff; /* blue.400 */
+  --action-default-icon-press: #bae1fc; /* blue.300 */
+
+  /* Action / Default / Background (0%, 8%, 16%) */
+  --action-default-background-default: #8acaff00; /* blue.400 @ 0% */
+  --action-default-background-hover: #8acaff14; /* blue.400 @ 8% */
+  --action-default-background-press: #8acaff29; /* blue.400 @ 16% */
+
+  /* Action / Default / Border */
+  --action-default-border-default: #37444f; /* grey.650 */
+  --action-default-border-hover: #8acaff; /* blue.400 */
+  --action-default-border-focus: #8acaff; /* blue.400 */
+  --action-default-border-press: #bae1fc; /* blue.300 */
+
+  /* Action / Icon / Background (0%, 8%, 16%) */
+  --action-icon-background-default: #ffffff00; /* white @ 0% */
+  --action-icon-background-hover: #ffffff14; /* white @ 8% */
+  --action-icon-background-press: #ffffff29; /* white @ 16% */
+
+  /* Action / Icon / Icon */
+  --action-icon-icon-default: #92a4b3; /* grey.350 */
+  --action-icon-icon-hover: #c0cdd8; /* grey.300 */
+  --action-icon-icon-press: #d1d9e1; /* grey.200 */
+
+  /* Action / Tertiary / Background (0%, 8%, 16%) */
+  --action-tertiary-background-default: #8fcdff00; /* #8FCDFF @ 0% */
+  --action-tertiary-background-hover: #8fcdff14; /* #8FCDFF @ 8% */
+  --action-tertiary-background-press: #8fcdff29; /* #8FCDFF @ 16% */
+
+  /* Action / Tertiary / Text */
+  --action-tertiary-text-default: #4299e0; /* blue.500 */
+  --action-tertiary-text-hover: #8acaff; /* blue.400 */
+  --action-tertiary-text-press: #bae1fc; /* blue.300 */
+
+  /* Action / Tertiary / Icon */
+  --action-tertiary-icon-default: #4299e0; /* blue.500 */
+  --action-tertiary-icon-hover: #8acaff; /* blue.400 */
+  --action-tertiary-icon-press: #bae1fc; /* blue.300 */
+
+  /* Action / Danger / Default / Text */
+  --action-danger-default-text-default: #e65b77; /* red.500 */
+  --action-danger-default-text-hover: #f792a6; /* red.400 */
+  --action-danger-default-text-press: #fbd0d8; /* red.300 */
+
+  /* Action / Danger / Default / Background (0%, 8%, 16%) */
+  --action-danger-default-background-default: #f792a600; /* red.400 @ 0% */
+  --action-danger-default-background-hover: #f792a614; /* red.400 @ 8% */
+  --action-danger-default-background-press: #f792a629; /* red.400 @ 16% */
+
+  /* Action / Danger / Default / Border */
+  --action-danger-default-border-default: #e65b77; /* red.500 */
+  --action-danger-default-border-hover: #f792a6; /* red.400 */
+  --action-danger-default-border-press: #fbd0d8; /* red.300 */
+
+  /* Action / Danger / Primary / Background */
+  --action-danger-primary-background-default: #e65b77; /* red.500 */
+  --action-danger-primary-background-hover: #f792a6; /* red.400 */
+  --action-danger-primary-background-press: #fbd0d8; /* red.300 */
+
+  /* Action / Danger / Primary / Text */
+  --action-danger-primary-text: #11171c; /* grey.800 */
+
+  /* Action / Disabled */
+  --action-disabled-text: #5f7281; /* grey.500 */
+  --action-disabled-background: #37444f; /* grey.650 */
+  --action-disabled-border: #445461; /* grey.600 */
+
+  /* Border */
+  --border: #1f272d; /* grey.700 */
+  --border-accessible: #c0cdd8; /* grey.300 */
+  --border-danger: #e65b77; /* red.500 */
+  --border-warning: #de7921; /* yellow.500 */
+  --border-success: #3ba65e; /* green.500 */
+
+  /* Skeleton */
+  --skeleton: #90a4b529; /* #90A4B5 @ 16% */
+
+  /* Overlay */
+  --overlay-overlay: #00000073; /* #000000 @ 45% */
+
+  /* Elevation */
+  --elevation-shadow-xs: 0px 2px 8px 0px rgba(0, 0, 0, 0.12);
+  --elevation-shadow-md: 0px 3px 6px 0px rgba(0, 0, 0, 0.16);
+  --elevation-shadow-lg: 0px 2px 16px 0px rgba(0, 0, 0, 0.20);
+
+  /* Tooltip */
+  --tooltip-background: #e8ecf0; /* grey.100 */
+
+  /* Code */
+  --code-background: #37444f; /* grey.650 */
+
+  /* Tag */
+  --tag-inverse: #11171c; /* grey.800 */
+  --tag-hover: #8acaff14; /* blue.400 @ 8% */
+  --tag-press: #8acaff29; /* blue.400 @ 16% */
+  --tag-icon-hover: #92a4b3; /* grey.350 */
+  --tag-icon-press: #92a4b3; /* grey.350 */
+
+  /* Tag / Background */
+  --tag-background-default: #e8ecf014; /* grey.100 @ 8% */
+  --tag-background-charcoal: #c0cdd8; /* grey.300 */
+  --tag-background-lemon: #fbf0f12e; /* #FBF0F1 @ 18% */
+  --tag-background-lime: #02b30214; /* #02B302 @ 8% */
+  --tag-background-teal: #02c0961f; /* #02C096 @ 12% */
+  --tag-background-turquoise: #02c0d51f; /* #02C0D5 @ 12% */
+  --tag-background-indigo: #0144ff1f; /* #0144FF @ 12% */
+  --tag-background-purple: #3b00ff1f; /* #3B00FF @ 12% */
+  --tag-background-pink: #f001961f; /* #F00196 @ 12% */
+  --tag-background-coral: #f000401a; /* #F00040 @ 10% */
+  --tag-background-brown: #ab56021a; /* #AB5602 @ 10% */
+
+  /* Tag / Text */
+  --tag-text-default: #e8ecf0; /* grey.100 */
+  --tag-text-charcoal: #11171c; /* grey.800 */
+  --tag-text-lemon: #ffe7b3;
+  --tag-text-lime: #c2f0c2;
+  --tag-text-teal: #adf0dd;
+  --tag-text-turquoise: #b6ecf7;
+  --tag-text-indigo: #dddffe;
+  --tag-text-purple: #e2ddfe;
+  --tag-text-pink: #fdd1ea;
+  --tag-text-coral: #fed2e1;
+  --tag-text-brown: #f2e1ca;
+
+  /* Tag / Icon */
+  --tag-icon-default: #92a4b3; /* grey.350 */
+  --tag-icon-charcoal: #37444f; /* grey.650 */
+  --tag-icon-lemon: #ffcd4d;
+  --tag-icon-lime: #70d083;
+  --tag-icon-teal: #0ad8b6;
+  --tag-icon-turquoise: #1fd0f3;
+  --tag-icon-indigo: #99a2ff;
+  --tag-icon-purple: #b399ff;
+  --tag-icon-pink: #f986c9;
+  --tag-icon-coral: #ff859d;
+  --tag-icon-brown: #dab594;
+
+  /* Table / Background / Unselected */
+  --table-background-unselected-default: #11171c; /* grey.800 */
+  --table-background-unselected-alt: #bdcddb0a; /* #BDCDDB @ 4% */
+
+  /* Table / Background / Selected */
+  --table-background-selected-8: #bdcddb14; /* #BDCDDB @ 8% */
+  --table-background-selected-12: #bdcddb1f; /* #BDCDDB @ 12% */
+
+  /* Progress */
+  --progress-fill: #5f7281; /* grey.500 */
+  --progress-track: #37444f; /* grey.650 */
+  --progress-fill-primary: #2272b4; /* blue.600 */
+
+  --background: var(--background-primary);
+  --foreground: #ededed;
+}
+
+.databricks-one {
+  --background-shell: var(--background-primary);
+  --one-leftnav-bg: color-mix(in srgb, #ebebeb 47%, transparent);
+}
+
+.dark .databricks-one {
+  --one-leftnav-bg: color-mix(in srgb, var(--background-secondary) 25%, transparent);
+}
+
+
+body {
+  background: var(--background-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+}

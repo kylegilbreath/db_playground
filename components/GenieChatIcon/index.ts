@@ -1,0 +1,1 @@
+export { GenieChatIcon } from "./GenieChatIcon";
