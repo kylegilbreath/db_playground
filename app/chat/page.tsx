@@ -561,6 +561,177 @@ function DashboardPreview() {
 }
 
 // ---------------------------------------------------------------------------
+// Review tab — diff view
+// ---------------------------------------------------------------------------
+
+// Fake diff lines per file for visual fidelity
+const FAKE_DIFF: Record<string, Array<{ kind: "add" | "remove" | "context"; text: string }>> = {
+  notebook: [
+    { kind: "context", text: "import pandas as pd" },
+    { kind: "context", text: "import matplotlib.pyplot as plt" },
+    { kind: "add",     text: "+ df = spark.sql('SELECT * FROM ski_resorts').toPandas()" },
+    { kind: "remove",  text: "- df = pd.read_csv('ski_resorts.csv')" },
+    { kind: "context", text: "" },
+    { kind: "context", text: "# Booking status breakdown" },
+    { kind: "add",     text: "+ status_counts = df.groupby('status').agg({'booking_id': 'count', 'total_price': 'sum'})" },
+    { kind: "add",     text: "+ status_counts.columns = ['count', 'revenue']" },
+    { kind: "context", text: "print(status_counts)" },
+  ],
+  file: [
+    { kind: "context", text: "def run_eda(spark):" },
+    { kind: "add",     text: '    """Run full EDA pipeline on ski_resort data."""' },
+    { kind: "context", text: "    df = spark.table('ski_resorts')" },
+    { kind: "add",     text: "    df = df.withColumn('avg_price', F.col('total_price') / F.col('guests'))" },
+    { kind: "remove",  text: "-   df = df.cache()" },
+    { kind: "context", text: "    return df" },
+  ],
+};
+
+function FileDiffSection({
+  asset,
+  onAccept,
+  onReject,
+}: {
+  asset: ReviewAsset;
+  onAccept: () => void;
+  onReject: () => void;
+}) {
+  const [open, setOpen] = React.useState(true);
+  const [status, setStatus] = React.useState<"pending" | "accepted" | "rejected">("pending");
+
+  const lines = FAKE_DIFF[asset.kind] ?? FAKE_DIFF.file;
+  const addCount = lines.filter((l) => l.kind === "add").length;
+  const removeCount = lines.filter((l) => l.kind === "remove").length;
+
+  const handleAccept = () => { setStatus("accepted"); onAccept(); };
+  const handleReject = () => { setStatus("rejected"); onReject(); };
+
+  return (
+    <div className={cx(
+      "overflow-hidden rounded-md border",
+      status === "accepted" ? "border-green-200 bg-green-50/30" :
+      status === "rejected" ? "border-border opacity-50" :
+      "border-border bg-background-primary",
+    )}>
+      {/* File header */}
+      <div className="flex items-center gap-2 border-b border-border bg-background-secondary px-3 py-1.5">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="flex shrink-0 items-center text-text-secondary hover:text-text-primary"
+        >
+          <Icon name={open ? "chevronDownIcon" : "chevronRightIcon"} size={12} />
+        </button>
+        <Icon
+          name={asset.kind === "notebook" ? "notebookIcon" : "fileCodeIcon"}
+          size={14}
+          className="shrink-0 text-text-secondary"
+        />
+        <span className="min-w-0 flex-1 truncate font-mono text-hint text-text-primary">{asset.name}</span>
+        <span className="shrink-0 font-mono text-hint text-green-600">+{addCount}</span>
+        <span className="shrink-0 font-mono text-hint text-red-500">-{removeCount}</span>
+        {status === "pending" ? (
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              aria-label="Reject file"
+              onClick={handleReject}
+              className="flex h-5 w-5 items-center justify-center rounded text-text-secondary hover:bg-background-tertiary hover:text-red-500"
+            >
+              <Icon name="closeIcon" size={12} />
+            </button>
+            <button
+              type="button"
+              aria-label="Accept file"
+              onClick={handleAccept}
+              className="flex h-5 w-5 items-center justify-center rounded text-text-secondary hover:bg-background-tertiary hover:text-green-600"
+            >
+              <Icon name="checkIcon" size={12} />
+            </button>
+          </div>
+        ) : (
+          <span className={cx(
+            "shrink-0 text-hint font-medium",
+            status === "accepted" ? "text-green-600" : "text-text-secondary line-through",
+          )}>
+            {status === "accepted" ? "Accepted" : "Rejected"}
+          </span>
+        )}
+      </div>
+
+      {/* Diff lines */}
+      {open && (
+        <div className="overflow-x-auto">
+          {lines.map((line, i) => (
+            <div
+              key={i}
+              className={cx(
+                "flex gap-3 px-3 py-px font-mono text-hint leading-5",
+                line.kind === "add" && "bg-green-50 text-green-800",
+                line.kind === "remove" && "bg-red-50 text-red-700 line-through",
+                line.kind === "context" && "text-text-secondary",
+              )}
+            >
+              <span className={cx(
+                "w-3 shrink-0 select-none",
+                line.kind === "add" && "text-green-500",
+                line.kind === "remove" && "text-red-400",
+              )}>
+                {line.kind === "add" ? "+" : line.kind === "remove" ? "-" : " "}
+              </span>
+              <span className="whitespace-pre">{line.text.replace(/^[+-] /, "")}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReviewDiffPanel({ assets }: { assets: ReviewAsset[] }) {
+  const [statuses, setStatuses] = React.useState<Record<string, "pending" | "accepted" | "rejected">>(
+    Object.fromEntries(assets.map((a) => [a.id, "pending"])),
+  );
+
+  const pending = assets.filter((a) => statuses[a.id] === "pending");
+  const allDone = pending.length === 0;
+
+  const acceptAll = () => setStatuses(Object.fromEntries(assets.map((a) => [a.id, "accepted"])));
+  const rejectAll = () => setStatuses(Object.fromEntries(assets.map((a) => [a.id, "rejected"])));
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border bg-background-primary">
+      {/* Header */}
+      <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
+        <span className="flex-1 text-paragraph font-medium text-text-primary">
+          {allDone ? "All changes reviewed" : `${pending.length} file${pending.length !== 1 ? "s" : ""} to review`}
+        </span>
+        {!allDone && (
+          <div className="flex items-center gap-xs">
+            <DefaultButton size="small" onClick={rejectAll}>Reject all</DefaultButton>
+            <PrimaryButton size="small" onClick={acceptAll}>Accept all</PrimaryButton>
+          </div>
+        )}
+      </div>
+
+      {/* File list */}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="flex flex-col gap-2 p-3">
+          {assets.map((asset) => (
+            <FileDiffSection
+              key={asset.id}
+              asset={asset}
+              onAccept={() => setStatuses((s) => ({ ...s, [asset.id]: "accepted" }))}
+              onReject={() => setStatuses((s) => ({ ...s, [asset.id]: "rejected" }))}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Review tab empty state
 // ---------------------------------------------------------------------------
 
@@ -598,11 +769,13 @@ function PreviewPanel({
   selectedAsset,
   activeThreadId,
   initialWidth = DEFAULT_PREVIEW_WIDTH,
+  reviewAssets,
 }: {
   onClose: () => void;
   selectedAsset: ReviewAsset | null;
   activeThreadId: string | null;
   initialWidth?: number;
+  reviewAssets?: ReviewAsset[];
 }) {
   const [activeTab, setActiveTab] = React.useState<PreviewTab>("Assets");
   // Multi-tab asset state
@@ -730,6 +903,9 @@ function PreviewPanel({
       {/* Pane */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden pb-3 pr-3">
         {activeTab === "Review" ? (
+          reviewAssets && reviewAssets.length > 0 ? (
+            <ReviewDiffPanel key={activeThreadId ?? "review"} assets={reviewAssets} />
+          ) : (
           <div className="flex w-full flex-1 flex-col items-center justify-center overflow-clip rounded-md border border-border bg-background-primary">
             <MissingBranchGraphic />
             <div className="flex flex-col items-center gap-2 px-6 pb-6 text-center">
@@ -741,6 +917,7 @@ function PreviewPanel({
               </p>
             </div>
           </div>
+          )
         ) : activeTab === "Assets" && openAssets.length > 0 ? (
           <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-md border border-border bg-background-primary">
             {/* Figma-style soft tab bar */}
@@ -820,6 +997,12 @@ export default function ChatPage() {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [initialPreviewWidth, setInitialPreviewWidth] = React.useState(DEFAULT_PREVIEW_WIDTH);
 
+  const reviewAssets = React.useMemo(() => {
+    if (state.runStatus !== "done") return undefined;
+    const summary = state.steps.find((s) => s.type === "assets-summary") as { assets: ReviewAsset[] } | undefined;
+    return summary?.assets;
+  }, [state.steps, state.runStatus]);
+
   const handleAssetClick = React.useCallback((asset: ReviewAsset) => {
     setSelectedAsset(asset);
     if (containerRef.current) {
@@ -862,6 +1045,7 @@ export default function ChatPage() {
             selectedAsset={selectedAsset}
             activeThreadId={state.activeThreadId}
             initialWidth={initialPreviewWidth}
+            reviewAssets={reviewAssets}
           />
         )}
       </div>
