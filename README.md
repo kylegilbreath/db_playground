@@ -1,4 +1,4 @@
-# Clerestory
+# DB Playground
 
 A prototype demonstrating a unified search and discovery experience — and unified chat.
 
