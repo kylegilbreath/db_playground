@@ -1,10 +1,107 @@
+"use client";
+
 import * as React from "react";
 
+// Lottie web type shim — loaded dynamically at runtime
+type LottieInstance = {
+  destroy: () => void;
+};
+type LottieStatic = {
+  loadAnimation: (opts: {
+    container: HTMLElement;
+    renderer: "svg";
+    loop: boolean;
+    autoplay: boolean;
+    path: string;
+  }) => LottieInstance;
+};
+
+let lottiePromise: Promise<LottieStatic> | null = null;
+
+function loadLottie(): Promise<LottieStatic> {
+  if (lottiePromise) return lottiePromise;
+  lottiePromise = new Promise((resolve, reject) => {
+    if (typeof window === "undefined") return;
+    if ((window as unknown as Record<string, unknown>).lottie) {
+      resolve((window as unknown as Record<string, unknown>).lottie as LottieStatic);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js";
+    script.onload = () => resolve((window as unknown as Record<string, unknown>).lottie as LottieStatic);
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+  return lottiePromise;
+}
+
 /**
- * Genie icon with multi-stop gradient fill.
- * Use for Genie chat empty states across surfaces.
+ * Genie icon — plays the Lottie animation once on mount (triggered by `animationKey`).
+ * Falls back to the static SVG if Lottie fails to load.
+ *
+ * Pass a new `animationKey` value to replay the animation (e.g. on new thread or panel open).
  */
-export function GenieChatIcon({ size = 56 }: { size?: number }) {
+export function GenieChatIcon({
+  size = 56,
+  animationKey,
+}: {
+  size?: number;
+  animationKey?: string | number;
+}) {
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const instanceRef = React.useRef<LottieInstance | null>(null);
+  const [lottieReady, setLottieReady] = React.useState(false);
+  const [lottieError, setLottieError] = React.useState(false);
+
+  // Load lottie-web once
+  React.useEffect(() => {
+    loadLottie()
+      .then(() => setLottieReady(true))
+      .catch(() => setLottieError(true));
+  }, []);
+
+  // (Re-)play animation whenever lottie is ready or animationKey changes
+  React.useEffect(() => {
+    if (!lottieReady || !containerRef.current) return;
+    const lottie = (window as unknown as Record<string, unknown>).lottie as LottieStatic;
+
+    // Destroy previous instance
+    if (instanceRef.current) {
+      instanceRef.current.destroy();
+      instanceRef.current = null;
+    }
+
+    instanceRef.current = lottie.loadAnimation({
+      container: containerRef.current,
+      renderer: "svg",
+      loop: false,
+      autoplay: true,
+      path: "/animations/genie-chat-icon.json",
+    });
+
+    return () => {
+      instanceRef.current?.destroy();
+      instanceRef.current = null;
+    };
+  }, [lottieReady, animationKey]);
+
+  if (lottieError) {
+    return <StaticGenieChatIcon size={size} />;
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      style={{ width: size, height: size }}
+      aria-hidden="true"
+    />
+  );
+}
+
+/**
+ * Static fallback SVG — also exported for use where animation isn't needed.
+ */
+export function StaticGenieChatIcon({ size = 56 }: { size?: number }) {
   const id = React.useId().replace(/:/g, "");
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">

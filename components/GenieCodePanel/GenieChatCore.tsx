@@ -202,13 +202,15 @@ function GenieChatEmptyState({
   onTextChange,
   onSubmit,
   size = "compact",
+  animationKey,
 }: {
   text: string;
   onTextChange: (v: string) => void;
   onSubmit: (promptOverride?: string) => void;
   size?: "compact" | "full";
+  animationKey?: number;
 }) {
-  const iconSize = size === "full" ? 64 : 40;
+  const iconSize = size === "full" ? 160 : 120;
   const gap = size === "full" ? "gap-4" : "gap-3";
   const maxW = size === "full" ? "max-w-[560px]" : "max-w-[400px]";
 
@@ -216,7 +218,7 @@ function GenieChatEmptyState({
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-8">
       <div className={cx("flex w-full flex-col items-center", maxW, size === "full" ? "gap-8" : "gap-6")}>
         <div className={cx("flex flex-col items-center", gap)}>
-          <GenieChatIcon size={iconSize} />
+          <GenieChatIcon size={iconSize} animationKey={animationKey} />
           <div className="flex flex-col items-center gap-1">
             <h2 className="text-heading-m font-semibold text-text-primary">Genie Code</h2>
             <p className="text-paragraph text-text-secondary">Run multi-step data and AI tasks</p>
@@ -562,6 +564,16 @@ export function GenieChatBody({
   const threadSidebarOpen = threadSidebarOpenProp ?? threadSidebarOpenInternal;
   const [moreMenuOpen, setMoreMenuOpen] = React.useState(false);
 
+  // Increment each time we enter the empty state so the animation replays
+  const [emptyStateKey, setEmptyStateKey] = React.useState(0);
+  const prevThreadIdRef = React.useRef<string | null>(activeThreadId);
+  React.useEffect(() => {
+    const wasInThread = prevThreadIdRef.current !== null;
+    const nowEmpty = activeThreadId === null;
+    if (wasInThread && nowEmpty) setEmptyStateKey((k) => k + 1);
+    prevThreadIdRef.current = activeThreadId;
+  }, [activeThreadId]);
+
   const setThreadSidebar = React.useCallback((open: boolean) => {
     setThreadSidebarOpenInternal(open);
     onThreadSidebarChange?.(open);
@@ -693,6 +705,7 @@ export function GenieChatBody({
             onTextChange={setText}
             onSubmit={handleSubmit}
             size={size}
+            animationKey={emptyStateKey}
           />
         ) : (
           <div className="flex min-h-0 flex-1 flex-col">

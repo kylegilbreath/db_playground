@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Icon } from "@/components/icons";
-import { GenieChatIcon } from "@/components/GenieChatIcon";
+import { StaticGenieChatIcon } from "@/components/GenieChatIcon";
 
 export type AnythingBoxMode = "search" | "ask";
 
@@ -87,7 +87,7 @@ export function AnythingBoxModeToggle({
         label="Ask"
         iconName="SparkleIcon"
         showIcon={showIcons}
-        leadingNode={<GenieChatIcon size={16} />}
+        leadingNode={<StaticGenieChatIcon size={16} />}
         onClick={() => onModeChange?.("ask")}
       />
     </div>

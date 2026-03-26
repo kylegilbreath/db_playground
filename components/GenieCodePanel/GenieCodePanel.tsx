@@ -82,7 +82,7 @@ export function GenieCodePanel({ onClose }: GenieCodePanelProps) {
         <div className="flex w-full max-w-[336px] flex-col items-center gap-lg">
           {/* Icon */}
           <div className="flex flex-col items-center gap-md px-6">
-            <GenieChatIcon size={64} />
+            <GenieChatIcon size={120} />
             <div className="flex flex-col items-center gap-sm text-center">
               <p className="text-[22px] font-semibold leading-7 text-text-primary">
                 Genie Code
