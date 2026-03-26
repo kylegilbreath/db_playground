@@ -143,10 +143,18 @@ export function useGenieChatState() {
     const baseDelay = 400;
     pending.steps.forEach((step, i) => {
       const t = setTimeout(() => {
-        setSteps((prev) => [...prev, step]);
+        setSteps((prev) => {
+          const next = [...prev, step];
+          if (i === pending.steps.length - 1) {
+            // Derive subtitle from last assistant-text step
+            const lastText = [...next].reverse().find((s) => s.type === "assistant-text") as { text?: string } | undefined;
+            const subtitle = lastText?.text ? lastText.text.split("\n")[0]! : undefined;
+            setThreads((prev) => prev.map((t) => t.id === pending.threadId ? { ...t, status: "attention" as ThreadStatus, subtitle, diff: { added: 23, removed: 4, files: 3 } } : t));
+          }
+          return next;
+        });
         if (i === pending.steps.length - 1) {
           setRunStatus("done");
-          setThreads((prev) => prev.map((t) => t.id === pending.threadId ? { ...t, status: "attention" as ThreadStatus } : t));
         }
       }, baseDelay + i * 800);
       timersRef.current.push(t);
