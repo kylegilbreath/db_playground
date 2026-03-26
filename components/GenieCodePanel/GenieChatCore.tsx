@@ -89,7 +89,7 @@ export function useGenieChatState() {
             // Pause — store remaining steps, set thread to "input"
             pendingStepsRef.current = { steps: runSteps.slice(pauseAt + 1), threadId };
             setRunStatus("done");
-            setThreads((prev) => prev.map((t) => t.id === threadId ? { ...t, status: "input" as ThreadStatus, time: "now", subtitle: "Waiting for your approval", diff: { added: 23, removed: 4, files: 3 } } : t));
+            setThreads((prev) => prev.map((t) => t.id === threadId ? { ...t, status: "input" as ThreadStatus, time: "now", subtitle: "Waiting for your approval", diff: undefined } : t));
           } else {
             // No confirmation or confirmation is last step — done
             setRunStatus("done");
@@ -323,7 +323,7 @@ export function GenieChatThreadList({
                   {(t.subtitle || t.diff) && (
                     <span className="flex items-center gap-xs">
                       {t.subtitle && <span className="min-w-0 flex-1 truncate text-hint text-text-secondary">{t.subtitle}</span>}
-                      {t.diff && (
+                      {t.diff && t.status !== "input" && (
                         <span className="flex shrink-0 items-center gap-xs text-hint">
                           <span className="font-medium text-green-600">+{t.diff.added}</span>
                           <span className="font-medium text-red-500">-{t.diff.removed}</span>
