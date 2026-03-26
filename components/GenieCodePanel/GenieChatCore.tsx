@@ -23,7 +23,7 @@ export type GenieThread = { id: string; label: string; status: ThreadStatus; tim
 
 export const SEED_THREADS: GenieThread[] = [
   { id: "thread-eda", label: "EDA on ski resort properties with a 6 month forecast", status: "done", time: "2h", subtitle: "Created Ski Resort EDA notebook, ran forecast model" },
-  { id: "thread-dashboard", label: "Assistant Usage Dashboard: Analyze Last 90 Days", status: "attention", time: "7h", subtitle: "2 files ready for review", diff: { added: 40, removed: 2, files: 3 } },
+  { id: "thread-dashboard", label: "Assistant Usage Dashboard: Analyze Last 90 Days", status: "attention", time: "7h", subtitle: "2 files ready for review", diff: { added: 40, removed: 2, files: 2 } },
   { id: "thread-input", label: "Cluster resorts into groups based on price, size, and snowfall", status: "done", time: "3d", subtitle: "Opened ski_resort_eda.py, ran clustering analysis" },
 ];
 
@@ -89,7 +89,7 @@ export function useGenieChatState() {
             // Pause — store remaining steps, set thread to "input"
             pendingStepsRef.current = { steps: runSteps.slice(pauseAt + 1), threadId };
             setRunStatus("done");
-            setThreads((prev) => prev.map((t) => t.id === threadId ? { ...t, status: "input" as ThreadStatus, time: "now", subtitle: "Waiting for your approval", diff: { added: 23, removed: 4, files: 2 } } : t));
+            setThreads((prev) => prev.map((t) => t.id === threadId ? { ...t, status: "input" as ThreadStatus, time: "now", subtitle: "Waiting for your approval", diff: { added: 23, removed: 4, files: 3 } } : t));
           } else {
             // No confirmation or confirmation is last step — done
             setRunStatus("done");
