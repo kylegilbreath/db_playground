@@ -39,7 +39,7 @@ export function AssetRow({ asset, onAssetClick }: { asset: ReviewAsset; onAssetC
   return (
     <div className="flex flex-col">
       {/* Main asset row */}
-      <div className="group flex items-center gap-xs py-1 pl-3 pr-2">
+      <div className="group flex items-center gap-xs py-1 pl-1 pr-2">
         {hasSubItems && (
           <button
             type="button"
@@ -49,7 +49,6 @@ export function AssetRow({ asset, onAssetClick }: { asset: ReviewAsset; onAssetC
             <Icon name={open ? "chevronDownIcon" : "chevronRightIcon"} size={12} />
           </button>
         )}
-        {!hasSubItems && <span className="w-3 shrink-0" />}
 
         <AssetChip asset={asset} onClick={onAssetClick} />
 

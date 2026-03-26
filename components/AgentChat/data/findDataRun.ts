@@ -2,6 +2,11 @@ import type { ChatStep } from "../types";
 
 export const FIND_DATA_STEPS: ChatStep[] = [
   {
+    type: "user",
+    id: "user-1",
+    text: "Cluster resorts into groups based on price, size, and snowfall",
+  },
+  {
     type: "thinking",
     id: "think-1",
     text: "I'll search the catalog for relevant datasets connected to this notebook's context.",

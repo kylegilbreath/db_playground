@@ -8,7 +8,7 @@ import { Icon } from "@/components/icons";
 import { IconButton } from "@/components/IconButton";
 import { TextInput } from "@/components/TextInput";
 
-import { useGenieChatState, GenieChatBody, GenieChatThreadList } from "@/components/GenieCodePanel/GenieChatCore";
+import { useGenieChatState, GenieChatBody, GenieChatThreadList, MoreOptionsMenu } from "@/components/GenieCodePanel/GenieChatCore";
 import { ASSISTANT_DASHBOARD_REVIEW_ASSETS } from "@/components/AgentChat/data/assistantDashboardRun";
 import type { ReviewAsset } from "@/components/AgentChat";
 
@@ -259,6 +259,9 @@ function ChatLeftNav({
   const setCollapsed = onCollapsedChange;
   const [activePanel, setActivePanel] = React.useState<SidePanel | null>(null);
   const [width, setWidth] = React.useState(DEFAULT_NAV_WIDTH);
+  const [searchActive, setSearchActive] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
   const isDragging = React.useRef(false);
   const startX = React.useRef(0);
   const startWidth = React.useRef(DEFAULT_NAV_WIDTH);
@@ -357,18 +360,56 @@ function ChatLeftNav({
               <Icon name="newThreadIcon" size={14} className="shrink-0 text-text-secondary" />
               New chat
             </button>
-            <button
-              type="button"
-              className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-paragraph text-text-secondary hover:bg-background-secondary"
-            >
-              <Icon name="searchIcon" size={14} className="shrink-0" />
-              Search chats
-            </button>
+            {searchActive ? (
+              <div className="flex w-full items-center gap-2 rounded-md border border-[#1A6FCC] bg-background-secondary px-2 py-2">
+                <Icon name="searchIcon" size={14} className="shrink-0 text-text-secondary" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      setSearchQuery("");
+                      setSearchActive(false);
+                    }
+                  }}
+                  onBlur={() => {
+                    if (!searchQuery) setSearchActive(false);
+                  }}
+                  placeholder="Search chats..."
+                  className="min-w-0 flex-1 bg-transparent text-paragraph text-text-primary outline-none placeholder:text-text-secondary"
+                  autoFocus
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => { setSearchQuery(""); setSearchActive(false); }}
+                    className="shrink-0 text-text-secondary hover:text-text-primary"
+                  >
+                    <Icon name="closeIcon" size={12} />
+                  </button>
+                )}
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => { setSearchActive(true); setTimeout(() => searchInputRef.current?.focus(), 0); }}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-paragraph text-text-secondary hover:bg-background-secondary"
+              >
+                <Icon name="searchIcon" size={14} className="shrink-0" />
+                Search chats
+              </button>
+            )}
           </div>
 
           {/* Thread list */}
           <div className="min-h-0 flex-1 overflow-y-auto">
-            <GenieChatThreadList threads={threads} activeThreadId={activeThreadId} onSelect={onSelect} />
+            <GenieChatThreadList
+              threads={searchQuery ? threads.filter((t) => t.label.toLowerCase().includes(searchQuery.toLowerCase())) : threads}
+              activeThreadId={activeThreadId}
+              onSelect={(id) => { onSelect(id); setSearchQuery(""); setSearchActive(false); }}
+            />
           </div>
         </div>
       )}
@@ -626,33 +667,128 @@ function NotebookPreview({ asset }: { asset: ReviewAsset }) {
 // ---------------------------------------------------------------------------
 
 function DashboardPreview() {
-  const PlaceholderBlock = ({ className = "" }: { className?: string }) => (
-    <div className={`shrink-0 rounded-lg bg-[#f6f7f9] ${className}`} />
+  // Sparkline path helpers
+  const dauPoints = [18, 24, 22, 30, 28, 35, 32, 40, 38, 44, 42, 48, 46, 52, 50, 58, 55, 62, 60, 68, 65, 70, 68, 74, 72, 78, 76, 82, 80, 86];
+  const wauPoints = [120, 128, 125, 134, 130, 140, 137, 145, 142, 150, 148, 156, 153, 162, 158, 168, 164, 174, 170, 180, 176, 184, 181, 190, 186, 196, 192, 202, 198, 208];
+
+  function toSparkline(pts: number[], w: number, h: number) {
+    const min = Math.min(...pts), max = Math.max(...pts);
+    const xs = pts.map((_, i) => (i / (pts.length - 1)) * w);
+    const ys = pts.map(v => h - ((v - min) / (max - min)) * h);
+    return xs.map((x, i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${ys[i].toFixed(1)}`).join(" ");
+  }
+
+  const Sparkline = ({ pts, color }: { pts: number[]; color: string }) => (
+    <svg viewBox="0 0 120 32" className="w-full h-8" preserveAspectRatio="none">
+      <path d={toSparkline(pts, 120, 32)} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
+
+  const StatCard = ({ label, value, sub, pts, color }: { label: string; value: string; sub: string; pts: number[]; color: string }) => (
+    <div className="flex flex-col gap-2 rounded-lg border border-border bg-background-primary p-4">
+      <span className="text-hint text-text-secondary">{label}</span>
+      <span className="text-[22px] font-semibold leading-none text-text-primary">{value}</span>
+      <Sparkline pts={pts} color={color} />
+      <span className="text-hint text-text-secondary">{sub}</span>
+    </div>
+  );
+
+  // Bar chart data — daily active users last 14 days
+  const barData = [42, 38, 55, 60, 58, 72, 68, 80, 75, 84, 79, 88, 83, 92];
+  const barMax = Math.max(...barData);
+
+  // Engagement breakdown
+  const engagementRows = [
+    { label: "Query generation", pct: 48, count: "12,840" },
+    { label: "Data exploration", pct: 28, count: "7,490" },
+    { label: "Notebook authoring", pct: 14, count: "3,745" },
+    { label: "Dashboard creation", pct: 10, count: "2,675" },
+  ];
+
+  // Top users table
+  const topUsers = [
+    { name: "sarah.chen@databricks.com", sessions: 142, queries: 894 },
+    { name: "marcus.j@databricks.com", sessions: 118, queries: 762 },
+    { name: "priya.r@databricks.com", sessions: 97, queries: 631 },
+    { name: "thomas.w@databricks.com", sessions: 84, queries: 548 },
+    { name: "aiko.t@databricks.com", sessions: 76, queries: 497 },
+  ];
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
-      {/* Scrollable body */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 pb-20">
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
         <div className="flex flex-col gap-4">
-          {/* Row 1: full-width */}
-          <PlaceholderBlock className="h-[180px] w-full" />
-          {/* Row 2: two equal columns */}
-          <div className="flex gap-4">
-            <PlaceholderBlock className="h-[180px] flex-1" />
-            <PlaceholderBlock className="h-[180px] flex-1" />
+
+          {/* Stat cards */}
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard label="Daily Active Users" value="2,847" sub="↑ 12% vs prior period" pts={dauPoints} color="#2272b4" />
+            <StatCard label="Weekly Active Users" value="9,214" sub="↑ 8% vs prior period" pts={wauPoints} color="#6b46c1" />
           </div>
-          {/* Row 3: full-width */}
-          <PlaceholderBlock className="h-[180px] w-full" />
-          {/* Row 4: three equal columns */}
-          <div className="flex gap-4">
-            <PlaceholderBlock className="h-[180px] flex-1" />
-            <PlaceholderBlock className="h-[180px] flex-1" />
-            <PlaceholderBlock className="h-[180px] flex-1" />
+
+          {/* DAU bar chart */}
+          <div className="rounded-lg border border-border bg-background-primary p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-paragraph font-medium text-text-primary">Daily Active Users — Last 14 Days</span>
+              <span className="text-hint text-text-secondary">Jan 11 – Jan 24</span>
+            </div>
+            <div className="flex items-end gap-1 h-[100px]">
+              {barData.map((v, i) => (
+                <div key={i} className="flex flex-1 flex-col items-center gap-1">
+                  <div
+                    className="w-full rounded-sm bg-[#2272b4] opacity-80"
+                    style={{ height: `${(v / barMax) * 100}%` }}
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="mt-1 flex justify-between text-hint text-text-secondary">
+              <span>Jan 11</span><span>Jan 17</span><span>Jan 24</span>
+            </div>
           </div>
+
+          {/* Engagement breakdown */}
+          <div className="rounded-lg border border-border bg-background-primary p-4">
+            <span className="mb-3 block text-paragraph font-medium text-text-primary">Engagement by Feature</span>
+            <div className="flex flex-col gap-2">
+              {engagementRows.map(row => (
+                <div key={row.label} className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between text-hint">
+                    <span className="text-text-secondary">{row.label}</span>
+                    <span className="font-medium text-text-primary">{row.count}</span>
+                  </div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-background-secondary">
+                    <div className="h-full rounded-full bg-[#2272b4]" style={{ width: `${row.pct}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Top users table */}
+          <div className="rounded-lg border border-border bg-background-primary p-4">
+            <span className="mb-3 block text-paragraph font-medium text-text-primary">Top Users</span>
+            <table className="w-full text-hint">
+              <thead>
+                <tr className="border-b border-border text-left text-text-secondary">
+                  <th className="pb-2 font-normal">User</th>
+                  <th className="pb-2 text-right font-normal">Sessions</th>
+                  <th className="pb-2 text-right font-normal">Queries</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topUsers.map((u, i) => (
+                  <tr key={i} className="border-b border-border last:border-0">
+                    <td className="py-1.5 text-text-primary truncate max-w-[160px]">{u.name}</td>
+                    <td className="py-1.5 text-right text-text-secondary">{u.sessions}</td>
+                    <td className="py-1.5 text-right text-text-secondary">{u.queries}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
         </div>
       </div>
-
     </div>
   );
 }
@@ -897,6 +1033,8 @@ function PreviewPanel({
     setActiveAssetId(selectedAsset.id);
   }, [selectedAsset]);
 
+  const [previewMoreMenuOpen, setPreviewMoreMenuOpen] = React.useState(false);
+
   const activeAsset = openAssets.find((a) => a.id === activeAssetId) ?? null;
 
   const closeAssetTab = (id: string) => {
@@ -974,12 +1112,22 @@ function PreviewPanel({
             size="small"
             tone="neutral"
           />
-          <IconButton
-            aria-label="More options"
-            icon={<Icon name="overflowIcon" size={14} />}
-            size="small"
-            tone="neutral"
-          />
+          <div className="relative">
+            <IconButton
+              aria-label="More options"
+              icon={<Icon name="overflowIcon" size={14} />}
+              size="small"
+              tone="neutral"
+              onClick={() => setPreviewMoreMenuOpen((v) => !v)}
+            />
+            {previewMoreMenuOpen && (
+              <MoreOptionsMenu
+                onClose={() => setPreviewMoreMenuOpen(false)}
+                onFullScreen={onClose}
+                isFullScreen={true}
+              />
+            )}
+          </div>
           <IconButton
             aria-label="Close preview panel"
             icon={
@@ -1138,20 +1286,25 @@ export default function ChatPage() {
     return summary?.assets;
   }, [state.steps, state.runStatus, state.activeThreadId]);
 
-  // Auto-switch to Review tab when assets become available
+  const assetClickRef = React.useRef(false);
+
+  // Auto-switch to Review tab when assets become available, unless opened via asset click
   React.useEffect(() => {
     if (reviewAssets && reviewAssets.length > 0 && previewOpen) {
-      setActiveTab("Review");
+      if (!assetClickRef.current) setActiveTab("Review");
+      assetClickRef.current = false;
     }
   }, [reviewAssets, previewOpen]);
 
   const handleAssetClick = React.useCallback((asset: ReviewAsset) => {
+    assetClickRef.current = true;
     setSelectedAsset(asset);
     if (containerRef.current) {
       setInitialPreviewWidth(Math.round(containerRef.current.offsetWidth / 2));
     }
     setPreviewOpen(true);
-  }, []);
+    setActiveTab("Assets");
+  }, [setActiveTab]);
 
   const handleTogglePreview = React.useCallback(() => {
     if (!previewOpen && containerRef.current) {

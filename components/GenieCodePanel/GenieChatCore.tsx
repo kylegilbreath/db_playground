@@ -19,11 +19,11 @@ import { Icon } from "@/components/icons";
 // ---------------------------------------------------------------------------
 
 export type ThreadStatus = "running" | "attention" | "input" | "done" | "review";
-export type GenieThread = { id: string; label: string; status: ThreadStatus; time?: string; subtitle?: string };
+export type GenieThread = { id: string; label: string; status: ThreadStatus; time?: string; subtitle?: string; diff?: { added: number; removed: number; files: number } };
 
 export const SEED_THREADS: GenieThread[] = [
   { id: "thread-eda", label: "EDA on ski resort properties with a 6 month forecast", status: "done", time: "2h", subtitle: "Created Ski Resort EDA notebook, ran forecast model" },
-  { id: "thread-dashboard", label: "Assistant Usage Dashboard: Analyze Last 90 Days", status: "attention", time: "7h", subtitle: "2 files ready for review" },
+  { id: "thread-dashboard", label: "Assistant Usage Dashboard: Analyze Last 90 Days", status: "attention", time: "7h", subtitle: "2 files ready for review", diff: { added: 40, removed: 2, files: 2 } },
   { id: "thread-input", label: "Cluster resorts into groups based on price, size, and snowfall", status: "done", time: "3d", subtitle: "Opened ski_resort_eda.py, ran clustering analysis" },
 ];
 
@@ -89,7 +89,7 @@ export function useGenieChatState() {
             // Pause — store remaining steps, set thread to "input"
             pendingStepsRef.current = { steps: runSteps.slice(pauseAt + 1), threadId };
             setRunStatus("done");
-            setThreads((prev) => prev.map((t) => t.id === threadId ? { ...t, status: "input" as ThreadStatus, time: "now", subtitle: "Waiting for your approval" } : t));
+            setThreads((prev) => prev.map((t) => t.id === threadId ? { ...t, status: "input" as ThreadStatus, time: "now", subtitle: "Waiting for your approval", diff: { added: 23, removed: 4, files: 2 } } : t));
           } else {
             // No confirmation or confirmation is last step — done
             setRunStatus("done");
@@ -168,6 +168,11 @@ export function useGenieChatState() {
     ? (threads.find((t) => t.id === activeThreadId)?.label ?? null)
     : null;
 
+  const handleRenameThread = React.useCallback((id: string, newLabel: string) => {
+    if (!newLabel.trim()) return;
+    setThreads((prev) => prev.map((t) => t.id === id ? { ...t, label: newLabel.trim() } : t));
+  }, []);
+
   return {
     text,
     setText,
@@ -182,6 +187,7 @@ export function useGenieChatState() {
     messagesEndRef,
     handleSubmit,
     handleNewChat,
+    handleRenameThread,
     hasAssets,
     timersRef,
   };
@@ -312,7 +318,19 @@ export function GenieChatThreadList({
                     <span className="min-w-0 flex-1 truncate text-paragraph font-medium leading-5 text-text-primary">{t.label}</span>
                     {t.time && <span className="shrink-0 text-hint text-text-secondary">{t.time}</span>}
                   </span>
-                  {t.subtitle && <span className="block truncate text-hint text-text-secondary">{t.subtitle}</span>}
+                  {(t.subtitle || t.diff) && (
+                    <span className="flex items-center gap-xs">
+                      {t.subtitle && <span className="min-w-0 flex-1 truncate text-hint text-text-secondary">{t.subtitle}</span>}
+                      {t.diff && (
+                        <span className="flex shrink-0 items-center gap-xs text-hint">
+                          <span className="font-medium text-green-600">+{t.diff.added}</span>
+                          <span className="font-medium text-red-500">-{t.diff.removed}</span>
+                          <span className="text-text-secondary opacity-40">·</span>
+                          <span className="text-text-secondary">{t.diff.files} file{t.diff.files !== 1 ? "s" : ""}</span>
+                        </span>
+                      )}
+                    </span>
+                  )}
                 </span>
               </button>
             );
@@ -428,7 +446,7 @@ const MORE_OPTIONS_ITEMS = [
   { icon: "speechBubbleIcon", label: "Send feedback to Databricks" },
 ] as const;
 
-function MoreOptionsMenu({
+export function MoreOptionsMenu({
   onClose,
   onTogglePanel,
   onFullScreen,
@@ -535,6 +553,7 @@ export function GenieChatBody({
     messagesEndRef,
     handleSubmit,
     handleNewChat,
+    handleRenameThread,
     hasAssets,
     timersRef: timers,
   } = state;
@@ -563,9 +582,19 @@ export function GenieChatBody({
         {/* Header */}
         <div className={cx("relative flex h-10 shrink-0 items-center gap-xs px-3", size === "compact" && "border-b border-border")}>
           {(size === "compact" || activeThreadTitle) && (
-            <span className="min-w-0 flex-1 truncate text-paragraph font-medium text-text-primary">
-              {activeThreadTitle ?? "Genie Code"}
-            </span>
+            activeThreadId && activeThreadTitle ? (
+              <input
+                key={activeThreadId}
+                className="min-w-0 flex-1 truncate bg-transparent text-paragraph font-medium text-text-primary outline-none hover:text-text-primary focus:rounded focus:outline focus:outline-2 focus:outline-action-default-border-focus"
+                defaultValue={activeThreadTitle}
+                onBlur={(e) => handleRenameThread(activeThreadId, e.currentTarget.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+              />
+            ) : (
+              <span className="min-w-0 flex-1 truncate text-paragraph font-medium text-text-primary">
+                {activeThreadTitle ?? "Genie Code"}
+              </span>
+            )
           )}
           {size === "full" && !activeThreadTitle && <div className="flex-1" />}
           {!previewOpen && (

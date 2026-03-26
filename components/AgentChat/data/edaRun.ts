@@ -2,6 +2,11 @@ import type { ChatStep } from "../types";
 
 export const EDA_STEPS: ChatStep[] = [
   {
+    type: "user",
+    id: "user-1",
+    text: "Do EDA on my ski_resort data",
+  },
+  {
     type: "thinking",
     id: "think-1",
     text: "The user wants to run EDA on the available data. I'll query the properties table and summarize the key metrics.",
