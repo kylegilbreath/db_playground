@@ -23,7 +23,7 @@ export type GenieThread = { id: string; label: string; status: ThreadStatus; tim
 
 export const SEED_THREADS: GenieThread[] = [
   { id: "thread-eda", label: "EDA on ski resort properties with a 6 month forecast", status: "done", time: "2h", subtitle: "Created Ski Resort EDA notebook, ran forecast model" },
-  { id: "thread-dashboard", label: "Assistant Usage Dashboard: Analyze Last 90 Days", status: "attention", time: "7h", subtitle: "2 files ready for review", diff: { added: 40, removed: 2, files: 2 } },
+  { id: "thread-dashboard", label: "Assistant Usage Dashboard: Analyze Last 90 Days", status: "attention", time: "7h", subtitle: "2 files ready for review", diff: { added: 40, removed: 2, files: 3 } },
   { id: "thread-input", label: "Cluster resorts into groups based on price, size, and snowfall", status: "done", time: "3d", subtitle: "Opened ski_resort_eda.py, ran clustering analysis" },
 ];
 
