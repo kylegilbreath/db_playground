@@ -9,6 +9,7 @@ import { IconButton } from "@/components/IconButton";
 import { TextInput } from "@/components/TextInput";
 
 import { useGenieChatState, GenieChatBody, GenieChatThreadList } from "@/components/GenieCodePanel/GenieChatCore";
+import { ASSISTANT_DASHBOARD_REVIEW_ASSETS } from "@/components/AgentChat/data/assistantDashboardRun";
 import type { ReviewAsset } from "@/components/AgentChat";
 
 // ---------------------------------------------------------------------------
@@ -1132,9 +1133,10 @@ export default function ChatPage() {
 
   const reviewAssets = React.useMemo(() => {
     if (state.runStatus !== "done") return undefined;
+    if (state.activeThreadId === "thread-dashboard") return ASSISTANT_DASHBOARD_REVIEW_ASSETS;
     const summary = state.steps.find((s) => s.type === "assets-summary") as { assets: ReviewAsset[] } | undefined;
     return summary?.assets;
-  }, [state.steps, state.runStatus]);
+  }, [state.steps, state.runStatus, state.activeThreadId]);
 
   // Auto-switch to Review tab when assets become available
   React.useEffect(() => {

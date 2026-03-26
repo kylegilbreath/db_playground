@@ -73,6 +73,7 @@ export type PromptBarProps = {
   onRejectAll?: () => void;
   onAcceptAll?: () => void;
   onAssetClick?: (asset: ReviewAsset) => void;
+  size?: "compact" | "full";
 };
 
 export function PromptBar({
@@ -85,6 +86,7 @@ export function PromptBar({
   onRejectAll,
   onAcceptAll,
   onAssetClick,
+  size = "compact",
 }: PromptBarProps) {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const isRunning = runStatus === "running";
@@ -116,7 +118,7 @@ export function PromptBar({
 
         {/* Input box */}
         <div
-          className={`flex flex-col gap-sm border border-border bg-background-primary p-sm shadow-[0px_1px_0px_0px_rgba(0,0,0,0.02),0px_2px_3px_-1px_rgba(0,0,0,0.05)] ${hasReview ? "rounded-b-lg border-t-0" : "rounded-lg"}`}
+          className={`flex flex-col gap-sm border border-border bg-background-primary ${size === "full" ? "p-md" : "p-sm"} shadow-[0px_1px_0px_0px_rgba(0,0,0,0.02),0px_2px_3px_-1px_rgba(0,0,0,0.05)] ${hasReview ? "rounded-b-lg border-t-0" : "rounded-lg"}`}
           onMouseDown={(e) => {
             if ((e.target as HTMLElement).closest("button,input")) return;
             e.preventDefault();

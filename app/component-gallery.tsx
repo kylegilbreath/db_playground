@@ -118,6 +118,8 @@ export async function ComponentGallery() {
               "sidebarClosedIcon",
               "sidebarOpenIcon",
               "threadAttentionIcon",
+              "forkIcon",
+              "branchCheckIn",
             ] as const
           ).map((name) => (
             <div key={name} className="flex flex-col items-center gap-xs">

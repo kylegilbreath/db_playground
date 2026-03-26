@@ -47,6 +47,7 @@ export interface ToolConfirmationMessage {
   verb: ActionVerb;
   asset: Asset;
   permissionLabel?: string;
+  initialStatus?: "asking" | "done" | "declined";
 }
 
 export interface AssetSubItem {

@@ -42,7 +42,7 @@ export function AgentChat({
               />
             );
           case "assets-summary":
-            return <AssetsSummary key={step.id} step={step} onAssetClick={onAssetClick} />;
+            return null;
           case "suggestion-chips":
             return <SuggestionChips key={step.id} step={step} onSelect={onSuggestionSelect} />;
           case "feedback":

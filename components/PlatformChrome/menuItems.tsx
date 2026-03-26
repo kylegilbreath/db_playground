@@ -30,24 +30,6 @@ export function getAppSwitcherItems(router: AppRouterInstance): DropdownMenuItem
       ),
     },
     {
-      id: "databricks_one_no_topbar",
-      label: "Databricks One (M1)",
-      description: "Side bar nav, no top bar",
-      onSelect: () => router.push("/databricks-one-chat-nav-no-top-bar"),
-      leadingIcon: (
-        <img alt="" src="/logos/DatabricksOne.svg" className="block size-8 object-contain" />
-      ),
-    },
-    {
-      id: "databricks_one_m2",
-      label: "Databricks One (M2)",
-      description: "M1 + custom text widget",
-      onSelect: () => router.push("/databricks-one-m2"),
-      leadingIcon: (
-        <img alt="" src="/logos/DatabricksOne.svg" className="block size-8 object-contain" />
-      ),
-    },
-    {
       id: "lakebase",
       label: "Lakebase Postgres",
       description: "Operational databases for applications",

@@ -36,15 +36,6 @@ const STATIC_STEPS: ChatStep[] = [
     text: "Lake Tahoe leads with 90 properties (avg $259). Average booking: 1.7 guests, ~$540 revenue.",
   },
   {
-    type: "assets-summary",
-    id: "as1",
-    defaultOpen: true,
-    assets: [
-      { id: "nb1", name: "Ski Resort EDA", kind: "notebook", diffCount: 10 },
-      { id: "f1", name: "ski_resort_eda.py", kind: "file", diffCount: 3 },
-    ],
-  },
-  {
     type: "suggestion-chips",
     id: "sc1",
     suggestions: ["Forecast revenue for 6 months", "Show cancellation rate by resort"],

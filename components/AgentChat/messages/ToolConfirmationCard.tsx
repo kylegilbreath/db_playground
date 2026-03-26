@@ -38,7 +38,7 @@ export function ToolConfirmationCard({
   onAllow?: () => void;
   onAssetClick?: (asset: ReviewAsset) => void;
 }) {
-  const [status, setStatus] = React.useState<CardStatus>("asking");
+  const [status, setStatus] = React.useState<CardStatus>(step.initialStatus ?? "asking");
   const [expanded, setExpanded] = React.useState(false);
 
   const label = `${step.verb} ${step.asset.name}`;

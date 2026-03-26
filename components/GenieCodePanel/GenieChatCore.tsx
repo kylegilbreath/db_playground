@@ -8,6 +8,7 @@ import { PromptBar } from "@/components/AgentChat/PromptBar";
 import { SKI_RESORT_STEPS, SKI_RESORT_DELAYS } from "@/components/AgentChat/data/skiResortRun";
 import { EDA_STEPS, EDA_DELAYS } from "@/components/AgentChat/data/edaRun";
 import { FIND_DATA_STEPS, FIND_DATA_DELAYS } from "@/components/AgentChat/data/findDataRun";
+import { ASSISTANT_DASHBOARD_STEPS, ASSISTANT_DASHBOARD_REVIEW_ASSETS } from "@/components/AgentChat/data/assistantDashboardRun";
 import { DefaultButton } from "@/components/DefaultButton";
 import { GenieChatIcon } from "@/components/GenieChatIcon";
 import { IconButton } from "@/components/IconButton";
@@ -17,12 +18,12 @@ import { Icon } from "@/components/icons";
 // Shared data
 // ---------------------------------------------------------------------------
 
-export type ThreadStatus = "running" | "attention" | "input" | "done";
+export type ThreadStatus = "running" | "attention" | "input" | "done" | "review";
 export type GenieThread = { id: string; label: string; status: ThreadStatus; time?: string; subtitle?: string };
 
 export const SEED_THREADS: GenieThread[] = [
   { id: "thread-eda", label: "EDA on ski resort properties with a 6 month forecast", status: "done", time: "2h", subtitle: "Created Ski Resort EDA notebook, ran forecast model" },
-  { id: "thread-revenue", label: "What is my dumpling sales revenue by category", status: "attention", time: "1d", subtitle: "Needs your input to continue" },
+  { id: "thread-dashboard", label: "Assistant Usage Dashboard: Analyze Last 90 Days", status: "attention", time: "7h", subtitle: "2 files ready for review" },
   { id: "thread-input", label: "Cluster resorts into groups based on price, size, and snowfall", status: "done", time: "3d", subtitle: "Opened ski_resort_eda.py, ran clustering analysis" },
 ];
 
@@ -43,15 +44,16 @@ function cx(...parts: Array<string | undefined | false>) {
 export function useGenieChatState() {
   const [text, setText] = React.useState("");
   const [threads, setThreads] = React.useState<GenieThread[]>(SEED_THREADS);
-  const [activeThreadId, setActiveThreadId] = React.useState<string | null>(null);
-  const [steps, setSteps] = React.useState<ChatStep[]>([]);
-  const [runStatus, setRunStatus] = React.useState<RunStatus>("idle");
+  const [activeThreadId, setActiveThreadId] = React.useState<string | null>("thread-dashboard");
+  const [steps, setSteps] = React.useState<ChatStep[]>(ASSISTANT_DASHBOARD_STEPS);
+  const [runStatus, setRunStatus] = React.useState<RunStatus>("done");
   const timersRef = React.useRef<ReturnType<typeof setTimeout>[]>([]);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
   // Steps pending after a tool-confirmation pause
   const pendingStepsRef = React.useRef<{ steps: ChatStep[]; threadId: string } | null>(null);
   // Persisted steps keyed by thread ID
   const threadStepsRef = React.useRef<Map<string, ChatStep[]>>(new Map([
+    ["thread-dashboard", ASSISTANT_DASHBOARD_STEPS],
     ["thread-eda", EDA_STEPS],
     ["thread-revenue", SKI_RESORT_STEPS],
     ["thread-input", FIND_DATA_STEPS],
@@ -112,7 +114,7 @@ export function useGenieChatState() {
     timersRef.current.forEach(clearTimeout);
     timersRef.current = [];
     setActiveThreadId(id);
-    setRunStatus("idle");
+    setRunStatus(id === "thread-dashboard" ? "done" : "idle");
     setSteps(threadStepsRef.current.get(id) ?? []);
   }, []);
 
@@ -222,7 +224,7 @@ function GenieChatEmptyState({
           ))}
         </div>
         <div className="w-full">
-          <PromptBar value={text} onValueChange={onTextChange} onSubmit={onSubmit} />
+          <PromptBar value={text} onValueChange={onTextChange} onSubmit={onSubmit} size={size} />
         </div>
       </div>
     </div>
@@ -244,7 +246,10 @@ function ThreadStatusIcon({ status }: { status: ThreadStatus }) {
     );
   }
   if (status === "attention") {
-    return <Icon name="threadAttentionIcon" size={14} className="shrink-0 text-text-secondary" />;
+    return <Icon name="branchCheckIn" size={14} className="shrink-0 text-text-secondary" />;
+  }
+  if (status === "review") {
+    return <Icon name="BracketsCheckIcon" size={14} className="shrink-0 text-text-secondary" />;
   }
   if (status === "input") {
     return (
@@ -288,23 +293,23 @@ export function GenieChatThreadList({
         <div key={group.label} className="flex flex-col">
           <span className="px-2 py-2 text-hint text-text-secondary">{group.label}</span>
           {group.threads.map((t) => {
-            const hasIcon = t.status === "running" || t.status === "attention" || t.status === "input";
+            const hasIcon = t.status === "running" || t.status === "attention" || t.status === "input" || t.status === "review";
             return (
               <button
                 key={t.id}
                 type="button"
                 onClick={() => onSelect(t.id)}
                 className={cx(
-                  "flex w-full items-start gap-2 rounded-md py-2 pr-2 pl-2 text-left hover:bg-background-secondary",
-                  activeThreadId === t.id && "bg-background-secondary",
+                  "flex w-full items-start gap-2 rounded-md py-2.5 pr-3 pl-3 text-left hover:bg-action-default-background-hover",
+                  activeThreadId === t.id && "bg-action-default-background-hover",
                 )}
               >
                 <span className="mt-[3px] shrink-0">
                   {hasIcon ? <ThreadStatusIcon status={t.status} /> : <span className="inline-block w-[14px]" />}
                 </span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-baseline gap-1">
-                    <span className="min-w-0 flex-1 truncate text-paragraph leading-5 text-text-primary">{t.label}</span>
+                <span className="min-w-0 flex-1 flex flex-col gap-[4px]">
+                  <span className="flex items-baseline gap-sm">
+                    <span className="min-w-0 flex-1 truncate text-paragraph font-medium leading-5 text-text-primary">{t.label}</span>
                     {t.time && <span className="shrink-0 text-hint text-text-secondary">{t.time}</span>}
                   </span>
                   {t.subtitle && <span className="block truncate text-hint text-text-secondary">{t.subtitle}</span>}
@@ -680,9 +685,13 @@ export function GenieChatBody({
                   onSubmit={() => handleSubmit()}
                   onStop={handleStop}
                   runStatus={runStatus}
-                  reviewAssets={hasAssets && runStatus === "done"
-                    ? (steps.find((s) => s.type === "assets-summary") as any)?.assets as ReviewAsset[]
-                    : undefined}
+                  reviewAssets={
+                    runStatus === "done" && activeThreadId === "thread-dashboard"
+                      ? ASSISTANT_DASHBOARD_REVIEW_ASSETS
+                      : hasAssets && runStatus === "done"
+                        ? (steps.find((s) => s.type === "assets-summary") as any)?.assets as ReviewAsset[]
+                        : undefined
+                  }
                   onAssetClick={onAssetClick}
                 />
               </div>
