@@ -351,6 +351,10 @@ export function GenieChatThreadList({
   );
 }
 
+const DEFAULT_SIDEBAR_WIDTH = 180;
+const MIN_SIDEBAR_WIDTH = 140;
+const MAX_SIDEBAR_WIDTH = 400;
+
 export function GenieChatThreadSidebar({
   threads,
   activeThreadId,
@@ -364,8 +368,37 @@ export function GenieChatThreadSidebar({
   onNewChat: () => void;
   onClose: () => void;
 }) {
+  const [width, setWidth] = React.useState(DEFAULT_SIDEBAR_WIDTH);
+  const isDragging = React.useRef(false);
+  const startX = React.useRef(0);
+  const startWidth = React.useRef(DEFAULT_SIDEBAR_WIDTH);
+
+  const handleMouseDown = React.useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDragging.current = true;
+    startX.current = e.clientX;
+    startWidth.current = width;
+    const onMouseMove = (mv: MouseEvent) => {
+      if (!isDragging.current) return;
+      // Sidebar is on the right, so dragging left increases width
+      const next = Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, startWidth.current - (mv.clientX - startX.current)));
+      setWidth(next);
+    };
+    const onMouseUp = () => {
+      isDragging.current = false;
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, [width]);
+
   return (
-    <div className="flex h-full w-[180px] shrink-0 flex-col border-l border-border">
+    <div className="relative flex h-full shrink-0 flex-col border-l border-border" style={{ width }}>
       <div className="flex h-10 shrink-0 items-center px-3">
         <span className="flex-1 text-paragraph font-medium text-text-primary">Chat history</span>
         <IconButton
@@ -394,6 +427,14 @@ export function GenieChatThreadSidebar({
         </button>
       </div>
       <GenieChatThreadList threads={threads} activeThreadId={activeThreadId} onSelect={onSelect} />
+      {/* Drag handle */}
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize chat history sidebar"
+        className="absolute left-0 top-0 h-full w-1 cursor-col-resize hover:bg-action-default-border-hover active:bg-action-default-border-hover"
+        onMouseDown={handleMouseDown}
+      />
     </div>
   );
 }

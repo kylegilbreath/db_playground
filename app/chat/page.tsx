@@ -28,7 +28,7 @@ const DEFAULT_PREVIEW_WIDTH = 340;
 const MIN_PREVIEW_WIDTH = 240;
 const MAX_PREVIEW_WIDTH = 600;
 
-type SidePanel = "tools" | "connections";
+type SidePanel = "threads" | "tools" | "connections";
 
 // ---------------------------------------------------------------------------
 // Toggle switch (inline, no external component needed)
@@ -257,7 +257,7 @@ function ChatLeftNav({
   onCollapsedChange: (v: boolean) => void;
 }) {
   const setCollapsed = onCollapsedChange;
-  const [activePanel, setActivePanel] = React.useState<SidePanel | null>(null);
+  const [activePanel, setActivePanel] = React.useState<SidePanel>("threads");
   const [width, setWidth] = React.useState(DEFAULT_NAV_WIDTH);
   const [searchActive, setSearchActive] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -290,7 +290,7 @@ function ChatLeftNav({
   }, [width]);
 
   const togglePanel = (panel: SidePanel) =>
-    setActivePanel((prev) => (prev === panel ? null : panel));
+    setActivePanel((prev) => (prev === panel ? "threads" : panel));
 
   if (collapsed) {
     return (
@@ -322,6 +322,16 @@ function ChatLeftNav({
           />
         </Tooltip>
         <span className="flex-1 text-paragraph font-medium text-text-primary">Genie Chat</span>
+        <Tooltip label="Threads" align="right">
+          <IconButton
+            aria-label="Threads"
+            icon={<Icon name="speechBubbleIcon" size={14} />}
+            size="small"
+            tone="neutral"
+            className={cx(activePanel === "threads" && "!bg-background-tertiary text-text-primary")}
+            onClick={() => togglePanel("threads")}
+          />
+        </Tooltip>
         <Tooltip label="Tools" align="right">
           <IconButton
             aria-label="Tools"
@@ -348,7 +358,7 @@ function ChatLeftNav({
         <ToolsPanel />
       ) : activePanel === "connections" ? (
         <ConnectionsPanel />
-      ) : (
+      ) : activePanel === "threads" ? (
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
           {/* Quick actions */}
           <div className="flex flex-col px-2 pt-1">
@@ -412,7 +422,7 @@ function ChatLeftNav({
             />
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* Drag handle */}
       <div
