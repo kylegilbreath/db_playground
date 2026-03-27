@@ -1094,10 +1094,10 @@ function DashboardPreview() {
                 <span className="text-paragraph font-medium text-text-primary">Daily Active Users — Last 14 Days</span>
                 <span className="text-hint text-text-secondary">Jan 11 – Jan 24</span>
               </div>
-              <div className="flex items-end gap-1 h-[100px]">
+              <div className="flex items-end gap-1" style={{ height: 100 }}>
                 {barData.map((v, i) => (
-                  <div key={i} className="flex flex-1 flex-col items-center gap-1">
-                    <div className="w-full rounded-sm bg-[#2272b4] opacity-80" style={{ height: `${(v / barMax) * 100}%` }} />
+                  <div key={i} className="flex flex-1 flex-col items-end">
+                    <div className="w-full rounded-sm bg-[#2272b4] opacity-80" style={{ height: `${(v / barMax) * 100}px` }} />
                   </div>
                 ))}
               </div>
