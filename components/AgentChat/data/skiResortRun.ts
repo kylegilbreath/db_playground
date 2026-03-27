@@ -26,6 +26,12 @@ export const SKI_RESORT_STEPS: ChatStep[] = [
         asset: { id: "nb1", name: "Ski Resort EDA", kind: "notebook" },
         status: "done",
       },
+      {
+        id: "a1-dash",
+        verb: "Created",
+        asset: { id: "dash1", name: "Ski Resort Dashboard", kind: "dashboard" },
+        status: "done",
+      },
     ],
   },
   {
@@ -56,6 +62,12 @@ export const SKI_RESORT_STEPS: ChatStep[] = [
         id: "a5",
         verb: "Opened",
         asset: { id: "nb1", name: "Ski Resort EDA", kind: "notebook" },
+        status: "done",
+      },
+      {
+        id: "a6",
+        verb: "Created",
+        asset: { id: "dash1", name: "Ski Resort Dashboard", kind: "dashboard" },
         status: "done",
       },
     ],

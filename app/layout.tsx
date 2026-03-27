@@ -16,17 +16,17 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "UB FY27",
+  title: "Datablitz",
   icons: {
     icon: [
       // Prefer SVG for crisp scaling where supported.
-      { url: "/favicon.svg?v=ub-fy27", type: "image/svg+xml" },
+      { url: "/favicon.svg?v=datablitz", type: "image/svg+xml" },
       // Fallback for legacy browsers.
-      { url: "/favicon.ico?v=ub-fy27", sizes: "any" },
+      { url: "/favicon.ico?v=datablitz", sizes: "any" },
     ],
-    apple: [{ url: "/apple-touch-icon.png?v=ub-fy27", sizes: "180x180" }],
+    apple: [{ url: "/apple-touch-icon.png?v=datablitz", sizes: "180x180" }],
   },
-  manifest: "/manifest.json?v=ub-fy27",
+  manifest: "/manifest.json?v=datablitz",
 };
 
 export const viewport: Viewport = {

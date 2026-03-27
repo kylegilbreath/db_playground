@@ -231,7 +231,7 @@ function GenieChatEmptyState({
   size?: "compact" | "full";
   animationKey?: number;
 }) {
-  const iconSize = size === "full" ? 160 : 120;
+  const iconSize = size === "full" ? 180 : 140;
   const gap = size === "full" ? "gap-4" : "gap-3";
   const maxW = size === "full" ? "max-w-[560px]" : "max-w-[400px]";
 
@@ -239,20 +239,22 @@ function GenieChatEmptyState({
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-8">
       <div className={cx("flex w-full flex-col items-center", maxW, size === "full" ? "gap-8" : "gap-6")}>
         <div className={cx("flex flex-col items-center", gap)}>
-          <GenieChatIcon size={iconSize} animationKey={animationKey} />
-          <div className="flex flex-col items-center gap-1">
+          <div className="animate-[fadeUp_0.5s_ease-out_both]">
+            <GenieChatIcon size={iconSize} animationKey={animationKey} />
+          </div>
+          <div className="flex flex-col items-center gap-1 animate-[fadeUp_0.5s_ease-out_0.1s_both]">
             <h2 className="text-heading-m font-semibold text-text-primary">Genie Code</h2>
             <p className="text-paragraph text-text-secondary">Run multi-step data and AI tasks</p>
           </div>
         </div>
-        <div className="flex w-full flex-wrap items-center justify-center gap-2">
+        <div className="flex w-full flex-wrap items-center justify-center gap-2 animate-[fadeUp_0.5s_ease-out_0.2s_both]">
           {GENIE_EXAMPLE_PROMPTS.map((prompt) => (
-            <DefaultButton key={prompt} radius="full" onClick={() => onSubmit(prompt)}>
+            <DefaultButton key={prompt} radius="full" onClick={() => onSubmit(prompt)} className="border-transparent bg-background-secondary hover:bg-background-tertiary">
               {prompt}
             </DefaultButton>
           ))}
         </div>
-        <div className="w-full">
+        <div className="w-full animate-[fadeUp_0.5s_ease-out_0.3s_both]">
           <PromptBar value={text} onValueChange={onTextChange} onSubmit={onSubmit} size={size} />
         </div>
       </div>

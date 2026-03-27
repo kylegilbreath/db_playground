@@ -22,9 +22,9 @@ export function getAppSwitcherItems(router: AppRouterInstance): DropdownMenuItem
     },
     {
       id: "databricks_one_topbar",
-      label: "Databricks One (Top bar)",
+      label: "Databricks One",
       description: "One variant with top bar and chat nav",
-      onSelect: () => router.push("/databricks-one-chat-nav-with-top-bar"),
+      onSelect: () => router.push("/databricks-one"),
       leadingIcon: (
         <img alt="" src="/logos/DatabricksOne.svg" className="block size-8 object-contain" />
       ),
@@ -43,13 +43,6 @@ export function getAppSwitcherItems(router: AppRouterInstance): DropdownMenuItem
       description: "Sticker sheet and component reference",
       onSelect: () => router.push("/components"),
       leadingIcon: <Icon name="AppsIcon" size={24} className="text-text-secondary" />,
-    },
-    {
-      id: "asset_matrix",
-      label: "Asset visual matrix",
-      description: "Asset types across view modes and themes",
-      onSelect: () => router.push("/databricks-one-chat-nav-no-top-bar/asset-matrix"),
-      leadingIcon: <Icon name="gridIcon" size={24} className="text-text-secondary" />,
     },
   ];
 }

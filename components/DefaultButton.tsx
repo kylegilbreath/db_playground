@@ -94,7 +94,7 @@ export function DefaultButton({
         </span>
       ) : null}
 
-      <span className="text-paragraph leading-5">{children}</span>
+      <span className="min-w-0 truncate text-paragraph leading-5">{children}</span>
 
       {menu ? (
         <span

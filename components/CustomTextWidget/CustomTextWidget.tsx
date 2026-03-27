@@ -74,6 +74,28 @@ export function CustomTextWidget(props: CustomTextWidgetProps) {
     className,
     actions = [],
     children,
+    // Destructure collapsible/preview props so they don't leak onto the <div>
+    mode,
+    // CollapsibleModeProps
+    // @ts-expect-error union narrowing — safe to destructure
+    expanded: _expanded,
+    // @ts-expect-error union narrowing
+    defaultExpanded: _defaultExpanded,
+    // @ts-expect-error union narrowing
+    onExpandedChange: _onExpandedChange,
+    // @ts-expect-error union narrowing
+    collapsedHeightPx: _collapsedHeightPx,
+    // @ts-expect-error union narrowing
+    showMoreLabel: _showMoreLabel,
+    // @ts-expect-error union narrowing
+    showLessLabel: _showLessLabel,
+    // PreviewModeProps
+    // @ts-expect-error union narrowing
+    previewHeightPx: _previewHeightPx,
+    // @ts-expect-error union narrowing
+    seeMoreLabel: _seeMoreLabel,
+    // @ts-expect-error union narrowing
+    onSeeMore: _onSeeMore,
     ...rest
   } = props;
 
@@ -122,14 +144,9 @@ export function CustomTextWidget(props: CustomTextWidgetProps) {
 
   const showFooterFade = isPreview || !expanded;
 
-  const cardProps = rest as Omit<
-    React.HTMLAttributes<HTMLDivElement>,
-    "children"
-  >;
-
   return (
     <div
-      {...cardProps}
+      {...rest}
       className={cx(
         "relative w-full overflow-hidden",
         "rounded-[16px] border border-border bg-background-primary",
@@ -139,7 +156,7 @@ export function CustomTextWidget(props: CustomTextWidgetProps) {
       )}
       style={{
         ...(animatedHeight === "auto" ? {} : { height: `${animatedHeight}px` }),
-        ...cardProps.style,
+        ...rest.style,
       }}
       ref={outerRef}
       onTransitionEnd={(e) => {

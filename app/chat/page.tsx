@@ -102,18 +102,21 @@ const SKILLS = [
   {
     id: "10x-engineer",
     name: "10x-engineer",
+    file: "10x-engineer.md",
     description:
       "Opinionated workflow constraints for high-leverage engineering — plan-first execution, subagent strategy, self-improvement loops, and autonomous bug fixing.",
   },
   {
     id: "frontend-reviewer",
     name: "frontend-reviewer",
+    file: "frontend-reviewer.md",
     description:
       "Deep frontend code review agent for React applications. Analyzes code for accessibility issues, performance problems, React anti-patterns, and security vulnerabilities. Returns structured feedback with P0/P1/P2 severity levels.",
   },
 ];
 
 function ToolsPanel() {
+  const router = useRouter();
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-3">
       {/* Skills section */}
@@ -124,14 +127,18 @@ function ToolsPanel() {
             Add
           </DefaultButton>
         </div>
-        <div className="flex flex-col gap-2 rounded-mid bg-background-secondary p-2">
+        <div className="flex flex-col rounded-mid bg-background-secondary overflow-hidden">
           {SKILLS.map((skill, i) => (
             <React.Fragment key={skill.id}>
               {i > 0 && <div className="h-px w-full bg-border" />}
-              <div className="flex flex-col gap-1">
+              <button
+                type="button"
+                onClick={() => router.push(`/editor?skill=${encodeURIComponent(skill.file)}`)}
+                className="flex flex-col gap-1 px-2 py-2 text-left hover:bg-background-tertiary transition-colors"
+              >
                 <p className="text-paragraph text-text-primary">{skill.name}</p>
                 <p className="line-clamp-4 text-hint text-text-secondary">{skill.description}</p>
-              </div>
+              </button>
             </React.Fragment>
           ))}
         </div>
@@ -697,13 +704,20 @@ function DashboardPreview() {
     </svg>
   );
 
-  const StatCard = ({ label, value, sub, pts, color }: { label: string; value: string; sub: string; pts: number[]; color: string }) => (
-    <div className="flex flex-col gap-2 rounded-lg border border-border bg-background-primary p-4">
+  const StatCard = ({ id, label, value, sub, pts, color }: { id: string; label: string; value: string; sub: string; pts: number[]; color: string }) => (
+    <button
+      type="button"
+      onClick={() => setSelectedWidget((w) => w === id ? null : id)}
+      className={cx(
+        "flex flex-col gap-2 rounded-lg border bg-background-primary p-4 text-left transition-colors",
+        selectedWidget === id ? "border-action-default-border-focus ring-1 ring-action-default-border-focus" : "border-border hover:border-action-default-border-hover",
+      )}
+    >
       <span className="text-hint text-text-secondary">{label}</span>
       <span className="text-[22px] font-semibold leading-none text-text-primary">{value}</span>
       <Sparkline pts={pts} color={color} />
       <span className="text-hint text-text-secondary">{sub}</span>
-    </div>
+    </button>
   );
 
   // Bar chart data — daily active users last 14 days
@@ -729,12 +743,35 @@ function DashboardPreview() {
 
   const router = useRouter();
   const [activeTab, setActiveTab] = React.useState("Ski Resort Dashboard");
+  const [activeDataset, setActiveDataset] = React.useState("ski_conditions");
+  const [resultTab, setResultTab] = React.useState<"Result Table" | "Schema">("Result Table");
+  const [dataSidebarTab, setDataSidebarTab] = React.useState<"datasets" | "catalog">("datasets");
+  const [selectedWidget, setSelectedWidget] = React.useState<string | null>(null);
+
+  const datasets = [
+    { id: "ski_conditions", name: "ski_conditions" },
+    { id: "lift_operations", name: "lift_operations" },
+    { id: "ticket_sales", name: "ticket_sales" },
+    { id: "snowfall_history", name: "snowfall_history" },
+  ];
+
+  const resultRows = [
+    { date: "2024-01-15", resort: "Vail", snowfall_in: 8, lifts_open: 32, visitors: 4820 },
+    { date: "2024-01-16", resort: "Breckenridge", snowfall_in: 5, lifts_open: 28, visitors: 3910 },
+    { date: "2024-01-17", resort: "Aspen", snowfall_in: 12, lifts_open: 14, visitors: 2150 },
+    { date: "2024-01-18", resort: "Vail", snowfall_in: 3, lifts_open: 35, visitors: 5200 },
+    { date: "2024-01-19", resort: "Park City", snowfall_in: 6, lifts_open: 40, visitors: 6100 },
+    { date: "2024-01-20", resort: "Breckenridge", snowfall_in: 9, lifts_open: 30, visitors: 4400 },
+    { date: "2024-01-21", resort: "Aspen", snowfall_in: 2, lifts_open: 16, visitors: 2800 },
+    { date: "2024-01-22", resort: "Vail", snowfall_in: 14, lifts_open: 31, visitors: 4650 },
+    { date: "2024-01-23", resort: "Park City", snowfall_in: 7, lifts_open: 42, visitors: 6300 },
+    { date: "2024-01-24", resort: "Breckenridge", snowfall_in: 4, lifts_open: 27, visitors: 3750 },
+  ];
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
-      {/* Dashboard header */}
+      {/* Edit view header */}
       <div className="shrink-0 border-b border-border bg-background-primary">
-        {/* Title row */}
         <div className="flex items-center gap-sm px-4 pt-3 pb-2">
           <span className="min-w-0 truncate text-title3 font-semibold text-text-primary">Ski Resort Dashboard</span>
           <button type="button" aria-label="Bookmark" className="shrink-0 text-text-secondary hover:text-text-primary">
@@ -744,107 +781,510 @@ function DashboardPreview() {
           <button type="button" aria-label="More options" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-sm text-text-secondary hover:bg-background-secondary hover:text-text-primary">
             <Icon name="overflowIcon" size={16} />
           </button>
-          <button type="button" className="flex shrink-0 items-center gap-xs text-paragraph text-text-secondary hover:text-text-primary">
+          <button type="button" className="flex shrink-0 items-center justify-center h-7 w-7 rounded-sm text-text-secondary hover:bg-background-secondary hover:text-text-primary">
             <Icon name="refreshIcon" size={14} />
-            1m ago
           </button>
-          <DefaultButton size="small">Schedule</DefaultButton>
-          <DefaultButton size="small">Share</DefaultButton>
-          <PrimaryButton size="small" leadingIcon={<Icon name="pencilIcon" size={14} />} className="shrink-0" onClick={() => router.push("/dashboard/edit")}>Edit draft</PrimaryButton>
+          <DefaultButton size="small" leadingIcon={<span className="inline-block h-2 w-2 shrink-0 rounded-full bg-green-500" />} menu className="max-w-[120px]">
+            <span className="truncate">0 - Shared SQL Warehouse</span>
+          </DefaultButton>
+          <DefaultButton size="small">Publish</DefaultButton>
+          <DefaultButton size="small" onClick={() => router.push("/dashboard/edit")}>Share</DefaultButton>
         </div>
         {/* Tabs */}
         <div className="flex items-end px-4">
+          <button
+            type="button"
+            onClick={() => setActiveTab("Data")}
+            className={cx(
+              "mr-2 flex items-center gap-xs pb-2 text-paragraph border-b-2 transition-colors",
+              activeTab === "Data"
+                ? "border-action-default-border-focus font-medium text-text-primary"
+                : "border-transparent text-text-secondary hover:text-text-primary",
+            )}
+          >
+            <Icon name="tableIcon" size={14} />
+            Data
+          </button>
+          <span className="mb-2 mr-2 h-4 w-px self-end bg-border" />
+          <button type="button" className="mb-2 mr-3 flex h-5 w-5 items-center justify-center rounded-sm text-text-secondary hover:bg-background-secondary hover:text-text-primary">
+            <Icon name="filterIcon" size={12} />
+          </button>
           {["Ski Resort Dashboard", "Executive Summary"].map((tab) => (
             <button
               key={tab}
               type="button"
               onClick={() => setActiveTab(tab)}
               className={cx(
-                "px-1 pb-2 mr-4 text-paragraph border-b-2 transition-colors",
+                "mr-sm flex items-center gap-xs pb-2 text-paragraph border-b-2 transition-colors",
                 activeTab === tab
                   ? "border-action-default-border-focus font-medium text-text-primary"
                   : "border-transparent text-text-secondary hover:text-text-primary",
               )}
             >
               {tab}
+              {activeTab === tab && <Icon name="overflowIcon" size={12} className="text-text-secondary" />}
             </button>
           ))}
+          <button type="button" className="pb-2 text-text-secondary hover:text-text-primary">
+            <Icon name="plusIcon" size={14} />
+          </button>
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-        <div className="flex flex-col gap-4">
-
-          {/* Stat cards */}
-          <div className="grid grid-cols-2 gap-3">
-            <StatCard label="Daily Active Users" value="2,847" sub="↑ 12% vs prior period" pts={dauPoints} color="#2272b4" />
-            <StatCard label="Weekly Active Users" value="9,214" sub="↑ 8% vs prior period" pts={wauPoints} color="#6b46c1" />
-          </div>
-
-          {/* DAU bar chart */}
-          <div className="rounded-lg border border-border bg-background-primary p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <span className="text-paragraph font-medium text-text-primary">Daily Active Users — Last 14 Days</span>
-              <span className="text-hint text-text-secondary">Jan 11 – Jan 24</span>
-            </div>
-            <div className="flex items-end gap-1 h-[100px]">
-              {barData.map((v, i) => (
-                <div key={i} className="flex flex-1 flex-col items-center gap-1">
-                  <div
-                    className="w-full rounded-sm bg-[#2272b4] opacity-80"
-                    style={{ height: `${(v / barMax) * 100}%` }}
-                  />
-                </div>
-              ))}
-            </div>
-            <div className="mt-1 flex justify-between text-hint text-text-secondary">
-              <span>Jan 11</span><span>Jan 17</span><span>Jan 24</span>
-            </div>
-          </div>
-
-          {/* Engagement breakdown */}
-          <div className="rounded-lg border border-border bg-background-primary p-4">
-            <span className="mb-3 block text-paragraph font-medium text-text-primary">Engagement by Feature</span>
-            <div className="flex flex-col gap-2">
-              {engagementRows.map(row => (
-                <div key={row.label} className="flex flex-col gap-1">
-                  <div className="flex items-center justify-between text-hint">
-                    <span className="text-text-secondary">{row.label}</span>
-                    <span className="font-medium text-text-primary">{row.count}</span>
+      {/* Body */}
+      {activeTab === "Data" ? (
+        <div className="flex min-h-0 flex-1">
+          {/* Datasets + Catalog sidebar */}
+          {(() => {
+            const catalogGroups = [
+              { label: "Active", count: 4, items: [
+                { name: "unique_orders", icon: "tableIcon" },
+                { name: "<dbtag1>always_highligh...", icon: "tableIcon" },
+                { name: "order_details", icon: "tableIcon" },
+                { name: "customers_100k", icon: "tableIcon" },
+              ]},
+              { label: "Recents", count: 3, items: [
+                { name: "craigslist_vehicles", icon: "tableIcon" },
+                { name: "bookings_profile_metrics", icon: "tableIcon" },
+                { name: "sample_orders_daily_202...", icon: "tableIcon" },
+              ]},
+              { label: "Favorites", count: 8, items: [
+                { name: "dim_orders", icon: "folderOutlinedIcon" },
+                { name: "craigslist_vehicles", icon: "tableIcon" },
+                { name: "car_prices", icon: "tableIcon" },
+                { name: "kyle_gilbreath", icon: "notebookIcon" },
+                { name: "kyle_g", icon: "databaseOutlinedIcon" },
+                { name: "samples", icon: "databaseOutlinedIcon" },
+                { name: "jason_messer", icon: "databaseOutlinedIcon" },
+                { name: "dumpling_shop", icon: "databaseOutlinedIcon" },
+              ]},
+              { label: "My Data", count: null, items: [
+                { name: "My Files", icon: "folderOutlinedIcon" },
+              ]},
+            ];
+            return (
+              <div className="flex w-[220px] shrink-0 flex-col overflow-hidden border-r border-border bg-background-secondary">
+                {/* Sidebar header */}
+                <div className="flex shrink-0 items-center justify-between px-3 py-2">
+                  <span className="text-paragraph font-medium text-text-primary">Data</span>
+                  <div className="flex items-center gap-xs">
+                    <button type="button" className="flex h-5 w-5 items-center justify-center rounded-sm text-text-secondary hover:bg-background-secondary hover:text-text-primary">
+                      <Icon name="refreshIcon" size={12} />
+                    </button>
+                    <button type="button" className="flex h-5 w-5 items-center justify-center rounded-sm text-text-secondary hover:bg-background-secondary hover:text-text-primary">
+                      <Icon name="closeIcon" size={12} />
+                    </button>
                   </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-background-secondary">
-                    <div className="h-full rounded-full bg-[#2272b4]" style={{ width: `${row.pct}%` }} />
+                </div>
+                {/* Segmented control */}
+                <div className="shrink-0 border-b border-border px-3 py-2">
+                  <div className="flex rounded-sm border border-border bg-background-tertiary p-0.5">
+                    {(["datasets", "catalog"] as const).map((tab) => (
+                      <button
+                        key={tab}
+                        type="button"
+                        onClick={() => setDataSidebarTab(tab)}
+                        className={cx(
+                          "flex-1 rounded-[3px] px-2 py-0.5 text-hint transition-colors",
+                          dataSidebarTab === tab
+                            ? "bg-background-primary font-medium text-text-primary shadow-sm"
+                            : "text-text-secondary hover:text-text-primary",
+                        )}
+                      >
+                        {tab === "datasets" ? "Datasets" : "Catalog"}
+                      </button>
+                    ))}
                   </div>
                 </div>
-              ))}
+
+                {dataSidebarTab === "datasets" ? (
+                  <>
+                    <div className="min-h-0 flex-1 overflow-y-auto px-1 py-1">
+                      {datasets.map((ds) => (
+                        <button
+                          key={ds.id}
+                          type="button"
+                          onClick={() => setActiveDataset(ds.id)}
+                          className={cx(
+                            "group flex w-full items-center gap-xs rounded-sm px-2 py-1.5 text-left text-paragraph",
+                            activeDataset === ds.id
+                              ? "bg-action-default-background-hover text-text-primary"
+                              : "text-text-secondary hover:bg-background-secondary hover:text-text-primary",
+                          )}
+                        >
+                          <Icon name="tableIcon" size={14} className="shrink-0" />
+                          <span className="min-w-0 flex-1 truncate">{ds.name}</span>
+                          {activeDataset === ds.id && (
+                            <Icon name="overflowHorizontalIcon" size={12} className="shrink-0 opacity-0 group-hover:opacity-100" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-auto flex flex-col gap-1 border-t border-border px-2 py-2">
+                      <button type="button" className="flex items-center gap-xs rounded-sm px-1 py-1.5 text-paragraph text-text-secondary hover:bg-background-secondary hover:text-text-primary">
+                        <Icon name="plusIcon" size={12} />
+                        Add dataset
+                      </button>
+                      <button type="button" className="flex items-center gap-xs rounded-sm px-1 py-1.5 text-paragraph text-text-secondary hover:bg-background-secondary hover:text-text-primary">
+                        <Icon name="plusIcon" size={12} />
+                        Add SQL dataset
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Search */}
+                    <div className="flex shrink-0 items-center gap-xs border-b border-border px-2 py-2">
+                      <div className="flex flex-1 items-center gap-xs rounded-sm border border-border bg-background-primary px-2 py-1">
+                        <Icon name="searchIcon" size={12} className="shrink-0 text-text-secondary" />
+                        <input type="text" placeholder="Type to search..." className="min-w-0 flex-1 bg-transparent text-hint text-text-primary placeholder:text-text-placeholder outline-none" />
+                      </div>
+                      <button type="button" className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-text-secondary hover:bg-background-secondary hover:text-text-primary">
+                        <Icon name="filterIcon" size={12} />
+                      </button>
+                    </div>
+                    {/* For you / All pills */}
+                    <div className="flex shrink-0 gap-xs px-3 py-2">
+                      <button type="button" className="rounded-full border border-border bg-background-secondary px-3 py-0.5 text-hint font-medium text-text-primary">For you</button>
+                      <button type="button" className="rounded-full border border-border px-3 py-0.5 text-hint text-text-secondary hover:bg-background-secondary">All</button>
+                    </div>
+                    {/* Tree */}
+                    <div className="min-h-0 flex-1 overflow-y-auto">
+                      {catalogGroups.map((group) => (
+                        <div key={group.label}>
+                          <div className="flex items-center gap-xs px-3 py-1">
+                            <Icon name="chevronDownIcon" size={12} className="text-text-secondary" />
+                            <span className="text-hint text-text-secondary">{group.label}{group.count !== null ? ` (${group.count})` : ""}</span>
+                          </div>
+                          {group.items.map((item) => (
+                            <button key={item.name} type="button" className="flex w-full items-center gap-xs pl-7 pr-3 py-1 text-left text-hint text-text-primary hover:bg-background-secondary">
+                              <Icon name="chevronRightIcon" size={10} className="shrink-0 text-text-secondary" />
+                              <Icon name={item.icon} size={14} className="shrink-0 text-text-secondary" />
+                              <span className="min-w-0 flex-1 truncate">{item.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* SQL editor + results */}
+          <div className="flex min-h-0 flex-1 flex-col">
+            {/* Editor toolbar */}
+            <div className="flex shrink-0 items-center gap-sm border-b border-border px-3 py-2">
+              <button type="button" className="flex items-center gap-xs rounded-md bg-action-primary-background-default px-3 py-1 text-paragraph font-medium text-action-primary-text-default hover:bg-action-primary-background-hover">
+                <Icon name="playIcon" size={14} />
+                Run
+              </button>
+              <span className="text-hint text-text-secondary">3 hours ago</span>
+              <div className="flex-1" />
+              <button type="button" className="flex items-center gap-xs text-hint text-action-tertiary-text-default hover:text-text-primary">
+                <Icon name="SparkleIcon" size={12} />
+                Edit
+              </button>
+            </div>
+
+            {/* SQL editor */}
+            <div className="shrink-0 border-b border-border bg-background-secondary px-4 py-3 font-mono text-hint">
+              <span className="text-text-secondary">1</span>
+              <span className="ml-3">
+                <span className="text-blue-500">select</span>
+                <span className="text-text-primary"> * </span>
+                <span className="text-blue-500">from</span>
+                <span className="text-orange-400"> ski_resort</span>
+                <span className="text-text-primary">.</span>
+                <span className="text-orange-400">conditions</span>
+                <span className="text-text-primary">.</span>
+                <span className="text-orange-400">{activeDataset}</span>
+              </span>
+            </div>
+
+            {/* Add parameter */}
+            <div className="shrink-0 border-b border-border px-3 py-2">
+              <button type="button" className="flex items-center gap-xs rounded-md border border-border px-3 py-1 text-paragraph text-text-secondary hover:bg-background-secondary hover:text-text-primary">
+                <Icon name="plusIcon" size={12} />
+                Add parameter
+              </button>
+            </div>
+
+            {/* Result tabs + table */}
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="flex shrink-0 items-center justify-between border-b border-border px-3">
+                <div className="flex items-end">
+                  {(["Result Table", "Schema"] as const).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setResultTab(t)}
+                      className={cx(
+                        "mr-4 pb-2 pt-2 text-paragraph border-b-2 transition-colors",
+                        resultTab === t
+                          ? "border-action-default-border-focus font-medium text-text-primary"
+                          : "border-transparent text-text-secondary hover:text-text-primary",
+                      )}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+                <button type="button" className="flex items-center gap-xs rounded-md border border-border px-2 py-1 text-hint text-text-secondary hover:bg-background-secondary hover:text-text-primary">
+                  <Icon name="plusIcon" size={12} />
+                  Add custom calculation
+                </button>
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                <table className="w-full text-hint">
+                  <thead className="sticky top-0 bg-background-primary">
+                    <tr className="border-b border-border text-left text-text-secondary">
+                      <th className="w-8 px-2 py-2 font-normal text-text-secondary" />
+                      <th className="px-3 py-2 font-normal">
+                        <div className="flex items-center gap-xs"><Icon name="calendarIcon" size={12} />date</div>
+                      </th>
+                      <th className="px-3 py-2 font-normal">
+                        <div className="flex items-center gap-xs"><Icon name="LettersIcon" size={12} />resort</div>
+                      </th>
+                      <th className="px-3 py-2 font-normal text-right">
+                        <div className="flex items-center justify-end gap-xs"><Icon name="NumbersIcon" size={12} />snowfall_in</div>
+                      </th>
+                      <th className="px-3 py-2 font-normal text-right">
+                        <div className="flex items-center justify-end gap-xs"><Icon name="NumbersIcon" size={12} />lifts_open</div>
+                      </th>
+                      <th className="px-3 py-2 font-normal text-right">
+                        <div className="flex items-center justify-end gap-xs"><Icon name="NumbersIcon" size={12} />visitors</div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {resultRows.map((row, i) => (
+                      <tr key={i} className="border-b border-border last:border-0 hover:bg-background-secondary">
+                        <td className="px-2 py-1.5 text-text-secondary">{i + 1}</td>
+                        <td className="px-3 py-1.5 text-text-primary">{row.date}</td>
+                        <td className="px-3 py-1.5 text-text-primary">{row.resort}</td>
+                        <td className="px-3 py-1.5 text-right text-text-secondary">{row.snowfall_in}</td>
+                        <td className="px-3 py-1.5 text-right text-text-secondary">{row.lifts_open}</td>
+                        <td className="px-3 py-1.5 text-right text-text-secondary">{row.visitors.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
-
-          {/* Top users table */}
-          <div className="rounded-lg border border-border bg-background-primary p-4">
-            <span className="mb-3 block text-paragraph font-medium text-text-primary">Top Users</span>
-            <table className="w-full text-hint">
-              <thead>
-                <tr className="border-b border-border text-left text-text-secondary">
-                  <th className="pb-2 font-normal">User</th>
-                  <th className="pb-2 text-right font-normal">Sessions</th>
-                  <th className="pb-2 text-right font-normal">Queries</th>
-                </tr>
-              </thead>
-              <tbody>
-                {topUsers.map((u, i) => (
-                  <tr key={i} className="border-b border-border last:border-0">
-                    <td className="py-1.5 text-text-primary truncate max-w-[160px]">{u.name}</td>
-                    <td className="py-1.5 text-right text-text-secondary">{u.sessions}</td>
-                    <td className="py-1.5 text-right text-text-secondary">{u.queries}</td>
-                  </tr>
+        </div>
+      ) : (
+      <div className="flex min-h-0 flex-1">
+        {/* Canvas */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+          <div className="flex flex-col gap-4">
+            <div className="grid grid-cols-2 gap-3">
+              <StatCard id="dau" label="Daily Active Users" value="2,847" sub="↑ 12% vs prior period" pts={dauPoints} color="#2272b4" />
+              <StatCard id="wau" label="Weekly Active Users" value="9,214" sub="↑ 8% vs prior period" pts={wauPoints} color="#6b46c1" />
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedWidget((w) => w === "bar" ? null : "bar")}
+              className={cx("w-full rounded-lg border bg-background-primary p-4 text-left transition-colors", selectedWidget === "bar" ? "border-action-default-border-focus ring-1 ring-action-default-border-focus" : "border-border hover:border-action-default-border-hover")}
+            >
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-paragraph font-medium text-text-primary">Daily Active Users — Last 14 Days</span>
+                <span className="text-hint text-text-secondary">Jan 11 – Jan 24</span>
+              </div>
+              <div className="flex items-end gap-1 h-[100px]">
+                {barData.map((v, i) => (
+                  <div key={i} className="flex flex-1 flex-col items-center gap-1">
+                    <div className="w-full rounded-sm bg-[#2272b4] opacity-80" style={{ height: `${(v / barMax) * 100}%` }} />
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+              <div className="mt-1 flex justify-between text-hint text-text-secondary">
+                <span>Jan 11</span><span>Jan 17</span><span>Jan 24</span>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedWidget((w) => w === "engagement" ? null : "engagement")}
+              className={cx("w-full rounded-lg border bg-background-primary p-4 text-left transition-colors", selectedWidget === "engagement" ? "border-action-default-border-focus ring-1 ring-action-default-border-focus" : "border-border hover:border-action-default-border-hover")}
+            >
+              <span className="mb-3 block text-paragraph font-medium text-text-primary">Engagement by Feature</span>
+              <div className="flex flex-col gap-2">
+                {engagementRows.map(row => (
+                  <div key={row.label} className="flex flex-col gap-1">
+                    <div className="flex items-center justify-between text-hint">
+                      <span className="text-text-secondary">{row.label}</span>
+                      <span className="font-medium text-text-primary">{row.count}</span>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-background-secondary">
+                      <div className="h-full rounded-full bg-[#2272b4]" style={{ width: `${row.pct}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedWidget((w) => w === "topusers" ? null : "topusers")}
+              className={cx("w-full rounded-lg border bg-background-primary p-4 text-left transition-colors", selectedWidget === "topusers" ? "border-action-default-border-focus ring-1 ring-action-default-border-focus" : "border-border hover:border-action-default-border-hover")}
+            >
+              <span className="mb-3 block text-paragraph font-medium text-text-primary">Top Users</span>
+              <table className="w-full text-hint">
+                <thead>
+                  <tr className="border-b border-border text-left text-text-secondary">
+                    <th className="pb-2 font-normal">User</th>
+                    <th className="pb-2 text-right font-normal">Sessions</th>
+                    <th className="pb-2 text-right font-normal">Queries</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topUsers.map((u, i) => (
+                    <tr key={i} className="border-b border-border last:border-0">
+                      <td className="py-1.5 text-text-primary truncate max-w-[120px]">{u.name}</td>
+                      <td className="py-1.5 text-right text-text-secondary">{u.sessions}</td>
+                      <td className="py-1.5 text-right text-text-secondary">{u.queries}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </button>
           </div>
-
         </div>
+
+        {/* Widget config panel */}
+        {selectedWidget && (
+          <div className="flex w-[240px] shrink-0 flex-col overflow-y-auto border-l border-border bg-background-primary">
+            {/* Panel header */}
+            <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
+              <span className="text-paragraph font-semibold text-text-primary">Widget</span>
+              <button type="button" onClick={() => setSelectedWidget(null)} className="flex h-6 w-6 items-center justify-center rounded-sm text-text-secondary hover:bg-background-secondary hover:text-text-primary">
+                <Icon name="overflowIcon" size={14} />
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-0 divide-y divide-border">
+              {/* Widget checkboxes */}
+              <div className="flex items-center gap-3 px-4 py-3">
+                <label className="flex items-center gap-2 text-paragraph text-text-primary cursor-pointer">
+                  <input type="checkbox" defaultChecked className="accent-[#2272b4]" />
+                  Title
+                </label>
+                <label className="flex items-center gap-2 text-paragraph text-text-primary cursor-pointer">
+                  <input type="checkbox" className="accent-[#2272b4]" />
+                  Description
+                </label>
+              </div>
+
+              {/* Dataset */}
+              <div className="flex flex-col gap-2 px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-paragraph font-semibold text-text-primary">Dataset</span>
+                  <button type="button" className="text-hint text-action-tertiary-text-default hover:underline">Show filters</button>
+                </div>
+                <div className="flex items-center justify-between rounded-sm border border-border px-3 py-1.5 text-paragraph text-text-primary">
+                  <span>unique_orders</span>
+                  <Icon name="chevronDownIcon" size={14} className="text-text-secondary" />
+                </div>
+              </div>
+
+              {/* Visualization */}
+              <div className="flex flex-col gap-2 px-4 py-3">
+                <span className="text-paragraph font-semibold text-text-primary">Visualization</span>
+                <div className="flex items-center justify-between rounded-sm border border-border px-3 py-1.5 text-paragraph text-text-primary">
+                  <div className="flex items-center gap-xs">
+                    <Icon name="chartBarIcon" size={16} className="text-[#2272b4]" />
+                    <span>Bar</span>
+                  </div>
+                  <Icon name="chevronDownIcon" size={14} className="text-text-secondary" />
+                </div>
+              </div>
+
+              {/* X axis */}
+              <div className="flex flex-col gap-2 px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-paragraph font-semibold text-text-primary">X axis</span>
+                  <div className="flex items-center gap-xs">
+                    <button type="button" className="text-text-secondary hover:text-text-primary"><Icon name="overflowIcon" size={14} /></button>
+                    <button type="button" className="text-text-secondary hover:text-text-primary"><Icon name="plusIcon" size={14} /></button>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between rounded-sm bg-background-secondary px-3 py-1.5 text-paragraph text-text-primary">
+                  <div className="flex items-center gap-xs">
+                    <Icon name="calendarIcon" size={14} className="text-text-secondary" />
+                    <span>MONTHLY(month)</span>
+                  </div>
+                  <button type="button" className="text-text-secondary hover:text-text-primary"><Icon name="closeSmallIcon" size={12} /></button>
+                </div>
+              </div>
+
+              {/* Y axis */}
+              <div className="flex flex-col gap-2 px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-paragraph font-semibold text-text-primary">Y axis</span>
+                  <div className="flex items-center gap-xs">
+                    <button type="button" className="text-text-secondary hover:text-text-primary"><Icon name="overflowIcon" size={14} /></button>
+                    <button type="button" className="text-text-secondary hover:text-text-primary"><Icon name="plusIcon" size={14} /></button>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between rounded-sm bg-background-secondary px-3 py-1.5 text-paragraph text-text-primary">
+                  <div className="flex items-center gap-xs">
+                    <Icon name="NumbersIcon" size={14} className="text-text-secondary" />
+                    <span>SUM(count)</span>
+                  </div>
+                  <button type="button" className="text-text-secondary hover:text-text-primary"><Icon name="closeSmallIcon" size={12} /></button>
+                </div>
+              </div>
+
+              {/* Color */}
+              <div className="flex flex-col gap-2 px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-paragraph font-semibold text-text-primary">Color</span>
+                  <div className="flex items-center gap-xs">
+                    <button type="button" className="text-text-secondary hover:text-text-primary"><Icon name="overflowIcon" size={14} /></button>
+                    <button type="button" className="text-text-secondary hover:text-text-primary"><Icon name="plusIcon" size={14} /></button>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between rounded-sm bg-background-secondary px-3 py-1.5 text-paragraph text-text-primary">
+                  <div className="flex items-center gap-xs">
+                    <Icon name="LettersIcon" size={14} className="text-text-secondary" />
+                    <span>category</span>
+                  </div>
+                  <button type="button" className="text-text-secondary hover:text-text-primary"><Icon name="closeSmallIcon" size={12} /></button>
+                </div>
+              </div>
+
+              {/* Tooltip */}
+              <div className="flex items-center justify-between px-4 py-3">
+                <span className="text-paragraph font-semibold text-text-primary">Tooltip</span>
+                <button type="button" className="text-text-secondary hover:text-text-primary"><Icon name="plusIcon" size={14} /></button>
+              </div>
+
+              {/* Labels */}
+              <div className="flex items-center justify-between px-4 py-3">
+                <span className="text-paragraph font-semibold text-text-primary">Labels</span>
+                <button type="button" className="flex h-5 w-9 items-center rounded-full bg-border px-0.5 transition-colors">
+                  <span className="h-4 w-4 rounded-full bg-background-primary shadow-sm" />
+                </button>
+              </div>
+
+              {/* Facet */}
+              <div className="flex items-center justify-between px-4 py-3">
+                <span className="text-paragraph font-semibold text-text-primary">Facet</span>
+                <button type="button" className="text-text-secondary hover:text-text-primary"><Icon name="plusIcon" size={14} /></button>
+              </div>
+
+              {/* Annotation */}
+              <div className="flex items-center justify-between px-4 py-3">
+                <span className="text-paragraph font-semibold text-text-primary">Annotation</span>
+                <button type="button" className="text-text-secondary hover:text-text-primary"><Icon name="plusIcon" size={14} /></button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
+      )}
     </div>
   );
 }
@@ -873,6 +1313,32 @@ const FAKE_DIFF: Record<string, Array<{ kind: "add" | "remove" | "context"; text
     { kind: "add",     text: "    df = df.withColumn('avg_price', F.col('total_price') / F.col('guests'))" },
     { kind: "remove",  text: "-   df = df.cache()" },
     { kind: "context", text: "    return df" },
+  ],
+  dashboard: [
+    { kind: "context", text: `{` },
+    { kind: "context", text: `  "datasets": [` },
+    { kind: "add",     text: `+   { "name": "f555d3cd", "displayName": "unique_orders",` },
+    { kind: "add",     text: `+     "queryLines": ["select * from dbdemos.dumpling_shop.unique_orders"] },` },
+    { kind: "add",     text: `+   { "name": "b424d2aa", "displayName": "bookings",` },
+    { kind: "add",     text: `+     "queryLines": ["select * from \`<dbtag1>always_highlighted_in_search_results?<dbtag1>\`.default.\`<dbtag1>always_highlighted?<dbtag1>\` limit 100"] },` },
+    { kind: "add",     text: `+   { "name": "c8ca9c29", "displayName": "order_details",` },
+    { kind: "add",     text: `+     "queryLines": ["SELECT * FROM dbdemos.dumpling_shop.order_details"] },` },
+    { kind: "remove",  text: `-   { "name": "9b99d957", "displayName": "customers_50k",` },
+    { kind: "remove",  text: `-     "queryLines": ["SELECT * FROM kyle_gilbreath.big_tables.customers_50k"] }` },
+    { kind: "add",     text: `+   { "name": "9b99d957", "displayName": "customers_100k",` },
+    { kind: "add",     text: `+     "queryLines": ["SELECT * FROM kyle_gilbreath.big_tables.customers_100k"] }` },
+    { kind: "context", text: `  ],` },
+    { kind: "context", text: `  "pages": [` },
+    { kind: "context", text: `    { "name": "eb25f21c", "displayName": "This is a test page name",` },
+    { kind: "add",     text: `+     "layout": [ { "widget": { "name": "996f7b68", "spec": { "widgetType": "bar" } } },` },
+    { kind: "add",     text: `+                 { "widget": { "name": "b902e340", "spec": { "widgetType": "table" } } } ],` },
+    { kind: "context", text: `      "pageType": "PAGE_TYPE_CANVAS" },` },
+    { kind: "add",     text: `+   { "name": "a29f2c31", "displayName": "New Page 1",` },
+    { kind: "add",     text: `+     "layout": [ { "widget": { "name": "0785390a", "multilineTextboxSpec": { "lines": ["# This is a new page"] } } } ],` },
+    { kind: "add",     text: `+     "pageType": "PAGE_TYPE_CANVAS" }` },
+    { kind: "context", text: `  ],` },
+    { kind: "context", text: `  "uiSettings": { "theme": { "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED" }, "applyModeEnabled": false }` },
+    { kind: "context", text: `}` },
   ],
 };
 
@@ -912,7 +1378,7 @@ function FileDiffSection({
           <Icon name={open ? "chevronDownIcon" : "chevronRightIcon"} size={12} />
         </button>
         <Icon
-          name={asset.kind === "notebook" ? "notebookIcon" : "fileCodeIcon"}
+          name={asset.kind === "notebook" ? "notebookIcon" : asset.kind === "dashboard" ? "dashboardIcon" : "fileCodeIcon"}
           size={14}
           className="shrink-0 text-text-secondary"
         />

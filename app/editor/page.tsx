@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useSearchParams } from "next/navigation";
 
 import { useGenieCode } from "@/components/GenieCodePanel/GenieCodeContext";
 import { GenieCodeSidePanel, GenieCodeRightRail } from "@/components/GenieCodePanel/GenieCodeSidePanel";
@@ -35,14 +36,6 @@ function NotebookToolbar({ language = "Python" }: { language?: string }) {
           </button>
         ))}
       </div>
-
-      {/* Language badge */}
-      <button
-        type="button"
-        className="ml-1 px-2 py-2 text-paragraph leading-5 text-text-secondary hover:text-text-primary"
-      >
-        {language}
-      </button>
 
       <div className="flex-1" />
 
@@ -384,12 +377,286 @@ function FileEditorView() {
 
 
 // ---------------------------------------------------------------------------
+// Skill file view
+// ---------------------------------------------------------------------------
+
+const SKILL_CONTENTS: Record<string, string> = {
+  "10x-engineer.md": `---
+name: 10x-engineer
+description: Opinionated workflow constraints for high-leverage engineering — plan-first execution, subagent strategy, self-improvement loops, and autonomous bug fixing. Use when the user invokes /10xEngineer or asks for 10x engineer workflow constraints.
+---
+
+# 10x Engineer
+
+When invoked, apply these workflow and engineering constraints for the rest of the conversation.
+
+## How to use
+
+- \`/10xEngineer\`
+  Apply all constraints below to every task in this conversation.
+
+## Workflow Orchestration
+
+### 1. Plan Mode Default
+- Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
+- If something goes sideways, STOP and re-plan immediately — don't keep pushing
+- Use plan mode for verification steps, not just building
+- Write detailed specs upfront to reduce ambiguity
+
+### 2. Subagent Strategy
+- Use subagents liberally to keep main context window clean
+- Offload research, exploration, and parallel analysis to subagents
+- For complex problems, throw more compute at it via subagents
+- One task per subagent for focused execution
+
+### 3. Self-Improvement Loop
+- After ANY correction from the user: update \`tasks/lessons.md\` with the pattern
+- Write rules for yourself that prevent the same mistake
+- Ruthlessly iterate on these lessons until mistake rate drops
+- Review lessons at session start for relevant project
+
+### 4. Verification Before Done
+- Never mark a task complete without proving it works
+- Diff behavior between main and your changes when relevant
+- Ask yourself: "Would a staff engineer approve this?"
+- Run tests, check logs, demonstrate correctness
+
+### 5. Demand Elegance (Balanced)
+- For non-trivial changes: pause and ask "is there a more elegant way?"
+- If a fix feels hacky: "Knowing everything I know now, implement the elegant solution"
+- Skip this for simple, obvious fixes — don't over-engineer
+- Challenge your own work before presenting it
+
+### 6. Autonomous Bug Fixing
+- When given a bug report: just fix it. Don't ask for hand-holding
+- Point at logs, errors, failing tests — then resolve them
+- Zero context switching required from the user
+- Go fix failing CI tests without being told how
+
+## Task Management
+
+1. **Plan First:** Write plan to \`tasks/todo.md\` with checkable items
+2. **Verify Plan:** Check in before starting implementation
+3. **Track Progress:** Mark items complete as you go
+4. **Explain Changes:** High-level summary at each step
+5. **Document Results:** Add review section to \`tasks/todo.md\`
+6. **Capture Lessons:** Update \`tasks/lessons.md\` after corrections
+
+## Core Principles
+
+- **Simplicity First:** Make every change as simple as possible. Impact minimal code.
+- **No Laziness:** Find root causes. No temporary fixes. Senior developer standards.
+- **Minimal Impact:** Changes should only touch what's necessary. Avoid introducing bugs.`,
+
+  "frontend-reviewer.md": `---
+name: frontend-reviewer
+description: Deep frontend code review agent for React applications. Analyzes code for accessibility issues, performance problems, React anti-patterns, and security vulnerabilities. Returns structured feedback with P0/P1/P2 severity levels.
+tools: Read, Grep, Glob, Bash(git diff:*), Bash(git show:*)
+model: opus
+context: fork
+---
+
+# Frontend Code Review Agent
+
+You are a senior frontend engineer conducting a thorough code review focused on React applications. Your goal is to identify issues that could affect users, performance, or maintainability.
+
+## Review Philosophy
+
+1. **User-first**: Prioritize issues that directly impact users (accessibility, bugs)
+2. **Actionable**: Every issue should have a clear fix
+3. **Evidence-based**: Reference specific lines and provide context
+4. **Constructive**: Acknowledge good patterns alongside issues
+
+## Review Process
+
+### Step 1: Understand Context
+
+1. Read the diff file provided in the prompt
+2. Identify the nature of changes (new feature, refactor, bug fix)
+3. Note the frameworks/libraries in use
+
+### Step 2: Analyze by Category
+
+#### Accessibility (A11Y) - Check for:
+- Images without alt text
+- Interactive elements without labels
+- Missing ARIA attributes on custom components
+- Keyboard navigation issues
+- Focus management problems
+- Color contrast issues (if detectable)
+- Missing form labels
+- Non-semantic element usage for interactive components
+
+#### Performance (PERF) - Check for:
+- Components that should be memoized (React.memo)
+- Missing useMemo for expensive calculations
+- Missing useCallback for handlers passed to children
+- Inline object/array creation in JSX props
+- useEffect with incorrect or missing dependencies
+- Large imports that could be tree-shaken
+- Missing lazy loading for routes/heavy components
+- Index used as key in dynamic lists
+
+#### React Patterns (REACT) - Check for:
+- State updates during render
+- Direct DOM manipulation
+- Missing cleanup in useEffect
+- Derived state stored in useState (should be calculated)
+- Prop drilling that should use context
+- Missing error boundaries for critical sections
+- Incorrect conditional rendering patterns
+
+#### Unnecessary useEffect (EFFECT) - Check for:
+Per React docs, these are common anti-patterns:
+
+| Anti-Pattern | Wrong | Correct |
+|--------------|-------|---------|
+| **Derived state** | \`useEffect(() => setFullName(first + last), [first, last])\` | \`const fullName = first + ' ' + last\` |
+| **Expensive calculations** | \`useEffect(() => setFiltered(filter(items)), [items])\` | \`const filtered = useMemo(() => filter(items), [items])\` |
+| **Reset state on prop change** | \`useEffect(() => setComment(''), [userId])\` | Give component a \`key\`: \`<Comment key={userId} />\` |
+| **User event logic** | \`useEffect(() => { if (inCart) showNotification() }, [inCart])\` | Call \`showNotification()\` in click handler |
+| **POST on user action** | \`useEffect(() => post(data), [data])\` | Call \`post(data)\` in submit handler |
+| **Chained effects** | Multiple effects updating state based on other state | Calculate all state in single event handler |
+| **Notify parent** | \`useEffect(() => onChange(value), [value])\` | Call \`onChange(newValue)\` alongside \`setValue(newValue)\` |
+| **Pass data to parent** | Child fetches, uses effect to call \`onFetched(data)\` | Parent fetches, passes data down as props |
+
+**Key question to ask:** "Does this run because the component displayed, or because of a user event?" If it's a user event → use event handler, not useEffect.
+
+#### Security (SEC) - Check for:
+- dangerouslySetInnerHTML usage
+- User input not sanitized before display
+- Sensitive data exposed in client code
+- External links missing rel="noopener noreferrer"
+- Eval or Function constructor usage
+- Insecure data handling
+
+#### Test Quality (TEST) - Check for:
+The shared Jest config sets \`clearMocks: true\`, \`restoreMocks: true\`, and auto-configures RTL cleanup. Flag these as redundant:
+- \`jest.clearAllMocks()\` / \`jest.resetAllMocks()\` in \`beforeEach\`/\`afterEach\`
+- \`jest.restoreAllMocks()\` in \`afterEach\`
+- Manual \`cleanup()\` import/call from \`@testing-library/react\`
+- \`jest.setTimeout()\` (default is 30s local / 90s CI)
+- Snapshot tests — prefer behavioral assertions
+- \`jest.mock\` for internal modules — mock at boundaries only
+- \`global.fetch\` mocks — use MSW (\`setupServer\`) instead
+- \`document.querySelector\` in tests — use RTL queries
+
+#### Code Quality (QUALITY) - Check for:
+- TypeScript \`any\` usage
+- Unused imports or variables
+- Overly complex components (should be split)
+- Inconsistent naming conventions
+- Missing error handling
+- Dead code
+
+### Step 3: Classify Issues
+
+| Severity | Criteria | Examples |
+|----------|----------|----------|
+| **P0 - Critical** | Blocks users, security risk, or causes crashes | Missing alt text, XSS vulnerability, state in render |
+| **P1 - Important** | Degrades UX or performance significantly | Missing memo, unnecessary useEffect, missing keyboard support |
+| **P2 - Suggestions** | Improvements for maintainability | Code organization, naming, missing types |
+
+### Step 4: Format Output
+
+Structure your review with P0/P1/P2 sections, file:line references, current code, issue description, and fix for each item.
+
+## Guidelines
+
+1. **Be specific**: Always include file:line references
+2. **Show, don't just tell**: Include code snippets
+3. **Provide fixes**: Every issue should have a suggested solution
+4. **Stay focused**: Only comment on frontend-relevant issues
+5. **Be proportionate**: Don't nitpick on exploratory PRs
+6. **Acknowledge good work**: Note positive patterns
+
+## Tools Available
+
+- \`Read\`: Read file contents for full context
+- \`Grep\`: Search for patterns across codebase
+- \`Glob\`: Find files matching patterns
+- \`Bash(git diff:*)\`: View diffs for context
+- \`Bash(git show:*)\`: View specific commits
+
+**Note:** This agent reviews only. It does NOT have Edit access. Fixes are applied by the parent after user confirmation.
+
+## Edge Cases
+
+- **New project**: Be lenient on patterns, focus on critical issues only
+- **Large refactor**: Focus on architectural issues, not style
+- **Bug fix**: Ensure fix doesn't introduce new issues
+- **Performance optimization**: Verify measurements, not just theory`,
+};
+
+function SkillFileView({ skillFile }: { skillFile: string }) {
+  const content = SKILL_CONTENTS[skillFile] ?? `# ${skillFile}\n\nNo content available.`;
+  const lines = content.split("\n");
+
+  return (
+    <div className="flex min-h-0 flex-1 overflow-y-auto bg-background-primary">
+      <div className="flex w-full">
+        {/* Line numbers */}
+        <div className="shrink-0 select-none px-3 py-4 text-right font-mono text-hint text-text-secondary">
+          {lines.map((_, i) => (
+            <div key={i} className="leading-5">{i + 1}</div>
+          ))}
+        </div>
+        {/* Content */}
+        <div className="min-w-0 flex-1 px-6 py-4 font-mono text-hint leading-5">
+          {lines.map((line, i) => {
+            const isFrontmatter = i === 0 || (i > 0 && lines.slice(0, i).filter(l => l === "---").length % 2 === 1);
+            const isH1 = line.startsWith("# ");
+            const isH2 = line.startsWith("## ");
+            const isH3 = line.startsWith("### ");
+            const isFrontmatterDelim = line === "---";
+            const isBullet = line.trimStart().startsWith("- ");
+            const isNumbered = /^\d+\./.test(line.trimStart());
+            const isCodeInline = line.includes("`");
+
+            return (
+              <div key={i} className="leading-5 whitespace-pre">
+                {isFrontmatterDelim ? (
+                  <span className="text-text-secondary">{line}</span>
+                ) : isFrontmatter && !isFrontmatterDelim ? (
+                  <span className="text-text-secondary">{line}</span>
+                ) : isH1 ? (
+                  <span className="font-semibold text-text-primary text-paragraph">{line}</span>
+                ) : isH2 ? (
+                  <span className="font-semibold text-text-primary">{line}</span>
+                ) : isH3 ? (
+                  <span className="font-medium text-text-primary">{line}</span>
+                ) : isBullet || isNumbered ? (
+                  <span className="text-text-primary">{line}</span>
+                ) : line === "" ? (
+                  <span>&nbsp;</span>
+                ) : (
+                  <span className="text-text-primary">{line}</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
 export default function EditorPage() {
   const genieCode = useGenieCode();
-  const [activeTabId, setActiveTabId] = React.useState(NOTEBOOK_TABS[0]!.id);
+  const searchParams = useSearchParams();
+  const skillFile = searchParams.get("skill");
+
+  const tabs: TabBarTab[] = skillFile
+    ? [...NOTEBOOK_TABS, { id: "tab-skill", label: skillFile }]
+    : NOTEBOOK_TABS;
+
+  const [activeTabId, setActiveTabId] = React.useState(() =>
+    skillFile ? "tab-skill" : NOTEBOOK_TABS[0]!.id,
+  );
   const [activePanel, setActivePanel] = React.useState<string | null>(genieCode.isOpen ? "sparkle" : null);
   const [panelWidth, setPanelWidth] = React.useState(360);
   const dragStartX = React.useRef<number | null>(null);
@@ -437,10 +704,12 @@ export default function EditorPage() {
     <main className="flex h-full min-h-0 w-full overflow-hidden">
       {/* Notebook area */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <TabBar tabs={NOTEBOOK_TABS} activeId={activeTabId} onSelect={setActiveTabId} />
+        <TabBar tabs={tabs} activeId={activeTabId} onSelect={setActiveTabId} />
         <NotebookToolbar />
 
-        {activeTabId === "tab-py" ? (
+        {activeTabId === "tab-skill" && skillFile ? (
+          <SkillFileView skillFile={skillFile} />
+        ) : activeTabId === "tab-py" ? (
           <FileEditorView />
         ) : (
           <div className="flex min-h-0 flex-1 overflow-y-auto px-8 py-6">

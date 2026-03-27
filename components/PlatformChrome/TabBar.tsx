@@ -38,7 +38,7 @@ export function TabBar({ tabs, activeId, onSelect, onClose, onNewTab }: TabBarPr
           )}
         >
           <Icon
-            name={tab.label.endsWith(".py") ? "fileCodeIcon" : "notebookIcon"}
+            name={tab.label.endsWith(".py") ? "fileCodeIcon" : tab.label.endsWith(".md") ? "fileDocumentIcon" : "notebookIcon"}
             size={14}
             className={tab.id === activeId ? "text-text-primary" : "text-text-secondary"}
           />
