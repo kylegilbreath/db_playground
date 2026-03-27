@@ -727,8 +727,51 @@ function DashboardPreview() {
     { name: "aiko.t@databricks.com", sessions: 76, queries: 497 },
   ];
 
+  const router = useRouter();
+  const [activeTab, setActiveTab] = React.useState("Ski Resort Dashboard");
+
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
+      {/* Dashboard header */}
+      <div className="shrink-0 border-b border-border bg-background-primary">
+        {/* Title row */}
+        <div className="flex items-center gap-sm px-4 pt-3 pb-2">
+          <span className="min-w-0 truncate text-title3 font-semibold text-text-primary">Ski Resort Dashboard</span>
+          <button type="button" aria-label="Bookmark" className="shrink-0 text-text-secondary hover:text-text-primary">
+            <Icon name="starIcon" size={16} />
+          </button>
+          <div className="flex-1" />
+          <button type="button" aria-label="More options" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-sm text-text-secondary hover:bg-background-secondary hover:text-text-primary">
+            <Icon name="overflowIcon" size={16} />
+          </button>
+          <button type="button" className="flex shrink-0 items-center gap-xs text-paragraph text-text-secondary hover:text-text-primary">
+            <Icon name="refreshIcon" size={14} />
+            1m ago
+          </button>
+          <DefaultButton size="small">Schedule</DefaultButton>
+          <DefaultButton size="small">Share</DefaultButton>
+          <PrimaryButton size="small" leadingIcon={<Icon name="pencilIcon" size={14} />} className="shrink-0" onClick={() => router.push("/dashboard/edit")}>Edit draft</PrimaryButton>
+        </div>
+        {/* Tabs */}
+        <div className="flex items-end px-4">
+          {["Ski Resort Dashboard", "Executive Summary"].map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={cx(
+                "px-1 pb-2 mr-4 text-paragraph border-b-2 transition-colors",
+                activeTab === tab
+                  ? "border-action-default-border-focus font-medium text-text-primary"
+                  : "border-transparent text-text-secondary hover:text-text-primary",
+              )}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
         <div className="flex flex-col gap-4">
 

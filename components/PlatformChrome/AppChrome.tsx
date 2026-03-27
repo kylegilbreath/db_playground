@@ -154,6 +154,8 @@ function AppChromeInner({ className, children }: AppChromeProps) {
         ? "ai-gateway"
       : pathname === "/editor"
         ? "editor"
+      : pathname.startsWith("/dashboard")
+        ? "dashboards"
       : pathname === "/one" || pathname === "/one/"
         ? "home"
       : pathname === "/one/chat" || pathname.startsWith("/one/chat/")

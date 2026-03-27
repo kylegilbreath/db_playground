@@ -58,6 +58,13 @@ export function useGenieChatState() {
     ["thread-revenue", SKI_RESORT_STEPS],
     ["thread-input", FIND_DATA_STEPS],
   ]));
+  // Persisted run status keyed by thread ID
+  const threadRunStatusRef = React.useRef<Map<string, RunStatus>>(new Map([
+    ["thread-dashboard", "done"],
+    ["thread-eda", "done"],
+    ["thread-revenue", "done"],
+    ["thread-input", "done"],
+  ]));
 
   React.useEffect(() => {
     return () => timersRef.current.forEach(clearTimeout);
@@ -67,12 +74,18 @@ export function useGenieChatState() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [steps]);
 
-  // Persist steps for the active thread whenever they change
+  // Persist steps and run status for the active thread whenever they change
   React.useEffect(() => {
     if (activeThreadId && steps.length > 0) {
       threadStepsRef.current.set(activeThreadId, steps);
     }
   }, [steps, activeThreadId]);
+
+  React.useEffect(() => {
+    if (activeThreadId) {
+      threadRunStatusRef.current.set(activeThreadId, runStatus);
+    }
+  }, [runStatus, activeThreadId]);
 
   const streamRun = React.useCallback((runSteps: ChatStep[], delays: number[], threadId: string) => {
     timersRef.current.forEach(clearTimeout);
@@ -114,7 +127,7 @@ export function useGenieChatState() {
     timersRef.current.forEach(clearTimeout);
     timersRef.current = [];
     setActiveThreadId(id);
-    setRunStatus(id === "thread-dashboard" ? "done" : "idle");
+    setRunStatus(threadRunStatusRef.current.get(id) ?? "idle");
     setSteps(threadStepsRef.current.get(id) ?? []);
   }, []);
 
