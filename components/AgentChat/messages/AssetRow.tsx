@@ -32,7 +32,7 @@ function RowActions({ onReject, onAccept }: { onReject?: () => void; onAccept?: 
   );
 }
 
-export function AssetRow({ asset, onAssetClick }: { asset: ReviewAsset; onAssetClick?: (asset: ReviewAsset) => void }) {
+export function AssetRow({ asset, onAssetClick, reviewed = false }: { asset: ReviewAsset; onAssetClick?: (asset: ReviewAsset) => void; reviewed?: boolean }) {
   const [open, setOpen] = React.useState(false);
   const hasSubItems = asset.subItems && asset.subItems.length > 0;
 
@@ -56,7 +56,7 @@ export function AssetRow({ asset, onAssetClick }: { asset: ReviewAsset; onAssetC
           <span className="text-paragraph font-medium text-green-600">+{asset.diffCount}</span>
         )}
 
-        <RowActions />
+        {!reviewed && <RowActions />}
       </div>
 
       {/* Sub-items */}
@@ -72,7 +72,7 @@ export function AssetRow({ asset, onAssetClick }: { asset: ReviewAsset; onAssetC
                   +{sub.diffCount}
                 </span>
               )}
-              <RowActions />
+              {!reviewed && <RowActions />}
             </div>
           ))}
         </div>

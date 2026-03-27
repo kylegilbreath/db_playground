@@ -13,17 +13,22 @@ import type { ReviewAsset, RunStatus } from "./types";
 
 function ReviewPanel({
   assets,
+  reviewed = false,
   onRejectAll,
   onAcceptAll,
   onAssetClick,
 }: {
   assets: ReviewAsset[];
+  reviewed?: boolean;
   onRejectAll?: () => void;
   onAcceptAll?: () => void;
   onAssetClick?: (asset: ReviewAsset) => void;
 }) {
   const [open, setOpen] = React.useState(true);
   const label = `${assets.length} asset${assets.length !== 1 ? "s" : ""}`;
+
+  const handleAccept = () => { onAcceptAll?.(); };
+  const handleReject = () => { onRejectAll?.(); };
 
   return (
     <div className="flex flex-col rounded-t-lg border-x border-t border-border bg-background-secondary">
@@ -42,15 +47,19 @@ function ReviewPanel({
           {label}
         </button>
         <div className="flex-1" />
-        <DefaultButton size="small" onClick={onRejectAll}>Reject All</DefaultButton>
-        <PrimaryButton size="small" onClick={onAcceptAll}>Accept All</PrimaryButton>
+        {!reviewed && (
+          <>
+            <DefaultButton size="small" onClick={handleReject}>Reject All</DefaultButton>
+            <PrimaryButton size="small" onClick={handleAccept}>Accept All</PrimaryButton>
+          </>
+        )}
       </div>
 
       {/* Asset list */}
       {open && (
         <div className="flex flex-col border-t border-border pb-1">
           {assets.map((asset) => (
-            <AssetRow key={asset.id} asset={asset} onAssetClick={onAssetClick} />
+            <AssetRow key={asset.id} asset={asset} onAssetClick={onAssetClick} reviewed={reviewed} />
           ))}
         </div>
       )}
@@ -73,6 +82,10 @@ export type PromptBarProps = {
   onRejectAll?: () => void;
   onAcceptAll?: () => void;
   onAssetClick?: (asset: ReviewAsset) => void;
+  /** Whether the current thread has already been reviewed (hides accept/reject buttons). */
+  reviewed?: boolean;
+  /** Called when the user accepts or rejects — so the parent can mark thread as reviewed. */
+  onReviewed?: () => void;
   size?: "compact" | "full";
 };
 
@@ -86,6 +99,8 @@ export function PromptBar({
   onRejectAll,
   onAcceptAll,
   onAssetClick,
+  reviewed = false,
+  onReviewed,
   size = "compact",
 }: PromptBarProps) {
   const inputRef = React.useRef<HTMLInputElement>(null);
@@ -110,8 +125,9 @@ export function PromptBar({
         {hasReview && (
           <ReviewPanel
             assets={reviewAssets}
-            onRejectAll={onRejectAll}
-            onAcceptAll={onAcceptAll}
+            reviewed={reviewed}
+            onRejectAll={() => { onRejectAll?.(); onReviewed?.(); }}
+            onAcceptAll={() => { onAcceptAll?.(); onReviewed?.(); }}
             onAssetClick={onAssetClick}
           />
         )}

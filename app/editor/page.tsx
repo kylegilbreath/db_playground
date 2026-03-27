@@ -473,6 +473,7 @@ export default function EditorPage() {
           width={panelWidth}
           onResizeStart={handleResizeStart}
           showRightRail
+          flat
           activeRailItem={activePanel}
           onRailItemToggle={handlePanelToggle}
         />

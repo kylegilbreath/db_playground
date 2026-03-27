@@ -75,6 +75,8 @@ export type GenieCodeSidePanelProps = {
   /** Active rail item (controlled by parent when showRightRail=true). */
   activeRailItem?: string | null;
   onRailItemToggle?: (id: string) => void;
+  /** When true, removes border radius and drop shadow (e.g. when flush with editor chrome). */
+  flat?: boolean;
 };
 
 export function GenieCodeSidePanel({
@@ -84,6 +86,7 @@ export function GenieCodeSidePanel({
   showRightRail = false,
   activeRailItem = "sparkle",
   onRailItemToggle,
+  flat = false,
 }: GenieCodeSidePanelProps) {
   const router = useRouter();
   const state = useGenieChatState();
@@ -96,7 +99,7 @@ export function GenieCodeSidePanel({
 
   return (
     <div
-      className="relative flex h-full shrink-0 overflow-hidden rounded-md border border-border bg-background-primary shadow-[var(--elevation-shadow-md)]"
+      className={cx("relative flex h-full shrink-0 overflow-hidden bg-background-primary", flat ? "border-b border-l border-r border-border" : "rounded-md border border-border shadow-[var(--elevation-shadow-md)]")}
       style={containerStyle}
     >
       {/* Resize handle */}

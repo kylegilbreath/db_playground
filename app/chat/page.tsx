@@ -248,6 +248,7 @@ function ChatLeftNav({
   onNewChat,
   collapsed,
   onCollapsedChange,
+  reviewedThreadIds = new Set(),
 }: {
   threads: ReturnType<typeof useGenieChatState>["threads"];
   activeThreadId: string | null;
@@ -255,6 +256,7 @@ function ChatLeftNav({
   onNewChat: () => void;
   collapsed: boolean;
   onCollapsedChange: (v: boolean) => void;
+  reviewedThreadIds?: Set<string>;
 }) {
   const setCollapsed = onCollapsedChange;
   const [activePanel, setActivePanel] = React.useState<SidePanel>("threads");
@@ -419,6 +421,7 @@ function ChatLeftNav({
               threads={searchQuery ? threads.filter((t) => t.label.toLowerCase().includes(searchQuery.toLowerCase())) : threads}
               activeThreadId={activeThreadId}
               onSelect={(id) => { onSelect(id); setSearchQuery(""); setSearchActive(false); }}
+              reviewedThreadIds={reviewedThreadIds}
             />
           </div>
         </div>
@@ -1019,6 +1022,7 @@ function PreviewPanel({
   setActiveAssetId,
   activeTab,
   setActiveTab,
+  isReviewed = false,
 }: {
   onClose: () => void;
   selectedAsset: ReviewAsset | null;
@@ -1031,6 +1035,7 @@ function PreviewPanel({
   setActiveAssetId: (id: string | null) => void;
   activeTab: PreviewTab;
   setActiveTab: (tab: PreviewTab) => void;
+  isReviewed?: boolean;
 }) {
 
   // Open or switch to asset tab when selectedAsset changes
@@ -1156,7 +1161,7 @@ function PreviewPanel({
       {/* Pane */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden pb-3 pr-3">
         {activeTab === "Review" ? (
-          reviewAssets && reviewAssets.length > 0 ? (
+          reviewAssets && reviewAssets.length > 0 && !isReviewed ? (
             <ReviewDiffPanel key={activeThreadId ?? "review"} assets={reviewAssets} />
           ) : (
           <div className="flex w-full flex-1 flex-col items-center justify-center overflow-clip rounded-md border border-border bg-background-primary">
@@ -1268,11 +1273,16 @@ export default function ChatPage() {
   const [threadOpenAssets, setThreadOpenAssets] = React.useState<Record<string, ReviewAsset[]>>({});
   const [threadActiveAssetId, setThreadActiveAssetId] = React.useState<Record<string, string | null>>({});
   const [threadActiveTab, setThreadActiveTab] = React.useState<Record<string, PreviewTab>>({});
+  const [reviewedThreadIds, setReviewedThreadIds] = React.useState<Set<string>>(new Set());
 
   const threadId = state.activeThreadId ?? "__none__";
   const openAssets = threadOpenAssets[threadId] ?? [];
   const activeAssetId = threadActiveAssetId[threadId] ?? null;
   const activeTab = threadActiveTab[threadId] ?? "Assets";
+  const isReviewed = reviewedThreadIds.has(threadId);
+  const handleReviewed = React.useCallback(() => {
+    setReviewedThreadIds((prev) => new Set([...prev, threadId]));
+  }, [threadId]);
 
   const setOpenAssets = React.useCallback((updater: ReviewAsset[] | ((prev: ReviewAsset[]) => ReviewAsset[])) => {
     setThreadOpenAssets((prev) => {
@@ -1333,6 +1343,7 @@ export default function ChatPage() {
           onNewChat={state.handleNewChat}
           collapsed={navCollapsed}
           onCollapsedChange={setNavCollapsed}
+          reviewedThreadIds={reviewedThreadIds}
         />
 
         <GenieChatBody
@@ -1343,6 +1354,8 @@ export default function ChatPage() {
           previewOpen={previewOpen}
           onAssetClick={handleAssetClick}
           onFullScreen={() => { sessionStorage.setItem("openGeniePanel", "1"); router.back(); }}
+          reviewed={isReviewed}
+          onReviewed={handleReviewed}
         />
 
         {previewOpen && (
@@ -1358,6 +1371,7 @@ export default function ChatPage() {
             setActiveAssetId={setActiveAssetId}
             activeTab={activeTab}
             setActiveTab={setActiveTab}
+            isReviewed={isReviewed}
           />
         )}
       </div>

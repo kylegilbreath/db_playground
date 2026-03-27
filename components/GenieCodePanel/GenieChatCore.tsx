@@ -297,10 +297,12 @@ export function GenieChatThreadList({
   threads,
   activeThreadId,
   onSelect,
+  reviewedThreadIds = new Set(),
 }: {
   threads: GenieThread[];
   activeThreadId: string | null;
   onSelect: (id: string) => void;
+  reviewedThreadIds?: Set<string>;
 }) {
   const groups = groupThreads(threads);
   return (
@@ -309,7 +311,7 @@ export function GenieChatThreadList({
         <div key={group.label} className="flex flex-col">
           <span className="px-2 py-2 text-hint text-text-secondary">{group.label}</span>
           {group.threads.map((t) => {
-            const hasIcon = t.status === "running" || t.status === "attention" || t.status === "input" || t.status === "review";
+            const hasIcon = !reviewedThreadIds.has(t.id) && (t.status === "running" || t.status === "attention" || t.status === "input" || t.status === "review");
             return (
               <button
                 key={t.id}
@@ -465,6 +467,10 @@ export type GenieChatBodyProps = {
   onThreadSidebarChange?: (open: boolean) => void;
   /** Called to close/toggle the chat side panel (compact mode). */
   onClosePanel?: () => void;
+  /** Whether the current thread's review has been actioned (hides accept/reject buttons). */
+  reviewed?: boolean;
+  /** Called when the user accepts or rejects all — so parent can mark thread as reviewed. */
+  onReviewed?: () => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -590,6 +596,8 @@ export function GenieChatBody({
   threadSidebarOpen: threadSidebarOpenProp,
   onThreadSidebarChange,
   onClosePanel,
+  reviewed = false,
+  onReviewed,
 }: GenieChatBodyProps) {
   const {
     text,
@@ -783,6 +791,8 @@ export function GenieChatBody({
                         ? (steps.find((s) => s.type === "assets-summary") as any)?.assets as ReviewAsset[]
                         : undefined
                   }
+                  reviewed={reviewed}
+                  onReviewed={onReviewed}
                   onAssetClick={onAssetClick}
                 />
               </div>
