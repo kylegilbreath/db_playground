@@ -1163,7 +1163,7 @@ function DashboardPreview() {
             <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
               <span className="text-paragraph font-semibold text-text-primary">Widget</span>
               <button type="button" onClick={() => setSelectedWidget(null)} className="flex h-6 w-6 items-center justify-center rounded-sm text-text-secondary hover:bg-background-secondary hover:text-text-primary">
-                <Icon name="overflowIcon" size={14} />
+                <Icon name="closeIcon" size={14} />
               </button>
             </div>
 
@@ -1621,8 +1621,8 @@ function PreviewPanel({
               className={cx(
                 "flex h-7 shrink-0 items-center justify-center rounded-md px-3 text-paragraph",
                 activeTab === tab
-                  ? "bg-background-secondary text-text-primary"
-                  : "text-text-secondary hover:bg-background-secondary",
+                  ? "bg-action-default-background-hover font-medium text-text-primary"
+                  : "text-text-secondary hover:bg-action-default-background-hover",
               )}
             >
               {tab}

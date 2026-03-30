@@ -91,6 +91,8 @@ export function GenieCodeSidePanel({
   const router = useRouter();
   const state = useGenieChatState();
   const [threadSidebarOpen, setThreadSidebarOpen] = React.useState(false);
+  const focusTitleInputRef = React.useRef<(() => void) | null>(null);
+  const handleFocusTitleInputReady = React.useCallback((fn: () => void) => { focusTitleInputRef.current = fn; }, []);
 
   const SIDEBAR_WIDTH = 180;
   const containerStyle = width !== undefined
@@ -117,6 +119,7 @@ export function GenieCodeSidePanel({
         threadSidebarOpen={threadSidebarOpen}
         onThreadSidebarChange={setThreadSidebarOpen}
         onClosePanel={onClose}
+        onFocusTitleInputReady={handleFocusTitleInputReady}
       />
       {threadSidebarOpen && (
         <GenieChatThreadSidebar
@@ -125,6 +128,7 @@ export function GenieCodeSidePanel({
           onSelect={state.handleSelectThread}
           onNewChat={state.handleNewChat}
           onClose={() => setThreadSidebarOpen(false)}
+          onRenameActiveThread={() => setTimeout(() => focusTitleInputRef.current?.(), 50)}
         />
       )}
 

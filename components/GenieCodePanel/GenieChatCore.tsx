@@ -452,12 +452,14 @@ export function GenieChatThreadSidebar({
   onSelect,
   onNewChat,
   onClose,
+  onRenameActiveThread,
 }: {
   threads: GenieThread[];
   activeThreadId: string | null;
   onSelect: (id: string) => void;
   onNewChat: () => void;
   onClose: () => void;
+  onRenameActiveThread?: () => void;
 }) {
   const [width, setWidth] = React.useState(DEFAULT_SIDEBAR_WIDTH);
   const isDragging = React.useRef(false);
@@ -492,13 +494,15 @@ export function GenieChatThreadSidebar({
     <div className="relative flex h-full shrink-0 flex-col border-l border-border" style={{ width }}>
       <div className="flex h-10 shrink-0 items-center px-3">
         <span className="flex-1 text-paragraph font-medium text-text-primary">Chat history</span>
-        <IconButton
-          aria-label="Collapse sidebar"
-          icon={<Icon name="sidebarCollapseIcon" size={14} />}
-          size="small"
-          tone="neutral"
-          onClick={onClose}
-        />
+        <Tip label="Close chat history" align="right">
+          <IconButton
+            aria-label="Collapse sidebar"
+            icon={<Icon name="sidebarCollapseIcon" size={14} />}
+            size="small"
+            tone="neutral"
+            onClick={onClose}
+          />
+        </Tip>
       </div>
       <div className="flex flex-col px-2 pb-2">
         <button
@@ -517,7 +521,7 @@ export function GenieChatThreadSidebar({
           Search chats
         </button>
       </div>
-      <GenieChatThreadList threads={threads} activeThreadId={activeThreadId} onSelect={onSelect} />
+      <GenieChatThreadList threads={threads} activeThreadId={activeThreadId} onSelect={onSelect} onRenameActiveThread={onRenameActiveThread} />
       {/* Drag handle */}
       <div
         role="separator"

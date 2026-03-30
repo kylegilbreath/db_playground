@@ -25,14 +25,14 @@ export function AssetChip({ asset, onClick }: { asset: Asset; onClick?: (asset: 
       <button
         type="button"
         onClick={() => onClick(asset)}
-        className="inline-flex items-center gap-xs rounded-sm border border-border px-xs py-0 text-paragraph leading-5 text-text-primary hover:bg-background-secondary"
+        className="inline-flex items-center gap-xs rounded-sm border border-border bg-background-primary px-xs py-0 text-paragraph leading-5 text-text-primary hover:border-action-default-border-hover hover:bg-background-tertiary"
       >
         {inner}
       </button>
     );
   }
   return (
-    <span className="inline-flex items-center gap-xs rounded-sm border border-border px-xs py-0 text-paragraph leading-5 text-text-primary">
+    <span className="inline-flex cursor-pointer items-center gap-xs rounded-sm border border-border bg-background-primary px-xs py-0 text-paragraph leading-5 text-text-primary hover:border-action-default-border-hover hover:bg-background-tertiary">
       {inner}
     </span>
   );
