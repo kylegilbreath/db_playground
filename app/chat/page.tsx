@@ -256,6 +256,7 @@ function ChatLeftNav({
   collapsed,
   onCollapsedChange,
   reviewedThreadIds = new Set(),
+  onRenameActiveThread,
 }: {
   threads: ReturnType<typeof useGenieChatState>["threads"];
   activeThreadId: string | null;
@@ -264,6 +265,7 @@ function ChatLeftNav({
   collapsed: boolean;
   onCollapsedChange: (v: boolean) => void;
   reviewedThreadIds?: Set<string>;
+  onRenameActiveThread?: () => void;
 }) {
   const setCollapsed = onCollapsedChange;
   const [activePanel, setActivePanel] = React.useState<SidePanel>("threads");
@@ -429,6 +431,7 @@ function ChatLeftNav({
               activeThreadId={activeThreadId}
               onSelect={(id) => { onSelect(id); setSearchQuery(""); setSearchActive(false); }}
               reviewedThreadIds={reviewedThreadIds}
+              onRenameActiveThread={onRenameActiveThread}
             />
           </div>
         </div>
@@ -1816,6 +1819,8 @@ export default function ChatPage() {
   }, [state.steps, state.runStatus, state.activeThreadId]);
 
   const assetClickRef = React.useRef(false);
+  const focusTitleInputRef = React.useRef<(() => void) | null>(null);
+  const handleFocusTitleInputReady = React.useCallback((fn: () => void) => { focusTitleInputRef.current = fn; }, []);
 
   // Auto-switch to Review tab when assets become available, unless opened via asset click
   React.useEffect(() => {
@@ -1853,6 +1858,7 @@ export default function ChatPage() {
           collapsed={navCollapsed}
           onCollapsedChange={setNavCollapsed}
           reviewedThreadIds={reviewedThreadIds}
+          onRenameActiveThread={() => setTimeout(() => focusTitleInputRef.current?.(), 50)}
         />
 
         <GenieChatBody
@@ -1865,6 +1871,7 @@ export default function ChatPage() {
           onFullScreen={() => { sessionStorage.setItem("openGeniePanel", "1"); router.back(); }}
           reviewed={isReviewed}
           onReviewed={handleReviewed}
+          onFocusTitleInputReady={handleFocusTitleInputReady}
         />
 
         {previewOpen && (

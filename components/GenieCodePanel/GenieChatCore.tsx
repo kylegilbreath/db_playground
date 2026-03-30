@@ -308,17 +308,63 @@ function groupThreads(threads: GenieThread[]): Array<{ label: string; threads: G
   return groups;
 }
 
+const THREAD_MENU_ITEMS = [
+  { icon: "shareIcon", label: "Share chat thread" },
+  { icon: "BranchIcon", label: "Clone chat thread" },
+  { icon: "pencilIcon", label: "Rename" },
+  { icon: "trashIcon", label: "Delete" },
+] as const;
+
+function ThreadMoreMenu({ onClose, onRename, anchorRef }: { onClose: () => void; onRename: () => void; anchorRef: React.RefObject<HTMLElement | null> }) {
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node) && anchorRef.current && !anchorRef.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [onClose, anchorRef]);
+
+  return (
+    <div
+      ref={ref}
+      className="absolute right-1 top-8 z-50 min-w-[200px] overflow-hidden rounded border border-border bg-background-primary py-1 shadow-[0px_2px_16px_0px_rgba(0,0,0,0.08)]"
+    >
+      {THREAD_MENU_ITEMS.map(({ icon, label }) => (
+        <button
+          key={label}
+          type="button"
+          onClick={() => { if (label === "Rename") { onRename(); } onClose(); }}
+          className="flex w-full items-center gap-sm px-2 py-1 text-left text-paragraph text-text-primary hover:bg-background-secondary"
+        >
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center">
+            <Icon name={icon} size={16} className="text-text-secondary" />
+          </span>
+          <span>{label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function GenieChatThreadList({
   threads,
   activeThreadId,
   onSelect,
   reviewedThreadIds = new Set(),
+  onRenameActiveThread,
 }: {
   threads: GenieThread[];
   activeThreadId: string | null;
   onSelect: (id: string) => void;
   reviewedThreadIds?: Set<string>;
+  onRenameActiveThread?: () => void;
 }) {
+  const [hoveredId, setHoveredId] = React.useState<string | null>(null);
+  const [menuOpenId, setMenuOpenId] = React.useState<string | null>(null);
+  const menuButtonRefs = React.useRef<Map<string, HTMLButtonElement>>(new Map());
+
   const groups = groupThreads(threads);
   return (
     <div className="flex flex-col gap-1 px-1">
@@ -327,39 +373,67 @@ export function GenieChatThreadList({
           <span className="px-2 py-2 text-hint text-text-secondary">{group.label}</span>
           {group.threads.map((t) => {
             const hasIcon = !reviewedThreadIds.has(t.id) && (t.status === "running" || t.status === "attention" || t.status === "input" || t.status === "review");
+            const isHovered = hoveredId === t.id;
+            const isMenuOpen = menuOpenId === t.id;
             return (
-              <button
+              <div
                 key={t.id}
-                type="button"
-                onClick={() => onSelect(t.id)}
-                className={cx(
-                  "flex w-full items-start gap-2 rounded-md py-2.5 pr-3 pl-3 text-left hover:bg-action-default-background-hover",
-                  activeThreadId === t.id && "bg-action-default-background-hover",
-                )}
+                className="relative"
+                onMouseEnter={() => setHoveredId(t.id)}
+                onMouseLeave={() => { if (!isMenuOpen) setHoveredId(null); }}
               >
-                <span className="mt-[3px] shrink-0">
-                  {hasIcon ? <ThreadStatusIcon status={t.status} /> : <span className="inline-block w-[14px]" />}
-                </span>
-                <span className="min-w-0 flex-1 flex flex-col gap-[4px]">
-                  <span className="flex items-baseline gap-sm">
-                    <span className="min-w-0 flex-1 truncate text-paragraph font-medium leading-5 text-text-primary">{t.label}</span>
-                    {t.time && <span className="shrink-0 text-hint text-text-secondary">{t.time}</span>}
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onSelect(t.id)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onSelect(t.id); }}
+                  className={cx(
+                    "flex w-full cursor-pointer items-start gap-2 rounded-md py-2.5 pr-3 pl-3 text-left hover:bg-action-default-background-hover",
+                    (activeThreadId === t.id || isMenuOpen) && "bg-action-default-background-hover",
+                  )}
+                >
+                  <span className="mt-[3px] shrink-0">
+                    {hasIcon ? <ThreadStatusIcon status={t.status} /> : <span className="inline-block w-[14px]" />}
                   </span>
-                  {(t.subtitle || t.diff) && (
-                    <span className="flex items-center gap-xs">
-                      {t.subtitle && <span className="min-w-0 flex-1 truncate text-hint text-text-secondary">{t.subtitle}</span>}
-                      {t.diff && t.status !== "input" && (
-                        <span className="flex shrink-0 items-center gap-xs text-hint">
-                          <span className="font-medium text-green-600">+{t.diff.added}</span>
-                          <span className="font-medium text-red-500">-{t.diff.removed}</span>
-                          <span className="text-text-secondary opacity-40">·</span>
-                          <span className="text-text-secondary">{t.diff.files} file{t.diff.files !== 1 ? "s" : ""}</span>
-                        </span>
+                  <span className="min-w-0 flex-1 flex flex-col gap-[4px]">
+                    <span className="flex items-center gap-sm">
+                      <span className="min-w-0 flex-1 truncate text-paragraph font-medium leading-5 text-text-primary">{t.label}</span>
+                      {(isHovered || isMenuOpen) ? (
+                        <button
+                          ref={(el) => { if (el) menuButtonRefs.current.set(t.id, el); }}
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setMenuOpenId(isMenuOpen ? null : t.id); }}
+                          className="shrink-0 flex h-5 w-5 items-center justify-center rounded-sm text-text-secondary hover:bg-action-default-background-press hover:text-text-primary"
+                        >
+                          <Icon name="overflowIcon" size={14} />
+                        </button>
+                      ) : (
+                        t.time && <span className="shrink-0 text-hint text-text-secondary">{t.time}</span>
                       )}
                     </span>
-                  )}
-                </span>
-              </button>
+                    {(t.subtitle || t.diff) && (
+                      <span className="flex items-center gap-xs">
+                        {t.subtitle && <span className="min-w-0 flex-1 truncate text-hint text-text-secondary">{t.subtitle}</span>}
+                        {t.diff && t.status !== "input" && (
+                          <span className="flex shrink-0 items-center gap-xs text-hint">
+                            <span className="font-medium text-green-600">+{t.diff.added}</span>
+                            <span className="font-medium text-red-500">-{t.diff.removed}</span>
+                            <span className="text-text-secondary opacity-40">·</span>
+                            <span className="text-text-secondary">{t.diff.files} file{t.diff.files !== 1 ? "s" : ""}</span>
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </span>
+                </div>
+                {isMenuOpen && (
+                  <ThreadMoreMenu
+                    onClose={() => { setMenuOpenId(null); setHoveredId(null); }}
+                    onRename={() => { if (t.id !== activeThreadId) onSelect(t.id); onRenameActiveThread?.(); }}
+                    anchorRef={{ current: menuButtonRefs.current.get(t.id) ?? null }}
+                  />
+                )}
+              </div>
             );
           })}
         </div>
@@ -486,6 +560,8 @@ export type GenieChatBodyProps = {
   reviewed?: boolean;
   /** Called when the user accepts or rejects all — so parent can mark thread as reviewed. */
   onReviewed?: () => void;
+  /** Called with a function that focuses the thread title input — lets parent trigger rename. */
+  onFocusTitleInputReady?: (focusFn: () => void) => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -613,7 +689,17 @@ export function GenieChatBody({
   onClosePanel,
   reviewed = false,
   onReviewed,
+  onFocusTitleInputReady,
 }: GenieChatBodyProps) {
+  const titleInputRef = React.useRef<HTMLInputElement>(null);
+  const focusTitleInput = React.useCallback(() => {
+    titleInputRef.current?.focus();
+    titleInputRef.current?.select();
+  }, []);
+  React.useEffect(() => {
+    onFocusTitleInputReady?.(focusTitleInput);
+  }, [onFocusTitleInputReady, focusTitleInput]);
+
   const {
     text,
     setText,
@@ -669,6 +755,7 @@ export function GenieChatBody({
             activeThreadId && activeThreadTitle ? (
               <input
                 key={activeThreadId}
+                ref={titleInputRef}
                 className="min-w-0 flex-1 truncate rounded bg-transparent px-1 text-paragraph font-medium text-text-primary outline-none hover:ring-1 hover:ring-border focus:ring-2 focus:ring-action-default-border-focus"
                 defaultValue={activeThreadTitle}
                 onBlur={(e) => handleRenameThread(activeThreadId, e.currentTarget.value)}
