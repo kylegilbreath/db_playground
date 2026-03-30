@@ -11,19 +11,22 @@ export type TextInputProps = Omit<
   "type" | "children"
 > & {
   iconPrefix?: React.ReactNode;
+  secondary?: boolean;
 };
 
 export function TextInput({
   iconPrefix,
   className,
+  secondary,
   ...rest
 }: TextInputProps) {
   return (
     <div
       className={cx(
         "flex h-8 items-center gap-xs rounded-sm border px-mid",
-        "bg-background-primary",
-        "border-border hover:border-action-default-border-hover",
+        secondary
+          ? "border-transparent bg-background-tertiary hover:border-border"
+          : "border-border bg-background-primary hover:border-action-default-border-hover",
         "focus-within:outline-none focus-within:ring-2 focus-within:ring-inset focus-within:ring-action-default-border-focus",
         className,
       )}

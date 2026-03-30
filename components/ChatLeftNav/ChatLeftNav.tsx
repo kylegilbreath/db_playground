@@ -125,6 +125,7 @@ export function ChatLeftNav({ selectedId, onSelect }: ChatLeftNavProps) {
             iconPrefix={<Icon name="searchIcon" size={16} />}
             placeholder="Search chats"
             className="!rounded-md"
+            secondary
           />
         </div>
 

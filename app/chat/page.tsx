@@ -414,7 +414,7 @@ function ChatLeftNav({
               <button
                 type="button"
                 onClick={() => { setSearchActive(true); setTimeout(() => searchInputRef.current?.focus(), 0); }}
-                className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-paragraph text-text-secondary hover:bg-background-secondary"
+                className="flex w-full items-center gap-2 rounded-md border border-transparent bg-background-secondary px-2 py-2 text-left text-paragraph text-text-secondary hover:border-border"
               >
                 <Icon name="searchIcon" size={14} className="shrink-0" />
                 Search chats

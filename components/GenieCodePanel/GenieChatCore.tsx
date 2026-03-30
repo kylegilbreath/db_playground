@@ -669,7 +669,7 @@ export function GenieChatBody({
             activeThreadId && activeThreadTitle ? (
               <input
                 key={activeThreadId}
-                className="min-w-0 flex-1 truncate bg-transparent text-paragraph font-medium text-text-primary outline-none hover:text-text-primary focus:rounded focus:outline focus:outline-2 focus:outline-action-default-border-focus"
+                className="min-w-0 flex-1 truncate rounded bg-transparent px-1 text-paragraph font-medium text-text-primary outline-none hover:ring-1 hover:ring-border focus:ring-2 focus:ring-action-default-border-focus"
                 defaultValue={activeThreadTitle}
                 onBlur={(e) => handleRenameThread(activeThreadId, e.currentTarget.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
