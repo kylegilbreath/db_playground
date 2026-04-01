@@ -28,7 +28,8 @@ const DEFAULT_PREVIEW_WIDTH = 340;
 const MIN_PREVIEW_WIDTH = 240;
 const MAX_PREVIEW_WIDTH = 600;
 
-type SidePanel = "threads" | "tools" | "connections";
+type SidePanel = "threads";
+type MainView = "thread" | "tools" | "connections";
 
 // ---------------------------------------------------------------------------
 // Toggle switch (inline, no external component needed)
@@ -98,95 +99,318 @@ const MCP_SERVERS = [
   },
 ];
 
-const SKILLS = [
+type SkillFile = { name: string; file: string };
+type SkillFolder = { name: string; children: SkillFile[] };
+type SkillEntry = SkillFile | SkillFolder;
+function isFolder(e: SkillEntry): e is SkillFolder { return "children" in e; }
+
+type Skill = {
+  id: string;
+  name: string;
+  primaryFile: string; // the SKILL.md equivalent — shown in preview on expand
+  entries: SkillEntry[];
+  description: string;
+};
+
+const SKILLS: Skill[] = [
   {
     id: "10x-engineer",
     name: "10x-engineer",
-    file: "10x-engineer.md",
+    primaryFile: "10x-engineer.md",
+    entries: [
+      { name: "SKILL.md", file: "10x-engineer.md" },
+      { name: "README.md", file: "10x-engineer-readme.md" },
+    ],
     description:
       "Opinionated workflow constraints for high-leverage engineering — plan-first execution, subagent strategy, self-improvement loops, and autonomous bug fixing.",
   },
   {
     id: "frontend-reviewer",
     name: "frontend-reviewer",
-    file: "frontend-reviewer.md",
+    primaryFile: "frontend-reviewer.md",
+    entries: [
+      { name: "SKILL.md", file: "frontend-reviewer.md" },
+      { name: "README.md", file: "frontend-reviewer-readme.md" },
+      { name: "STYLE_PRESETS.md", file: "frontend-reviewer-style.md" },
+    ],
     description:
       "Deep frontend code review agent for React applications. Analyzes code for accessibility issues, performance problems, React anti-patterns, and security vulnerabilities. Returns structured feedback with P0/P1/P2 severity levels.",
   },
+  {
+    id: "ux-designer",
+    name: "ux-designer",
+    primaryFile: "ux-designer.md",
+    entries: [
+      { name: "SKILL.md", file: "ux-designer.md" },
+      {
+        name: "references",
+        children: [
+          { name: "patterns-and-flows.md", file: "ux-designer-patterns.md" },
+          { name: "psychology-deep-dive.md", file: "ux-designer-psychology.md" },
+        ],
+      },
+    ],
+    description: "UX design review and critique agent for product interfaces.",
+  },
 ];
 
-function ToolsPanel() {
-  const router = useRouter();
+// ---------------------------------------------------------------------------
+// Skill file viewer — renders a .md file in the preview panel
+// ---------------------------------------------------------------------------
+
+const SKILL_FILE_CONTENT: Record<string, string> = {
+  "10x-engineer-readme.md": `# 10x Engineer — README\n\nSetup and usage instructions for the 10x Engineer skill.`,
+  "frontend-reviewer-readme.md": `# Frontend Reviewer — README\n\nSetup and usage instructions for the Frontend Reviewer skill.`,
+  "frontend-reviewer-style.md": `# Style Presets\n\nStyle configuration presets used by the Frontend Reviewer skill.`,
+  "ux-designer.md": `# UX Designer Skill\n\nUX design review and critique agent for product interfaces.\n\n## Capabilities\n\n- Design critique and feedback\n- Accessibility audit\n- Information architecture review`,
+  "ux-designer-patterns.md": `# Patterns and Flows\n\nReference patterns and user flow templates for UX design review.`,
+  "ux-designer-psychology.md": `# Psychology Deep Dive\n\nCognitive psychology principles applied to UX design critique.`,
+  "10x-engineer.md": `# 10x Engineer Skill
+
+Opinionated workflow constraints for high-leverage engineering — plan-first execution, subagent strategy, self-improvement loops, and autonomous bug fixing.
+
+## Core Philosophy
+
+- **Plan first** — Never write code without a clear plan. Use EnterPlanMode for any non-trivial task.
+- **Subagent strategy** — Delegate parallelizable work to subagents. Don't do everything serially.
+- **Self-improvement loops** — After completing a task, reflect on what could be done better.
+- **Autonomous bug fixing** — When tests fail, diagnose root cause before switching approaches.
+
+## Workflow Constraints
+
+1. Always read the file before editing it
+2. Run tests after every change
+3. Prefer small, focused commits
+4. Never skip linting or type checks
+5. Document decisions in commit messages, not comments`,
+
+  "frontend-reviewer.md": `# Frontend Reviewer Skill
+
+Deep frontend code review agent for React applications. Analyzes code for accessibility issues, performance problems, React anti-patterns, and security vulnerabilities. Returns structured feedback with P0/P1/P2 severity levels.
+
+## Review Categories
+
+### Accessibility (A11Y)
+- Images without alt text
+- Interactive elements without labels
+- Missing ARIA attributes
+- Keyboard navigation issues
+- Focus management problems
+
+### Performance (PERF)
+- Missing React.memo, useMemo, useCallback
+- Inline object/array creation in JSX props
+- useEffect with incorrect dependencies
+- Missing lazy loading for routes
+
+### React Patterns (REACT)
+- State updates during render
+- Direct DOM manipulation
+- Missing cleanup in useEffect
+- Derived state stored in useState
+
+## Severity Levels
+
+- **P0** — Breaks functionality or accessibility
+- **P1** — Significant performance or UX degradation
+- **P2** — Code quality and maintainability`,
+};
+
+function SkillFileViewer({ skillFile, content: contentProp }: { skillFile: string; content?: string }) {
+  const content = contentProp ?? SKILL_FILE_CONTENT[skillFile] ?? `# ${skillFile}\n\nSkill file content not available.`;
+  const lines = content.split("\n");
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-3">
-      {/* Skills section */}
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center">
-          <span className="flex-1 text-paragraph font-semibold text-text-primary">Skills</span>
-          <DefaultButton size="small" leadingIcon={<Icon name="plusIcon" size={12} />}>
-            Add
-          </DefaultButton>
-        </div>
-        <div className="flex flex-col rounded-mid bg-background-secondary overflow-hidden">
-          {SKILLS.map((skill, i) => (
-            <React.Fragment key={skill.id}>
-              {i > 0 && <div className="h-px w-full bg-border" />}
-              <button
-                type="button"
-                onClick={() => router.push(`/editor?skill=${encodeURIComponent(skill.file)}`)}
-                className="flex flex-col gap-1 px-2 py-2 text-left hover:bg-background-tertiary transition-colors"
-              >
-                <p className="text-paragraph text-text-primary">{skill.name}</p>
-                <p className="line-clamp-4 text-hint text-text-secondary">{skill.description}</p>
-              </button>
-            </React.Fragment>
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6 py-5">
+      {lines.map((line, i) => {
+        if (line.startsWith("# ")) {
+          return <h1 key={i} className="mb-3 text-title3 font-semibold text-text-primary">{line.slice(2)}</h1>;
+        }
+        if (line.startsWith("## ")) {
+          return <h2 key={i} className="mb-2 mt-5 text-paragraph font-semibold text-text-primary">{line.slice(3)}</h2>;
+        }
+        if (line.startsWith("### ")) {
+          return <h3 key={i} className="mb-1 mt-3 text-paragraph font-medium text-text-primary">{line.slice(4)}</h3>;
+        }
+        if (line.startsWith("- **")) {
+          const match = line.match(/^- \*\*(.+?)\*\* — (.+)$/);
+          if (match) {
+            return <p key={i} className="mb-1 text-paragraph text-text-primary"><span className="font-medium">{match[1]}</span> — {match[2]}</p>;
+          }
+        }
+        if (line.startsWith("- ")) {
+          return <p key={i} className="mb-1 pl-3 text-paragraph text-text-primary before:mr-2 before:content-['•']">{line.slice(2)}</p>;
+        }
+        const numMatch = line.match(/^(\d+)\. (.+)$/);
+        if (numMatch) {
+          return <p key={i} className="mb-1 text-paragraph text-text-primary"><span className="mr-2 font-medium">{numMatch[1]}.</span>{numMatch[2]}</p>;
+        }
+        if (line.startsWith("**") && line.endsWith("**")) {
+          return <p key={i} className="mb-1 text-paragraph font-semibold text-text-primary">{line.slice(2, -2)}</p>;
+        }
+        if (line === "") {
+          return <div key={i} className="h-1" />;
+        }
+        return <p key={i} className="mb-1 text-paragraph text-text-secondary">{line}</p>;
+      })}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tools main view — full-width skills + instructions
+// ---------------------------------------------------------------------------
+
+
+function allFilesInEntries(entries: SkillEntry[]): string[] {
+  return entries.flatMap((e) => isFolder(e) ? e.children.map((c) => c.file) : [e.file]);
+}
+
+function SkillFolderRow({ folder, selectedSkillFile, onSkillClick }: { folder: SkillFolder; selectedSkillFile: string | null; onSkillClick: (file: string) => void }) {
+  const [expanded, setExpanded] = React.useState(() => folder.children.some((c) => c.file === selectedSkillFile));
+  return (
+    <div className="flex flex-col">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="flex w-full items-center gap-xs rounded-sm px-sm py-xs text-left transition-colors hover:bg-action-default-background-hover"
+      >
+        <Icon name="folderOutlinedIcon" size={12} className="shrink-0 text-text-secondary" />
+        <span className="flex-1 truncate text-paragraph text-text-secondary">{folder.name}</span>
+        <Icon name={expanded ? "chevronDownIcon" : "chevronRightIcon"} size={12} className="shrink-0 text-text-secondary" />
+      </button>
+      {expanded && (
+        <div className="ml-[20px] flex flex-col border-l border-border pl-sm">
+          {folder.children.map((f) => (
+            <button
+              key={f.file}
+              type="button"
+              onClick={() => onSkillClick(f.file)}
+              className={cx(
+                "flex w-full items-center gap-xs rounded-sm px-sm py-xs text-left text-paragraph transition-colors hover:bg-action-default-background-hover",
+                selectedSkillFile === f.file ? "bg-action-default-background-hover font-medium text-text-primary" : "text-text-secondary",
+              )}
+            >
+              {f.name}
+            </button>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+function SkillTreeRow({ skill, selectedSkillFile, onSkillClick }: { skill: Skill; selectedSkillFile: string | null; onSkillClick: (file: string) => void }) {
+  const hasMultipleEntries = skill.entries.length > 1;
+  const allFiles = allFilesInEntries(skill.entries);
+  const [expanded, setExpanded] = React.useState(
+    () => hasMultipleEntries && (allFiles.includes(selectedSkillFile ?? "") || skill.primaryFile === selectedSkillFile)
+  );
+
+  const isAnyFileSelected = allFiles.includes(selectedSkillFile ?? "");
+
+  return (
+    <div className="flex flex-col">
+      {/* Skill row */}
+      <button
+        type="button"
+        onClick={() => {
+          if (hasMultipleEntries) setExpanded((v) => !v);
+          onSkillClick(skill.primaryFile);
+        }}
+        className={cx(
+          "flex w-full items-center gap-sm rounded-sm px-sm py-xs text-left transition-colors hover:bg-action-default-background-hover",
+          isAnyFileSelected && !expanded ? "bg-action-default-background-hover" : "",
+        )}
+      >
+        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border border-border bg-background-primary">
+          <Icon name="WrenchIcon" size={12} className="text-text-secondary" />
+        </div>
+        <span className="flex-1 truncate text-paragraph font-medium text-text-primary">{skill.name}</span>
+        {hasMultipleEntries && (
+          <Icon name={expanded ? "chevronDownIcon" : "chevronRightIcon"} size={12} className="shrink-0 text-text-secondary" />
+        )}
+      </button>
+
+      {/* Expanded entries */}
+      {expanded && hasMultipleEntries && (
+        <div className="ml-[20px] flex flex-col border-l border-border pl-sm">
+          {skill.entries.map((entry, i) =>
+            isFolder(entry) ? (
+              <SkillFolderRow key={i} folder={entry} selectedSkillFile={selectedSkillFile} onSkillClick={onSkillClick} />
+            ) : (
+              <button
+                key={entry.file}
+                type="button"
+                onClick={() => onSkillClick(entry.file)}
+                className={cx(
+                  "flex w-full items-center gap-xs rounded-sm px-sm py-xs text-left text-paragraph transition-colors hover:bg-action-default-background-hover",
+                  selectedSkillFile === entry.file ? "bg-action-default-background-hover font-medium text-text-primary" : "text-text-secondary",
+                )}
+              >
+                {entry.name}
+              </button>
+            )
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ToolsMainView({ onSkillClick, selectedSkillFile, skills }: { onSkillClick: (file: string) => void; selectedSkillFile: string | null; skills: Skill[] }) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-8 py-6">
+      {/* Skills section */}
+      <div className="flex flex-col gap-xs">
+        <div className="flex items-center pb-xs">
+          <span className="flex-1 text-title4 font-semibold text-text-primary">Skills</span>
+          <DefaultButton size="small" leadingIcon={<Icon name="plusIcon" size={12} />}>Add</DefaultButton>
+        </div>
+        {skills.map((skill) => (
+          <SkillTreeRow
+            key={skill.id}
+            skill={skill}
+            selectedSkillFile={selectedSkillFile}
+            onSkillClick={onSkillClick}
+          />
+        ))}
       </div>
 
-      {/* Divider */}
       <div className="h-px w-full bg-border" />
 
       {/* Instructions section */}
-      <div className="flex flex-col gap-3">
-        <span className="text-paragraph font-semibold text-text-primary">Instructions</span>
-
+      <div className="flex flex-col gap-md">
         {/* User instructions */}
-        <div className="flex flex-col gap-2">
-          <p className="text-paragraph text-text-primary">User instructions</p>
-          <p className="text-hint text-text-secondary">
-            Guidance lets you provide system-level instructions to the Assistant. It&apos;s a persistent way to share context, preferences, or preferred ways of authoring.
+        <div className="flex flex-col gap-sm">
+          <p className="text-paragraph font-semibold text-text-primary">User instructions</p>
+          <p className="text-paragraph text-text-secondary">
+            Instructions lets you provide system-level instructions to Genie Code. It&apos;s a persistent way to share context, preferences, or preferred ways of authoring.
           </p>
-          <div className="flex items-center gap-0">
-            <TextInput
-              defaultValue="/Users/kyle.gilbreath@..."
-              disabled
-              className="flex-1 rounded-r-none border-r-0 text-hint text-text-secondary"
-            />
-            <DefaultButton size="default" className="rounded-l-none border-l-0">
-              Move
-            </DefaultButton>
+          <div className="flex items-center gap-xs rounded-sm border border-border bg-background-primary px-mid">
+            <span className="min-w-0 flex-1 truncate py-[7px] text-paragraph text-text-secondary">
+              /Users/kyle.gilbreath@databricks.com/.assistant_instructions.md
+            </span>
+            <Icon name="lockOutlinedIcon" size={14} className="shrink-0 text-text-secondary" />
           </div>
-          <PrimaryButton size="default" leadingIcon={<Icon name="ArrowInIcon" size={14} />}>
-            Open instructions file
-          </PrimaryButton>
-          <p className="text-hint text-text-secondary">
-            The fastest way to add instructions is to start your input with the{" "}
-            <span className="font-semibold text-text-primary">#</span> character, or with{" "}
-            <span className="font-semibold text-text-primary">/addInstruction</span>
+          <div>
+            <PrimaryButton size="default">Open instructions file</PrimaryButton>
+          </div>
+          <p className="text-paragraph text-text-secondary">
+            The fastest way to add instructions is to start your input with the <strong className="font-semibold text-text-primary">#</strong> character.
           </p>
         </div>
 
         {/* Workspace instructions */}
-        <div className="flex flex-col gap-2">
-          <p className="text-paragraph text-text-primary">Workspace instructions</p>
-          <p className="text-hint text-text-secondary">
-            Workspace guidance is configured by your workspace admin and provides more context to the Assistant to help it follow guidelines and operate more efficiently in your workspace.{" "}
+        <div className="flex flex-col gap-sm">
+          <p className="text-paragraph font-semibold text-text-primary">Workspace instructions</p>
+          <p className="text-paragraph text-text-secondary">
+            Workspace instructions are configured by your workspace admin and provide more context to Genie Code to help it follow guidelines and operate more efficiently in your workspace.{" "}
             <span className="cursor-pointer text-action-default-text hover:underline">Learn more</span>
           </p>
-          <DefaultButton size="small" leadingIcon={<Icon name="ArrowInIcon" size={12} />}>
-            View file
-          </DefaultButton>
+          <div>
+            <DefaultButton size="default" leadingIcon={<Icon name="ArrowInIcon" size={14} />}>View file</DefaultButton>
+          </div>
         </div>
       </div>
     </div>
@@ -194,49 +418,32 @@ function ToolsPanel() {
 }
 
 // ---------------------------------------------------------------------------
-// Connections panel (contains MCP Servers)
+// Connections main view — placeholder
 // ---------------------------------------------------------------------------
 
-function ConnectionsPanel() {
+function ConnectionsMainView() {
   const [enabled, setEnabled] = React.useState<Record<string, boolean>>(
     Object.fromEntries(MCP_SERVERS.map((s) => [s.id, true])),
   );
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-      {/* Section header */}
-      <div className="flex items-center gap-sm px-3 py-2">
-        <span className="flex-1 text-paragraph font-semibold text-text-primary">MCP Servers</span>
-        <DefaultButton size="small" leadingIcon={<Icon name="plusIcon" size={12} />}>
-          Add
-        </DefaultButton>
+    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-8 py-6">
+      <div className="flex items-center">
+        <span className="flex-1 text-title4 font-semibold text-text-primary">MCP Servers</span>
+        <DefaultButton size="small" leadingIcon={<Icon name="plusIcon" size={12} />}>Add</DefaultButton>
       </div>
-
-      {/* Server list */}
-      <div className="flex flex-col gap-3 px-3 pb-3">
+      <div className="flex flex-col gap-3">
         {MCP_SERVERS.map((server) => (
-          <div key={server.id} className="flex items-center gap-sm">
-            {/* Icon */}
-            <div className={cx("flex h-6 w-6 shrink-0 items-center justify-center rounded", server.iconBg)}>
-              <Icon name="AppsIcon" size={14} className="text-text-secondary" />
+          <div key={server.id} className="flex items-center gap-sm rounded-md border border-border px-3 py-3">
+            <div className={cx("flex h-8 w-8 shrink-0 items-center justify-center rounded", server.iconBg)}>
+              <Icon name="AppsIcon" size={16} className="text-text-secondary" />
             </div>
-            {/* Name + tools count */}
             <div className="min-w-0 flex-1">
-              <p className="truncate text-paragraph text-text-primary">{server.name}</p>
+              <p className="truncate text-paragraph font-medium text-text-primary">{server.name}</p>
               <p className="text-hint text-action-default-text">{server.tools} tools enabled</p>
             </div>
-            {/* Toggle */}
-            <Toggle
-              checked={enabled[server.id] ?? true}
-              onChange={(v) => setEnabled((prev) => ({ ...prev, [server.id]: v }))}
-            />
-            {/* Overflow */}
-            <IconButton
-              aria-label="More"
-              icon={<Icon name="overflowIcon" size={14} />}
-              size="small"
-              tone="neutral"
-            />
+            <Toggle checked={enabled[server.id] ?? true} onChange={(v) => setEnabled((prev) => ({ ...prev, [server.id]: v }))} />
+            <IconButton aria-label="More" icon={<Icon name="overflowIcon" size={14} />} size="small" tone="neutral" />
           </div>
         ))}
       </div>
@@ -257,6 +464,8 @@ function ChatLeftNav({
   onCollapsedChange,
   reviewedThreadIds = new Set(),
   onRenameActiveThread,
+  activeMainView,
+  onSetMainView,
 }: {
   threads: ReturnType<typeof useGenieChatState>["threads"];
   activeThreadId: string | null;
@@ -266,9 +475,10 @@ function ChatLeftNav({
   onCollapsedChange: (v: boolean) => void;
   reviewedThreadIds?: Set<string>;
   onRenameActiveThread?: () => void;
+  activeMainView: MainView;
+  onSetMainView: (view: MainView) => void;
 }) {
   const setCollapsed = onCollapsedChange;
-  const [activePanel, setActivePanel] = React.useState<SidePanel>("threads");
   const [width, setWidth] = React.useState(DEFAULT_NAV_WIDTH);
   const [searchActive, setSearchActive] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -300,9 +510,6 @@ function ChatLeftNav({
     document.body.style.userSelect = "none";
   }, [width]);
 
-  const togglePanel = (panel: SidePanel) =>
-    setActivePanel((prev) => (prev === panel ? "threads" : panel));
-
   if (collapsed) {
     return (
       <div className="flex h-full w-9 shrink-0 flex-col items-center border-r border-border py-2">
@@ -332,110 +539,96 @@ function ChatLeftNav({
             onClick={() => setCollapsed(true)}
           />
         </Tooltip>
-        <span className="flex-1 text-paragraph font-medium text-text-primary">Genie Chat</span>
-        <Tooltip label="Threads" align="right">
-          <IconButton
-            aria-label="Threads"
-            icon={<Icon name="speechBubbleIcon" size={14} />}
-            size="small"
-            tone="neutral"
-            className={cx(activePanel === "threads" && "!bg-background-tertiary text-text-primary")}
-            onClick={() => togglePanel("threads")}
-          />
-        </Tooltip>
-        <Tooltip label="Tools" align="right">
-          <IconButton
-            aria-label="Tools"
-            icon={<Icon name="WrenchIcon" size={14} />}
-            size="small"
-            tone="neutral"
-            className={cx(activePanel === "tools" && "!bg-background-tertiary text-text-primary")}
-            onClick={() => togglePanel("tools")}
-          />
-        </Tooltip>
-        <Tooltip label="Connections" align="right">
-          <IconButton
-            aria-label="Connections"
-            icon={<Icon name="plugIcon" size={14} />}
-            size="small"
-            tone="neutral"
-            className={cx(activePanel === "connections" && "!bg-background-tertiary text-text-primary")}
-            onClick={() => togglePanel("connections")}
-          />
-        </Tooltip>
+        <span className="flex-1 text-paragraph font-semibold text-text-primary">Genie Chat</span>
       </div>
 
-      {activePanel === "tools" ? (
-        <ToolsPanel />
-      ) : activePanel === "connections" ? (
-        <ConnectionsPanel />
-      ) : activePanel === "threads" ? (
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
-          {/* Quick actions */}
-          <div className="flex flex-col px-2 pt-1">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
+        {/* Quick actions */}
+        <div className="flex flex-col px-2 pt-1">
+          <button
+            type="button"
+            onClick={() => { onNewChat(); onSetMainView("thread"); }}
+            className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-paragraph text-text-primary hover:bg-background-secondary"
+          >
+            <Icon name="newThreadIcon" size={14} className="shrink-0 text-text-secondary" />
+            New chat
+          </button>
+          <button
+            type="button"
+            onClick={() => onSetMainView(activeMainView === "tools" ? "thread" : "tools")}
+            className={cx(
+              "flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-paragraph hover:bg-background-secondary",
+              activeMainView === "tools" ? "bg-action-default-background-hover font-medium text-text-primary" : "text-text-primary",
+            )}
+          >
+            <Icon name="WrenchIcon" size={14} className="shrink-0 text-text-secondary" />
+            Tools
+          </button>
+          <button
+            type="button"
+            onClick={() => onSetMainView(activeMainView === "connections" ? "thread" : "connections")}
+            className={cx(
+              "flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-paragraph hover:bg-background-secondary",
+              activeMainView === "connections" ? "bg-action-default-background-hover font-medium text-text-primary" : "text-text-primary",
+            )}
+          >
+            <Icon name="plugIcon" size={14} className="shrink-0 text-text-secondary" />
+            Connections
+          </button>
+          {searchActive ? (
+            <div className="mt-xs flex w-full items-center gap-2 rounded-md border border-[#1A6FCC] bg-background-secondary px-2 py-2">
+              <Icon name="searchIcon" size={14} className="shrink-0 text-text-secondary" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setSearchQuery("");
+                    setSearchActive(false);
+                  }
+                }}
+                onBlur={() => {
+                  if (!searchQuery) setSearchActive(false);
+                }}
+                placeholder="Search chats..."
+                className="min-w-0 flex-1 bg-transparent text-paragraph text-text-primary outline-none placeholder:text-text-secondary"
+                autoFocus
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => { setSearchQuery(""); setSearchActive(false); }}
+                  className="shrink-0 text-text-secondary hover:text-text-primary"
+                >
+                  <Icon name="closeIcon" size={12} />
+                </button>
+              )}
+            </div>
+          ) : (
             <button
               type="button"
-              onClick={onNewChat}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-paragraph text-text-primary hover:bg-background-secondary"
+              onClick={() => { setSearchActive(true); setTimeout(() => searchInputRef.current?.focus(), 0); }}
+              className="mt-xs flex w-full items-center gap-2 rounded-md border border-transparent bg-background-secondary px-2 py-2 text-left text-paragraph text-text-secondary hover:border-border"
             >
-              <Icon name="newThreadIcon" size={14} className="shrink-0 text-text-secondary" />
-              New chat
+              <Icon name="searchIcon" size={14} className="shrink-0" />
+              Search chats
             </button>
-            {searchActive ? (
-              <div className="flex w-full items-center gap-2 rounded-md border border-[#1A6FCC] bg-background-secondary px-2 py-2">
-                <Icon name="searchIcon" size={14} className="shrink-0 text-text-secondary" />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Escape") {
-                      setSearchQuery("");
-                      setSearchActive(false);
-                    }
-                  }}
-                  onBlur={() => {
-                    if (!searchQuery) setSearchActive(false);
-                  }}
-                  placeholder="Search chats..."
-                  className="min-w-0 flex-1 bg-transparent text-paragraph text-text-primary outline-none placeholder:text-text-secondary"
-                  autoFocus
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => { setSearchQuery(""); setSearchActive(false); }}
-                    className="shrink-0 text-text-secondary hover:text-text-primary"
-                  >
-                    <Icon name="closeIcon" size={12} />
-                  </button>
-                )}
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => { setSearchActive(true); setTimeout(() => searchInputRef.current?.focus(), 0); }}
-                className="flex w-full items-center gap-2 rounded-md border border-transparent bg-background-secondary px-2 py-2 text-left text-paragraph text-text-secondary hover:border-border"
-              >
-                <Icon name="searchIcon" size={14} className="shrink-0" />
-                Search chats
-              </button>
-            )}
-          </div>
-
-          {/* Thread list */}
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            <GenieChatThreadList
-              threads={searchQuery ? threads.filter((t) => t.label.toLowerCase().includes(searchQuery.toLowerCase())) : threads}
-              activeThreadId={activeThreadId}
-              onSelect={(id) => { onSelect(id); setSearchQuery(""); setSearchActive(false); }}
-              reviewedThreadIds={reviewedThreadIds}
-              onRenameActiveThread={onRenameActiveThread}
-            />
-          </div>
+          )}
         </div>
-      ) : null}
+
+        {/* Thread list */}
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <GenieChatThreadList
+            threads={searchQuery ? threads.filter((t) => t.label.toLowerCase().includes(searchQuery.toLowerCase())) : threads}
+            activeThreadId={activeMainView === "thread" ? activeThreadId : null}
+            onSelect={(id) => { onSelect(id); onSetMainView("thread"); setSearchQuery(""); setSearchActive(false); }}
+            reviewedThreadIds={reviewedThreadIds}
+            onRenameActiveThread={onRenameActiveThread}
+          />
+        </div>
+      </div>
 
       {/* Drag handle */}
       <div
@@ -1535,6 +1728,8 @@ function PreviewPanel({
   activeTab,
   setActiveTab,
   isReviewed = false,
+  skillFile,
+  onSkillSave,
 }: {
   onClose: () => void;
   selectedAsset: ReviewAsset | null;
@@ -1548,6 +1743,8 @@ function PreviewPanel({
   activeTab: PreviewTab;
   setActiveTab: (tab: PreviewTab) => void;
   isReviewed?: boolean;
+  skillFile?: string | null;
+  onSkillSave?: (file: string, content: string) => void;
 }) {
 
   // Open or switch to asset tab when selectedAsset changes
@@ -1561,6 +1758,14 @@ function PreviewPanel({
   }, [selectedAsset]);
 
   const [previewMoreMenuOpen, setPreviewMoreMenuOpen] = React.useState(false);
+  const [skillEditMode, setSkillEditMode] = React.useState(false);
+  const [skillEditContent, setSkillEditContent] = React.useState<string>("");
+
+  // Reset edit mode when skillFile changes
+  React.useEffect(() => {
+    setSkillEditMode(false);
+    setSkillEditContent(skillFile ? (SKILL_FILE_CONTENT[skillFile] ?? `# ${skillFile}\n\nSkill file content not available.`) : "");
+  }, [skillFile]);
 
   const activeAsset = openAssets.find((a) => a.id === activeAssetId) ?? null;
 
@@ -1611,68 +1816,116 @@ function PreviewPanel({
       />
       {/* Header */}
       <div className="flex h-10 shrink-0 items-center gap-xs pr-3">
-        {/* Tabs */}
+        {/* Tabs / skill title */}
         <div className="relative flex min-w-0 flex-1 items-center overflow-hidden">
-          {(["Assets", "Review"] as PreviewTab[]).map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setActiveTab(tab)}
-              className={cx(
-                "flex h-7 shrink-0 items-center justify-center rounded-md px-3 text-paragraph",
-                activeTab === tab
-                  ? "bg-action-default-background-hover font-medium text-text-primary"
-                  : "text-text-secondary hover:bg-action-default-background-hover",
-              )}
-            >
-              {tab}
-            </button>
-          ))}
+          {skillFile ? (
+            <span className="truncate pl-3 text-paragraph font-medium text-text-primary">{skillFile.replace(".md", "")}</span>
+          ) : (
+            (["Assets", "Review"] as PreviewTab[]).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={cx(
+                  "flex h-7 shrink-0 items-center justify-center rounded-md px-3 text-paragraph",
+                  activeTab === tab
+                    ? "bg-action-default-background-hover font-medium text-text-primary"
+                    : "text-text-secondary hover:bg-action-default-background-hover",
+                )}
+              >
+                {tab}
+              </button>
+            ))
+          )}
           {/* Fade-out mask */}
           <div className="pointer-events-none absolute right-0 top-0 h-full w-8 bg-gradient-to-r from-transparent to-background-primary" />
         </div>
         {/* Right actions */}
-        <div className="flex shrink-0 items-center gap-xs">
-          <IconButton
-            aria-label="Status"
-            icon={<span className="inline-block h-2.5 w-2.5 rounded-full bg-green-500" />}
-            size="small"
-            tone="neutral"
-          />
-          <div className="relative">
+        {skillFile ? (
+          <div className="flex shrink-0 items-center gap-xs">
+            {skillEditMode ? (
+              <PrimaryButton
+                size="small"
+                onClick={() => {
+                  onSkillSave?.(skillFile, skillEditContent);
+                  setSkillEditMode(false);
+                }}
+              >
+                Save file
+              </PrimaryButton>
+            ) : (
+              <DefaultButton
+                size="small"
+                leadingIcon={<Icon name="pencilIcon" size={12} />}
+                onClick={() => setSkillEditMode(true)}
+              >
+                Edit file
+              </DefaultButton>
+            )}
             <IconButton
-              aria-label="More options"
-              icon={<Icon name="overflowIcon" size={14} />}
+              aria-label="Close preview panel"
+              icon={<Icon name="closeIcon" size={14} />}
               size="small"
               tone="neutral"
-              onClick={() => setPreviewMoreMenuOpen((v) => !v)}
+              onClick={onClose}
             />
-            {previewMoreMenuOpen && (
-              <MoreOptionsMenu
-                onClose={() => setPreviewMoreMenuOpen(false)}
-                onFullScreen={onClose}
-                isFullScreen={true}
-              />
-            )}
           </div>
-          <IconButton
-            aria-label="Close preview panel"
-            icon={
-              <span className="inline-flex rotate-180">
-                <Icon name="sidebarOpenIcon" size={16} />
-              </span>
-            }
-            size="small"
-            tone="neutral"
-            className="!bg-background-tertiary"
-            onClick={onClose}
-          />
-        </div>
+        ) : (
+          <div className="flex shrink-0 items-center gap-xs">
+            <IconButton
+              aria-label="Status"
+              icon={<span className="inline-block h-2.5 w-2.5 rounded-full bg-green-500" />}
+              size="small"
+              tone="neutral"
+            />
+            <div className="relative">
+              <IconButton
+                aria-label="More options"
+                icon={<Icon name="overflowIcon" size={14} />}
+                size="small"
+                tone="neutral"
+                onClick={() => setPreviewMoreMenuOpen((v) => !v)}
+              />
+              {previewMoreMenuOpen && (
+                <MoreOptionsMenu
+                  onClose={() => setPreviewMoreMenuOpen(false)}
+                  onFullScreen={onClose}
+                  isFullScreen={true}
+                />
+              )}
+            </div>
+            <IconButton
+              aria-label="Close preview panel"
+              icon={
+                <span className="inline-flex rotate-180">
+                  <Icon name="sidebarOpenIcon" size={16} />
+                </span>
+              }
+              size="small"
+              tone="neutral"
+              className="!bg-background-tertiary"
+              onClick={onClose}
+            />
+          </div>
+        )}
       </div>
 
       {/* Pane */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden pb-3 pr-3">
-        {activeTab === "Review" ? (
+        {skillFile ? (
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border bg-background-primary">
+            {skillEditMode ? (
+              <textarea
+                className="min-h-0 flex-1 resize-none bg-background-primary px-6 py-5 font-mono text-paragraph text-text-primary outline-none"
+                value={skillEditContent}
+                onChange={(e) => setSkillEditContent(e.target.value)}
+                spellCheck={false}
+              />
+            ) : (
+              <SkillFileViewer skillFile={skillFile} content={skillEditContent} />
+            )}
+          </div>
+        ) : activeTab === "Review" ? (
           reviewAssets && reviewAssets.length > 0 && !isReviewed ? (
             <ReviewDiffPanel key={activeThreadId ?? "review"} assets={reviewAssets} />
           ) : (
@@ -1822,6 +2075,39 @@ export default function ChatPage() {
   const focusTitleInputRef = React.useRef<(() => void) | null>(null);
   const handleFocusTitleInputReady = React.useCallback((fn: () => void) => { focusTitleInputRef.current = fn; }, []);
 
+  const [mainView, setMainView] = React.useState<MainView>("thread");
+  const [selectedSkillFile, setSelectedSkillFile] = React.useState<string | null>(null);
+  const [skills, setSkills] = React.useState(() => [...SKILLS]);
+
+  const handleSkillSave = React.useCallback((file: string, newContent: string) => {
+    SKILL_FILE_CONTENT[file] = newContent;
+    // Parse name from first # heading, description from first non-empty non-heading line
+    const lines = newContent.split("\n");
+    const titleLine = lines.find((l) => l.startsWith("# "));
+    const name = titleLine ? titleLine.slice(2).trim() : file.replace(".md", "");
+    const descLine = lines.find((l) => l.trim() && !l.startsWith("#"));
+    const description = descLine ? descLine.replace(/^\s*-\s*/, "").trim() : "";
+    setSkills((prev) => prev.map((s) => s.primaryFile === file ? { ...s, name, description } : s));
+  }, []);
+
+  const handleSetMainView = React.useCallback((view: MainView) => {
+    setMainView(view);
+    if (view !== "tools") {
+      setSelectedSkillFile(null);
+    } else {
+      // Auto-select first skill's primary file and open preview
+      const firstFile = SKILLS[0]?.primaryFile ?? null;
+      setSelectedSkillFile(firstFile);
+      if (containerRef.current) setInitialPreviewWidth(Math.round(containerRef.current.offsetWidth * 0.45));
+    }
+  }, []);
+
+  const handleSkillClick = React.useCallback((file: string) => {
+    setSelectedSkillFile(file);
+    if (containerRef.current) setInitialPreviewWidth(Math.round(containerRef.current.offsetWidth * 0.45));
+    setPreviewOpen(true);
+  }, []);
+
   // Auto-switch to Review tab when assets become available, unless opened via asset click
   React.useEffect(() => {
     if (reviewAssets && reviewAssets.length > 0 && previewOpen) {
@@ -1859,24 +2145,32 @@ export default function ChatPage() {
           onCollapsedChange={setNavCollapsed}
           reviewedThreadIds={reviewedThreadIds}
           onRenameActiveThread={() => setTimeout(() => focusTitleInputRef.current?.(), 50)}
+          activeMainView={mainView}
+          onSetMainView={handleSetMainView}
         />
 
-        <GenieChatBody
-          state={state}
-          size="full"
-          hideThreadToggle
-          onToggleNav={handleTogglePreview}
-          previewOpen={previewOpen}
-          onAssetClick={handleAssetClick}
-          onFullScreen={() => { sessionStorage.setItem("openGeniePanel", "1"); router.back(); }}
-          reviewed={isReviewed}
-          onReviewed={handleReviewed}
-          onFocusTitleInputReady={handleFocusTitleInputReady}
-        />
+        {mainView === "tools" ? (
+          <ToolsMainView onSkillClick={handleSkillClick} selectedSkillFile={selectedSkillFile} skills={skills} />
+        ) : mainView === "connections" ? (
+          <ConnectionsMainView />
+        ) : (
+          <GenieChatBody
+            state={state}
+            size="full"
+            hideThreadToggle
+            onToggleNav={handleTogglePreview}
+            previewOpen={previewOpen}
+            onAssetClick={handleAssetClick}
+            onFullScreen={() => { sessionStorage.setItem("openGeniePanel", "1"); router.back(); }}
+            reviewed={isReviewed}
+            onReviewed={handleReviewed}
+            onFocusTitleInputReady={handleFocusTitleInputReady}
+          />
+        )}
 
-        {previewOpen && (
+        {(previewOpen || (mainView === "tools" && selectedSkillFile)) && (
           <PreviewPanel
-            onClose={() => setPreviewOpen(false)}
+            onClose={() => { setPreviewOpen(false); setSelectedSkillFile(null); }}
             selectedAsset={selectedAsset}
             activeThreadId={state.activeThreadId}
             initialWidth={initialPreviewWidth}
@@ -1888,6 +2182,8 @@ export default function ChatPage() {
             activeTab={activeTab}
             setActiveTab={setActiveTab}
             isReviewed={isReviewed}
+            skillFile={mainView === "tools" ? selectedSkillFile : null}
+            onSkillSave={handleSkillSave}
           />
         )}
       </div>
