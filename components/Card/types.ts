@@ -59,6 +59,8 @@ export type SmallCardItem = {
 export type ThumbnailCardItem = SmallCardItem & {
   /** Required top thumbnail. */
   thumbnail: CardThumbnailProps;
+  /** Optional navigation href — wraps the entire card in a link. */
+  href?: string;
   /**
    * Optional second line in the metadata area (Figma shows a 2-line treatment on some variants).
    * Kept generic for composability.

@@ -181,6 +181,8 @@ export type SearchLayoutThumbnailCardModel = SearchLayoutCardBaseModel & {
   metadata?: string;
   /** Optional longer description (2 lines max in UI). */
   description?: string;
+  /** Optional navigation href — wraps the entire card in a link. */
+  href?: string;
   thumbnail:
     | { kind: "placeholder"; iconName?: string; phosphorIcon?: string; tagColor?: string }
     | { kind: "dashboard"; index: number; alt: string }
@@ -674,6 +676,7 @@ export function makeTemplateFromSpec(entry: AssetEntry): SearchLayoutTemplate {
     id: `suggested_${idx + 1}`,
     title: { label: names[idx % names.length], icon: primaryIcon, decorators: pickDecorators(idx, true) },
     subtitle: "You view frequently",
+    ...(idx === 0 ? { href: "/dashboard/edit" } : {}),
     thumbnail: assetType === "Apps"
       ? { kind: "image" as const, src: { light: `/images/app-thumbnail-${String(1 + (idx % 10)).padStart(2, "0")}.png`, dark: `/images/app-thumbnail-${String(1 + (idx % 10)).padStart(2, "0")}.png` }, alt: "App preview" }
       : assetType === "GenieSpaces"

@@ -16,8 +16,8 @@ function iconForKind(kind: Asset["kind"]): string {
 export function AssetChip({ asset, onClick }: { asset: Asset; onClick?: (asset: Asset) => void }) {
   const inner = (
     <>
-      <Icon name={iconForKind(asset.kind)} size={12} className="text-text-secondary" />
-      {asset.name}
+      <Icon name={iconForKind(asset.kind)} size={12} className="shrink-0 text-text-secondary" />
+      <span className="truncate">{asset.name}</span>
     </>
   );
   if (onClick) {
@@ -25,14 +25,14 @@ export function AssetChip({ asset, onClick }: { asset: Asset; onClick?: (asset: 
       <button
         type="button"
         onClick={() => onClick(asset)}
-        className="inline-flex items-center gap-xs rounded-sm border border-border bg-background-primary px-xs py-0 text-paragraph leading-5 text-text-primary hover:border-action-default-border-hover hover:bg-background-tertiary"
+        className="inline-flex max-w-[160px] min-w-0 items-center gap-xs rounded-sm border border-border bg-background-primary px-xs py-0 text-paragraph leading-5 text-text-primary hover:border-action-default-border-hover hover:bg-background-tertiary"
       >
         {inner}
       </button>
     );
   }
   return (
-    <span className="inline-flex cursor-pointer items-center gap-xs rounded-sm border border-border bg-background-primary px-xs py-0 text-paragraph leading-5 text-text-primary hover:border-action-default-border-hover hover:bg-background-tertiary">
+    <span className="inline-flex max-w-[160px] min-w-0 cursor-pointer items-center gap-xs rounded-sm border border-border bg-background-primary px-xs py-0 text-paragraph leading-5 text-text-primary hover:border-action-default-border-hover hover:bg-background-tertiary">
       {inner}
     </span>
   );

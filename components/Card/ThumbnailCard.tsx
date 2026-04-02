@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 
 import { CardThumbnail } from "@/components/CardThumbnail";
 import { MetadataItem, MetadataRow } from "@/components/Metadata";
@@ -24,13 +25,14 @@ export type ThumbnailCardProps = Omit<React.HTMLAttributes<HTMLDivElement>, "chi
  * Used for dashboard previews, placeholders, snippets, etc.
  */
 export function ThumbnailCard({ item, className, ...rest }: ThumbnailCardProps) {
-  return (
+  const card = (
     <div
       {...rest}
       className={cx(
         "flex w-full flex-col overflow-hidden",
         "rounded-[16px] border border-border bg-background-primary",
         "shadow-[var(--elevation-shadow-xs)] transition-shadow",
+        item.href && "cursor-pointer hover:shadow-[var(--elevation-shadow-sm)]",
         className,
       )}
     >
@@ -91,5 +93,10 @@ export function ThumbnailCard({ item, className, ...rest }: ThumbnailCardProps) 
       </div>
     </div>
   );
+
+  if (item.href) {
+    return <Link href={item.href} className="block">{card}</Link>;
+  }
+  return card;
 }
 

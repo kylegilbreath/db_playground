@@ -3,8 +3,12 @@
 import * as React from "react";
 import { useSearchParams } from "next/navigation";
 
+function cx(...parts: Array<string | undefined | false>) {
+  return parts.filter(Boolean).join(" ");
+}
+
 import { useGenieCode } from "@/components/GenieCodePanel/GenieCodeContext";
-import { GenieCodeSidePanel, GenieCodeRightRail } from "@/components/GenieCodePanel/GenieCodeSidePanel";
+import { GenieCodeSidePanel, GenieCodeRightRail, VariablesPanel, RevisionsPanel, ConfigPanel, InfoPanel } from "@/components/GenieCodePanel/GenieCodeSidePanel";
 import { CodeBlock } from "@/components/CodeBlock/CodeBlock";
 import { TabBar, type TabBarTab } from "@/components/PlatformChrome/TabBar";
 import { IconButton } from "@/components/IconButton";
@@ -41,9 +45,9 @@ function NotebookToolbar({ language = "Python" }: { language?: string }) {
 
       {/* Right-side actions */}
       <div className="flex items-center gap-sm py-1">
-        <PrimaryButton size="small" leadingIcon={<Icon name="playIcon" size={14} />}>
+        <DefaultButton size="small" leadingIcon={<Icon name="playIcon" size={14} />}>
           Run all
-        </PrimaryButton>
+        </DefaultButton>
         <DefaultButton size="small" leadingIcon={<span className="inline-block h-2 w-2 rounded-full bg-green-500" />} menu>
           Serverless
         </DefaultButton>
@@ -177,16 +181,14 @@ function NotebookCell({
 }) {
   return (
     <div className="flex w-full flex-col gap-sm">
-      {/* Step header */}
-      <div className="flex flex-col gap-xs rounded-md border border-border bg-background-primary p-4">
-        <div className="text-heading-s font-semibold text-text-primary">
-          Step {stepNumber} – {stepTitle}
-        </div>
+      {/* Text cell */}
+      <div className="shrink-0 rounded-md border border-border bg-background-primary p-4">
+        <p className="mb-2 text-[15px] font-semibold leading-6 text-text-primary">{stepTitle}</p>
         {stepDescription && (
-          <p className="text-paragraph leading-5 text-text-secondary">{stepDescription}</p>
+          <p className="mb-2 text-paragraph leading-5 text-text-secondary">{stepDescription}</p>
         )}
         {bullets && (
-          <ul className="ml-4 list-disc text-paragraph leading-5 text-text-secondary">
+          <ul className="mb-2 flex flex-col gap-0.5 pl-4 list-disc text-paragraph leading-5 text-text-secondary">
             {bullets.map((b, i) => (
               <li key={i}>{b}</li>
             ))}
@@ -645,6 +647,139 @@ function SkillFileView({ skillFile }: { skillFile: string }) {
 // Page
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Left rail panels
+// ---------------------------------------------------------------------------
+
+const WORKSPACE_FILES = [
+  { name: "Ski Resort EDA", icon: "notebookIcon" },
+  { name: "file-name.py", icon: "fileCodeIcon" },
+  { name: "New Query 2026-03-17", icon: "fileDocumentIcon" },
+  { name: "New Query 2026-03-13", icon: "fileDocumentIcon" },
+  { name: "New Query 2026-03-09", icon: "fileDocumentIcon" },
+  { name: "New Query 2026-03-02", icon: "fileDocumentIcon" },
+  { name: "Untitled Notebook", icon: "notebookIcon" },
+  { name: "Untitled Notebook", icon: "notebookIcon" },
+  { name: "test.py", icon: "fileCodeIcon" },
+];
+
+const SCHEMA_TABLES = [
+  { name: "ski_conditions", cols: ["date", "resort", "snowfall_in", "lifts_open", "visitors"] },
+  { name: "lift_operations", cols: ["lift_id", "name", "status", "capacity"] },
+  { name: "ticket_sales", cols: ["sale_id", "date", "type", "price", "resort"] },
+  { name: "snowfall_history", cols: ["date", "resort", "amount_in", "season"] },
+];
+
+const TOC_ITEMS = [
+  { label: "Understand Table Structure & Sample the Data", level: 1 },
+  { label: "Filter & Clean Data", level: 1 },
+  { label: "Aggregate by Resort", level: 1 },
+  { label: "Visualize Trends", level: 1 },
+];
+
+function WorkspacePanel() {
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex h-10 shrink-0 items-center justify-between border-b border-border px-3">
+        <span className="text-paragraph font-medium text-text-primary">Workspace</span>
+        <div className="flex items-center gap-xs">
+          <button type="button" className="flex h-5 w-5 items-center justify-center rounded-sm text-text-secondary hover:bg-background-secondary hover:text-text-primary">
+            <Icon name="refreshIcon" size={12} />
+          </button>
+          <button type="button" className="flex h-5 w-5 items-center justify-center rounded-sm text-text-secondary hover:bg-background-secondary hover:text-text-primary">
+            <Icon name="plusIcon" size={12} />
+          </button>
+        </div>
+      </div>
+      <div className="shrink-0 border-b border-border px-2 py-2">
+        <div className="flex items-center gap-xs rounded-sm border border-border bg-background-primary px-2 py-1">
+          <Icon name="searchIcon" size={12} className="shrink-0 text-text-secondary" />
+          <input type="text" placeholder="Type to search..." className="min-w-0 flex-1 bg-transparent text-hint text-text-primary placeholder:text-text-placeholder outline-none" />
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center gap-xs border-b border-border px-3 py-1.5 text-hint text-text-secondary">
+        <Icon name="chevronLeftIcon" size={12} />
+        <Icon name="folderOutlinedIcon" size={12} />
+        <span className="truncate">Drafts</span>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto py-1">
+        {WORKSPACE_FILES.map((f, i) => (
+          <button key={i} type="button" className="flex w-full items-center gap-xs px-3 py-1.5 text-left text-hint text-text-primary hover:bg-background-secondary">
+            <Icon name={f.icon} size={14} className="shrink-0 text-text-secondary" />
+            <span className="min-w-0 flex-1 truncate">{f.name}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SchemaPanel() {
+  const [expanded, setExpanded] = React.useState<string | null>("ski_conditions");
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-2">
+        <span className="text-paragraph font-medium text-text-primary">Schema</span>
+      </div>
+      <div className="shrink-0 border-b border-border px-2 py-2">
+        <div className="flex items-center gap-xs rounded-sm border border-border bg-background-primary px-2 py-1">
+          <Icon name="searchIcon" size={12} className="shrink-0 text-text-secondary" />
+          <input type="text" placeholder="Search tables..." className="min-w-0 flex-1 bg-transparent text-hint text-text-primary placeholder:text-text-placeholder outline-none" />
+        </div>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto py-1">
+        {SCHEMA_TABLES.map((t) => (
+          <div key={t.name}>
+            <button
+              type="button"
+              onClick={() => setExpanded(expanded === t.name ? null : t.name)}
+              className="flex w-full items-center gap-xs px-3 py-1.5 text-left text-hint text-text-primary hover:bg-background-secondary"
+            >
+              <Icon name={expanded === t.name ? "chevronDownIcon" : "chevronRightIcon"} size={10} className="shrink-0 text-text-secondary" />
+              <Icon name="tableIcon" size={14} className="shrink-0 text-text-secondary" />
+              <span className="min-w-0 flex-1 truncate">{t.name}</span>
+            </button>
+            {expanded === t.name && t.cols.map((col) => (
+              <div key={col} className="flex items-center gap-xs py-1 pl-9 pr-3 text-hint text-text-secondary hover:bg-background-secondary">
+                <Icon name="NumbersIcon" size={12} className="shrink-0" />
+                <span className="truncate">{col}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TocPanel() {
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex shrink-0 items-center border-b border-border px-3 py-2">
+        <span className="text-paragraph font-medium text-text-primary">Table of Contents</span>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto py-2">
+        {TOC_ITEMS.map((item, i) => (
+          <button key={i} type="button" className="flex w-full items-center gap-xs px-3 py-1.5 text-left text-hint text-text-secondary hover:bg-background-secondary hover:text-text-primary">
+            <span className="shrink-0 tabular-nums text-text-placeholder">{i + 1}</span>
+            <span className="min-w-0 flex-1 truncate">{item.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const LEFT_RAIL_ITEMS = [
+  { id: "workspace", icon: "folderOutlinedIcon", label: "Workspace" },
+  { id: "schema", icon: "tableIcon", label: "Schema" },
+  { id: "toc", icon: "listIcon", label: "Table of Contents" },
+];
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
+
 export default function EditorPage() {
   const genieCode = useGenieCode();
   const searchParams = useSearchParams();
@@ -658,6 +793,11 @@ export default function EditorPage() {
     skillFile ? "tab-skill" : NOTEBOOK_TABS[0]!.id,
   );
   const [activePanel, setActivePanel] = React.useState<string | null>(genieCode.isOpen ? "sparkle" : null);
+  const [rightPanel, setRightPanel] = React.useState<string | null>(null);
+  const [leftPanel, setLeftPanel] = React.useState<string | null>("workspace");
+  const [leftPanelWidth, setLeftPanelWidth] = React.useState(220);
+  const leftDragStartX = React.useRef<number | null>(null);
+  const leftDragStartWidth = React.useRef<number>(220);
   const [panelWidth, setPanelWidth] = React.useState(360);
   const dragStartX = React.useRef<number | null>(null);
   const dragStartWidth = React.useRef<number>(360);
@@ -673,12 +813,37 @@ export default function EditorPage() {
   }, [genieCode.isOpen]);
 
   const handlePanelToggle = (id: string) => {
-    const next = activePanel === id ? null : id;
-    setActivePanel(next);
-    // Keep top nav active state in sync
-    if (next !== null) genieCode.open();
-    else genieCode.close();
+    if (id === "sparkle") {
+      const next = activePanel === "sparkle" ? null : "sparkle";
+      setActivePanel(next);
+      setRightPanel(null);
+      if (next !== null) genieCode.open();
+      else genieCode.close();
+    } else {
+      setRightPanel(rightPanel === id ? null : id);
+      setActivePanel(null);
+      genieCode.close();
+    }
   };
+
+  const handleLeftResizeStart = React.useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    leftDragStartX.current = e.clientX;
+    leftDragStartWidth.current = leftPanelWidth;
+    const onMouseMove = (ev: MouseEvent) => {
+      if (leftDragStartX.current === null) return;
+      const delta = ev.clientX - leftDragStartX.current;
+      const next = Math.max(160, Math.min(480, leftDragStartWidth.current + delta));
+      setLeftPanelWidth(next);
+    };
+    const onMouseUp = () => {
+      leftDragStartX.current = null;
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  }, [leftPanelWidth]);
 
   const handleResizeStart = React.useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -701,7 +866,41 @@ export default function EditorPage() {
   }, [panelWidth]);
 
   return (
-    <main className="flex h-full min-h-0 w-full overflow-hidden">
+    <main className="flex h-full min-h-0 w-full gap-xs overflow-hidden">
+      {/* Left rail */}
+      <div className="flex h-full w-9 shrink-0 flex-col items-center border-r border-border bg-background-primary py-2">
+        {LEFT_RAIL_ITEMS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            aria-label={item.label}
+            onClick={() => setLeftPanel(leftPanel === item.id ? null : item.id)}
+            className={cx(
+              "flex h-7 w-7 items-center justify-center rounded-sm",
+              leftPanel === item.id
+                ? "bg-background-tertiary text-text-primary"
+                : "text-text-secondary hover:bg-background-tertiary hover:text-text-primary",
+            )}
+          >
+            <Icon name={item.icon} size={16} />
+          </button>
+        ))}
+      </div>
+
+      {/* Left panel */}
+      {leftPanel !== null && (
+        <div className="relative flex h-full shrink-0 flex-col border-r border-border bg-background-primary overflow-hidden" style={{ width: leftPanelWidth }}>
+          {leftPanel === "workspace" && <WorkspacePanel />}
+          {leftPanel === "schema" && <SchemaPanel />}
+          {leftPanel === "toc" && <TocPanel />}
+          {/* Resize handle */}
+          <div
+            onMouseDown={handleLeftResizeStart}
+            className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-action-default-border-hover"
+          />
+        </div>
+      )}
+
       {/* Notebook area */}
       <div className="flex min-w-0 flex-1 flex-col">
         <TabBar tabs={tabs} activeId={activeTabId} onSelect={setActiveTabId} />
@@ -735,8 +934,8 @@ export default function EditorPage() {
         )}
       </div>
 
-      {/* Genie Code side panel — only when a panel is active */}
-      {activePanel !== null && (
+      {/* Genie Code side panel — only when sparkle is active */}
+      {activePanel === "sparkle" && (
         <GenieCodeSidePanel
           onClose={() => { setActivePanel(null); genieCode.close(); }}
           width={panelWidth}
@@ -748,9 +947,19 @@ export default function EditorPage() {
         />
       )}
 
-      {/* Right rail — always visible when no panel is open */}
+      {/* Right utility panels */}
+      {rightPanel !== null && (
+        <div className="flex h-full w-[280px] shrink-0 flex-col border-l border-border bg-background-primary">
+          {rightPanel === "variables" && <VariablesPanel onClose={() => setRightPanel(null)} />}
+          {rightPanel === "revisions" && <RevisionsPanel onClose={() => setRightPanel(null)} />}
+          {rightPanel === "config" && <ConfigPanel onClose={() => setRightPanel(null)} />}
+          {rightPanel === "info" && <InfoPanel onClose={() => setRightPanel(null)} />}
+        </div>
+      )}
+
+      {/* Right rail — always visible when no genie panel is open */}
       {activePanel === null && (
-        <GenieCodeRightRail activeItem={null} onToggle={handlePanelToggle} />
+        <GenieCodeRightRail activeItem={rightPanel} onToggle={handlePanelToggle} />
       )}
     </main>
   );

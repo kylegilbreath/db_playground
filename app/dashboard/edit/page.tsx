@@ -13,7 +13,7 @@ function cx(...parts: Array<string | undefined | false>) {
 // Dashboard viz content (shared with chat preview)
 // ---------------------------------------------------------------------------
 
-function DashboardContent() {
+function DashboardContent({ selectedWidget, setSelectedWidget }: { selectedWidget: string | null; setSelectedWidget: (id: string | null) => void }) {
   const dauPoints = [18, 24, 22, 30, 28, 35, 32, 40, 38, 44, 42, 48, 46, 52, 50, 58, 55, 62, 60, 68, 65, 70, 68, 74, 72, 78, 76, 82, 80, 86];
   const wauPoints = [120, 128, 125, 134, 130, 140, 137, 145, 142, 150, 148, 156, 153, 162, 158, 168, 164, 174, 170, 180, 176, 184, 181, 190, 186, 196, 192, 202, 198, 208];
 
@@ -30,13 +30,20 @@ function DashboardContent() {
     </svg>
   );
 
-  const StatCard = ({ label, value, sub, pts, color }: { label: string; value: string; sub: string; pts: number[]; color: string }) => (
-    <div className="flex flex-col gap-2 rounded-lg border border-border bg-background-primary p-4">
+  const StatCard = ({ id, label, value, sub, pts, color }: { id: string; label: string; value: string; sub: string; pts: number[]; color: string }) => (
+    <button
+      type="button"
+      onClick={() => setSelectedWidget(selectedWidget === id ? null : id)}
+      className={cx(
+        "flex flex-col gap-2 rounded-lg border bg-background-primary p-4 text-left transition-colors",
+        selectedWidget === id ? "border-action-default-border-focus ring-1 ring-action-default-border-focus" : "border-border hover:border-action-default-border-hover",
+      )}
+    >
       <span className="text-hint text-text-secondary">{label}</span>
       <span className="text-[22px] font-semibold leading-none text-text-primary">{value}</span>
       <Sparkline pts={pts} color={color} />
       <span className="text-hint text-text-secondary">{sub}</span>
-    </div>
+    </button>
   );
 
   const barData = [42, 38, 55, 60, 58, 72, 68, 80, 75, 84, 79, 88, 83, 92];
@@ -60,28 +67,36 @@ function DashboardContent() {
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-3">
-        <StatCard label="Daily Active Users" value="2,847" sub="↑ 12% vs prior period" pts={dauPoints} color="#2272b4" />
-        <StatCard label="Weekly Active Users" value="9,214" sub="↑ 8% vs prior period" pts={wauPoints} color="#6b46c1" />
+        <StatCard id="dau" label="Daily Active Users" value="2,847" sub="↑ 12% vs prior period" pts={dauPoints} color="#2272b4" />
+        <StatCard id="wau" label="Weekly Active Users" value="9,214" sub="↑ 8% vs prior period" pts={wauPoints} color="#6b46c1" />
       </div>
 
-      <div className="rounded-lg border border-border bg-background-primary p-4">
+      <button
+        type="button"
+        onClick={() => setSelectedWidget(selectedWidget === "bar" ? null : "bar")}
+        className={cx("w-full rounded-lg border bg-background-primary p-4 text-left transition-colors", selectedWidget === "bar" ? "border-action-default-border-focus ring-1 ring-action-default-border-focus" : "border-border hover:border-action-default-border-hover")}
+      >
         <div className="mb-3 flex items-center justify-between">
           <span className="text-paragraph font-medium text-text-primary">Daily Active Users — Last 14 Days</span>
           <span className="text-hint text-text-secondary">Jan 11 – Jan 24</span>
         </div>
-        <div className="flex items-end gap-1 h-[100px]">
+        <div className="flex items-end gap-1" style={{ height: 100 }}>
           {barData.map((v, i) => (
-            <div key={i} className="flex flex-1 flex-col items-center gap-1">
-              <div className="w-full rounded-sm bg-[#2272b4] opacity-80" style={{ height: `${(v / barMax) * 100}%` }} />
+            <div key={i} className="flex flex-1 flex-col items-end">
+              <div className="w-full rounded-sm bg-[#2272b4] opacity-80" style={{ height: `${(v / barMax) * 100}px` }} />
             </div>
           ))}
         </div>
         <div className="mt-1 flex justify-between text-hint text-text-secondary">
           <span>Jan 11</span><span>Jan 17</span><span>Jan 24</span>
         </div>
-      </div>
+      </button>
 
-      <div className="rounded-lg border border-border bg-background-primary p-4">
+      <button
+        type="button"
+        onClick={() => setSelectedWidget(selectedWidget === "engagement" ? null : "engagement")}
+        className={cx("w-full rounded-lg border bg-background-primary p-4 text-left transition-colors", selectedWidget === "engagement" ? "border-action-default-border-focus ring-1 ring-action-default-border-focus" : "border-border hover:border-action-default-border-hover")}
+      >
         <span className="mb-3 block text-paragraph font-medium text-text-primary">Engagement by Feature</span>
         <div className="flex flex-col gap-2">
           {engagementRows.map(row => (
@@ -96,9 +111,13 @@ function DashboardContent() {
             </div>
           ))}
         </div>
-      </div>
+      </button>
 
-      <div className="rounded-lg border border-border bg-background-primary p-4">
+      <button
+        type="button"
+        onClick={() => setSelectedWidget(selectedWidget === "topusers" ? null : "topusers")}
+        className={cx("w-full rounded-lg border bg-background-primary p-4 text-left transition-colors", selectedWidget === "topusers" ? "border-action-default-border-focus ring-1 ring-action-default-border-focus" : "border-border hover:border-action-default-border-hover")}
+      >
         <span className="mb-3 block text-paragraph font-medium text-text-primary">Top Users</span>
         <table className="w-full text-hint">
           <thead>
@@ -118,7 +137,7 @@ function DashboardContent() {
             ))}
           </tbody>
         </table>
-      </div>
+      </button>
     </div>
   );
 }
@@ -130,6 +149,7 @@ function DashboardContent() {
 export default function DashboardEditPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = React.useState("Ski Resort Dashboard");
+  const [selectedWidget, setSelectedWidget] = React.useState<string | null>(null);
 
   return (
     <div className="flex h-full flex-col bg-background-primary">
@@ -218,12 +238,15 @@ export default function DashboardEditPage() {
 
         {/* Canvas */}
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          <DashboardContent />
+          <DashboardContent selectedWidget={selectedWidget} setSelectedWidget={setSelectedWidget} />
         </div>
 
         {/* Widget config panel */}
         <div className="flex w-[200px] shrink-0 flex-col items-center justify-center border-l border-border bg-background-primary">
-          <span className="text-paragraph text-text-secondary">Select a widget to configure</span>
+          {selectedWidget
+            ? <span className="text-paragraph text-text-secondary px-4 text-center">Widget selected</span>
+            : <span className="text-paragraph text-text-secondary px-4 text-center">Select a widget to configure</span>
+          }
         </div>
       </div>
     </div>

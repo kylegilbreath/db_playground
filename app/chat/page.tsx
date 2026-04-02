@@ -81,21 +81,35 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 // Tools panel (MCP Servers)
 // ---------------------------------------------------------------------------
 
-const MCP_SERVERS = [
+type McpTool = { id: string; name: string; description: string; enabled: boolean };
+type McpServer = { id: string; name: string; tools: McpTool[]; iconBg: string; icon: string };
+
+const MCP_SERVERS: McpServer[] = [
   {
     id: "uc-fn",
     name: "UC Function: chloe-chan.mcp-function-with-long-name",
-    tools: 5,
     iconBg: "bg-[#f0f9f6]",
     icon: "AppsIcon",
+    tools: [
+      { id: "execute_sql", name: "execute_sql", description: "Run a SQL query against a catalog", enabled: true },
+      { id: "list_tables", name: "list_tables", description: "List tables in a schema", enabled: true },
+      { id: "describe_table", name: "describe_table", description: "Get schema details for a table", enabled: true },
+      { id: "get_row_count", name: "get_row_count", description: "Return approximate row count", enabled: false },
+      { id: "sample_rows", name: "sample_rows", description: "Return a sample of rows from a table", enabled: true },
+    ],
   },
   {
     id: "gdrive",
     name: "Google Drive search",
-    tools: 5,
     iconBg: "bg-[#f1f3f4]",
     icon: "driveIcon",
-    iconIsImg: true,
+    tools: [
+      { id: "search_files", name: "search_files", description: "Search for files across Google Drive", enabled: true },
+      { id: "read_file", name: "read_file", description: "Read the contents of a Drive file", enabled: true },
+      { id: "list_folder", name: "list_folder", description: "List files in a Drive folder", enabled: true },
+      { id: "create_doc", name: "create_doc", description: "Create a new Google Doc", enabled: false },
+      { id: "share_file", name: "share_file", description: "Share a file with specified users", enabled: false },
+    ],
   },
 ];
 
@@ -154,11 +168,66 @@ const SKILLS: Skill[] = [
   },
 ];
 
+const WORKSPACE_SKILLS: Skill[] = [
+  {
+    id: "unit-tests",
+    name: "unit-tests",
+    primaryFile: "unit-tests.md",
+    entries: [
+      { name: "SKILL.md", file: "unit-tests.md" },
+      { name: "README.md", file: "unit-tests-readme.md" },
+    ],
+    description: "Generates unit tests for notebooks and Python files using pytest conventions.",
+  },
+];
+
 // ---------------------------------------------------------------------------
 // Skill file viewer — renders a .md file in the preview panel
 // ---------------------------------------------------------------------------
 
 const SKILL_FILE_CONTENT: Record<string, string> = {
+  "unit-tests.md": `# Unit Tests Skill
+
+Generates pytest-based unit tests for Databricks notebooks and Python files. Follows workspace testing conventions and coverage requirements.
+
+## When to use
+
+Invoke this skill when you want to generate, review, or improve test coverage for a notebook cell, Python function, or module.
+
+## How to use
+
+- \`/unit-tests\` — generate tests for the current file or selected cell
+- \`/unit-tests --coverage\` — generate tests with coverage annotations
+
+## Test conventions
+
+- Use \`pytest\` as the test runner
+- Mock Spark sessions with \`pyspark.testing.utils.assertDataFrameEqual\`
+- Use \`unittest.mock.patch\` for external dependencies
+- Name test files \`test_<module_name>.py\`
+- One \`describe\`-style class per function under test
+
+## Example
+
+\`\`\`python
+import pytest
+from unittest.mock import patch, MagicMock
+from my_module import calculate_snowfall_average
+
+def test_calculate_snowfall_average_returns_correct_mean():
+    data = [{"resort": "Vail", "snowfall_in": 8}, {"resort": "Aspen", "snowfall_in": 12}]
+    result = calculate_snowfall_average(data)
+    assert result == 10.0
+
+def test_calculate_snowfall_average_empty_input():
+    with pytest.raises(ValueError, match="No data provided"):
+        calculate_snowfall_average([])
+\`\`\`
+
+## Coverage requirements
+
+Workspace policy requires ≥80% line coverage for all production modules. This skill will annotate generated tests with coverage targets.`,
+  "unit-tests-readme.md": `# Unit Tests — README\n\nSetup and usage instructions for the unit-tests workspace skill.\n\nRequires pytest ≥7.0 and pyspark ≥3.3.`,
   "10x-engineer-readme.md": `# 10x Engineer — README\n\nSetup and usage instructions for the 10x Engineer skill.`,
   "frontend-reviewer-readme.md": `# Frontend Reviewer — README\n\nSetup and usage instructions for the Frontend Reviewer skill.`,
   "frontend-reviewer-style.md": `# Style Presets\n\nStyle configuration presets used by the Frontend Reviewer skill.`,
@@ -358,59 +427,92 @@ function SkillTreeRow({ skill, selectedSkillFile, onSkillClick }: { skill: Skill
   );
 }
 
-function ToolsMainView({ onSkillClick, selectedSkillFile, skills }: { onSkillClick: (file: string) => void; selectedSkillFile: string | null; skills: Skill[] }) {
+function ToolsMainView({ onSkillClick, selectedSkillFile, skills, scope, onScopeChange }: { onSkillClick: (file: string) => void; selectedSkillFile: string | null; skills: Skill[]; scope: "user" | "workspace"; onScopeChange: (s: "user" | "workspace") => void }) {
+  const visibleSkills = scope === "workspace" ? WORKSPACE_SKILLS : skills;
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-8 py-6">
-      {/* Skills section */}
-      <div className="flex flex-col gap-xs">
-        <div className="flex items-center pb-xs">
-          <span className="flex-1 text-title4 font-semibold text-text-primary">Skills</span>
-          <DefaultButton size="small" leadingIcon={<Icon name="plusIcon" size={12} />}>Add</DefaultButton>
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* Header */}
+      <div className="flex shrink-0 items-center px-8 py-3">
+        <span className="flex-1 text-title3 font-semibold text-text-primary">Tools</span>
+        <div className="flex w-fit rounded-sm border border-border bg-background-tertiary p-0.5">
+          {(["user", "workspace"] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => {
+                onScopeChange(s);
+                const firstSkill = s === "workspace" ? WORKSPACE_SKILLS[0] : skills[0];
+                if (firstSkill) onSkillClick(firstSkill.primaryFile);
+              }}
+              className={cx(
+                "rounded-[3px] px-3 py-1 text-paragraph transition-colors",
+                scope === s
+                  ? "bg-background-primary font-medium text-text-primary shadow-sm"
+                  : "text-text-secondary hover:text-text-primary",
+              )}
+            >
+              {s === "user" ? "User" : "Workspace"}
+            </button>
+          ))}
         </div>
-        {skills.map((skill) => (
-          <SkillTreeRow
-            key={skill.id}
-            skill={skill}
-            selectedSkillFile={selectedSkillFile}
-            onSkillClick={onSkillClick}
-          />
-        ))}
       </div>
 
-      <div className="h-px w-full bg-border" />
-
-      {/* Instructions section */}
-      <div className="flex flex-col gap-md">
-        {/* User instructions */}
-        <div className="flex flex-col gap-sm">
-          <p className="text-paragraph font-semibold text-text-primary">User instructions</p>
-          <p className="text-paragraph text-text-secondary">
-            Instructions lets you provide system-level instructions to Genie Code. It&apos;s a persistent way to share context, preferences, or preferred ways of authoring.
-          </p>
-          <div className="flex items-center gap-xs rounded-sm border border-border bg-background-primary px-mid">
-            <span className="min-w-0 flex-1 truncate py-[7px] text-paragraph text-text-secondary">
-              /Users/kyle.gilbreath@databricks.com/.assistant_instructions.md
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-8 py-6">
+        {/* Skills section */}
+        <div className="flex flex-col gap-xs">
+          <div className="flex items-center pb-xs">
+            <span className="flex-1 text-title4 font-semibold text-text-primary">
+              {scope === "user" ? "User skills" : "Workspace skills"}
             </span>
-            <Icon name="lockOutlinedIcon" size={14} className="shrink-0 text-text-secondary" />
+            <DefaultButton size="small" leadingIcon={<Icon name="plusIcon" size={12} />}>Add</DefaultButton>
           </div>
-          <div>
-            <PrimaryButton size="default">Open instructions file</PrimaryButton>
-          </div>
-          <p className="text-paragraph text-text-secondary">
-            The fastest way to add instructions is to start your input with the <strong className="font-semibold text-text-primary">#</strong> character.
-          </p>
+          {visibleSkills.map((skill) => (
+            <SkillTreeRow
+              key={skill.id}
+              skill={skill}
+              selectedSkillFile={selectedSkillFile}
+              onSkillClick={onSkillClick}
+            />
+          ))}
         </div>
 
-        {/* Workspace instructions */}
+        <div className="h-px w-full bg-border" />
+
+        {/* Instructions section */}
         <div className="flex flex-col gap-sm">
-          <p className="text-paragraph font-semibold text-text-primary">Workspace instructions</p>
-          <p className="text-paragraph text-text-secondary">
-            Workspace instructions are configured by your workspace admin and provide more context to Genie Code to help it follow guidelines and operate more efficiently in your workspace.{" "}
-            <span className="cursor-pointer text-action-default-text hover:underline">Learn more</span>
+          <p className="text-paragraph font-semibold text-text-primary">
+            {scope === "user" ? "User instructions" : "Workspace instructions"}
           </p>
-          <div>
-            <DefaultButton size="default" leadingIcon={<Icon name="ArrowInIcon" size={14} />}>View file</DefaultButton>
-          </div>
+          {scope === "user" ? (
+            <>
+              <p className="text-paragraph text-text-secondary">
+                Instructions lets you provide system-level instructions to Genie Code. It&apos;s a persistent way to share context, preferences, or preferred ways of authoring.
+              </p>
+              <div className="flex items-center gap-xs rounded-sm border border-border bg-background-primary px-mid">
+                <span className="min-w-0 flex-1 truncate py-[7px] text-paragraph text-text-secondary">
+                  /Users/kyle.gilbreath@databricks.com/.assistant_instructions.md
+                </span>
+                <Icon name="lockOutlinedIcon" size={14} className="shrink-0 text-text-secondary" />
+              </div>
+              <div>
+                <PrimaryButton size="default">Open instructions file</PrimaryButton>
+              </div>
+              <p className="text-paragraph text-text-secondary">
+                The fastest way to add instructions is to start your input with the <strong className="font-semibold text-text-primary">#</strong> character.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-paragraph text-text-secondary">
+                Workspace instructions are configured by your workspace admin and provide more context to Genie Code to help it follow guidelines and operate more efficiently in your workspace.{" "}
+                <span className="cursor-pointer text-action-default-text hover:underline">Learn more</span>
+              </p>
+              <div>
+                <DefaultButton size="default" leadingIcon={<Icon name="ArrowInIcon" size={14} />}>View file</DefaultButton>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -421,31 +523,60 @@ function ToolsMainView({ onSkillClick, selectedSkillFile, skills }: { onSkillCli
 // Connections main view — placeholder
 // ---------------------------------------------------------------------------
 
-function ConnectionsMainView() {
-  const [enabled, setEnabled] = React.useState<Record<string, boolean>>(
+function ConnectionsMainView({
+  selectedServerId,
+  onServerClick,
+}: {
+  selectedServerId: string | null;
+  onServerClick: (id: string) => void;
+}) {
+  const [serverEnabled, setServerEnabled] = React.useState<Record<string, boolean>>(
     Object.fromEntries(MCP_SERVERS.map((s) => [s.id, true])),
   );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-8 py-6">
       <div className="flex items-center">
-        <span className="flex-1 text-title4 font-semibold text-text-primary">MCP Servers</span>
+        <span className="flex-1 text-title3 font-semibold text-text-primary">MCP Servers</span>
         <DefaultButton size="small" leadingIcon={<Icon name="plusIcon" size={12} />}>Add</DefaultButton>
       </div>
       <div className="flex flex-col gap-3">
-        {MCP_SERVERS.map((server) => (
-          <div key={server.id} className="flex items-center gap-sm rounded-md border border-border px-3 py-3">
-            <div className={cx("flex h-8 w-8 shrink-0 items-center justify-center rounded", server.iconBg)}>
-              <Icon name="AppsIcon" size={16} className="text-text-secondary" />
+        {MCP_SERVERS.map((server) => {
+          const enabledCount = server.tools.filter((t) => t.enabled).length;
+          const isSelected = selectedServerId === server.id;
+          return (
+            <div
+              key={server.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => onServerClick(server.id)}
+              onKeyDown={(e) => e.key === "Enter" && onServerClick(server.id)}
+              className={cx(
+                "flex w-full cursor-pointer items-center gap-sm rounded-md border px-3 py-3 transition-colors",
+                isSelected
+                  ? "border-action-default-border-focus ring-1 ring-action-default-border-focus"
+                  : "border-border hover:border-action-default-border-hover",
+              )}
+            >
+              <div className={cx("flex h-8 w-8 shrink-0 items-center justify-center rounded", server.iconBg)}>
+                <Icon name="AppsIcon" size={16} className="text-text-secondary" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-paragraph font-medium text-text-primary">{server.name}</p>
+                <p className="text-hint text-action-default-text">{enabledCount} tools enabled</p>
+              </div>
+              <div onClick={(e) => e.stopPropagation()}>
+                <Toggle
+                  checked={serverEnabled[server.id] ?? true}
+                  onChange={(v) => setServerEnabled((prev) => ({ ...prev, [server.id]: v }))}
+                />
+              </div>
+              <div onClick={(e) => e.stopPropagation()}>
+                <IconButton aria-label="More" icon={<Icon name="overflowIcon" size={14} />} size="small" tone="neutral" />
+              </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-paragraph font-medium text-text-primary">{server.name}</p>
-              <p className="text-hint text-action-default-text">{server.tools} tools enabled</p>
-            </div>
-            <Toggle checked={enabled[server.id] ?? true} onChange={(v) => setEnabled((prev) => ({ ...prev, [server.id]: v }))} />
-            <IconButton aria-label="More" icon={<Icon name="overflowIcon" size={14} />} size="small" tone="neutral" />
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -740,6 +871,7 @@ const PYTHON_FILE_LINES = [
 ];
 
 function PythonFilePreview({ asset }: { asset: ReviewAsset }) {
+  const router = useRouter();
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Toolbar */}
@@ -749,7 +881,8 @@ function PythonFilePreview({ asset }: { asset: ReviewAsset }) {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <DefaultButton size="small" leadingIcon={<Icon name="playIcon" size={12} />}>Run</DefaultButton>
-          <PrimaryButton size="small">Save</PrimaryButton>
+          <DefaultButton size="small">Save</DefaultButton>
+          <PrimaryButton size="small" onClick={() => router.push("/editor")}>Go to source →</PrimaryButton>
         </div>
       </div>
       {/* Code */}
@@ -776,6 +909,7 @@ function PythonFilePreview({ asset }: { asset: ReviewAsset }) {
 
 
 function NotebookPreview({ asset }: { asset: ReviewAsset }) {
+  const router = useRouter();
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Notebook toolbar */}
@@ -795,7 +929,8 @@ function NotebookPreview({ asset }: { asset: ReviewAsset }) {
             </span>
           </DefaultButton>
           <DefaultButton size="small">Schedule</DefaultButton>
-          <PrimaryButton size="small">Share</PrimaryButton>
+          <DefaultButton size="small">Share</DefaultButton>
+          <PrimaryButton size="small" onClick={() => router.push("/editor")}>Go to source →</PrimaryButton>
         </div>
       </div>
 
@@ -985,6 +1120,7 @@ function DashboardPreview() {
           </DefaultButton>
           <DefaultButton size="small">Publish</DefaultButton>
           <DefaultButton size="small" onClick={() => router.push("/dashboard/edit")}>Share</DefaultButton>
+          <PrimaryButton size="small" onClick={() => router.push("/dashboard/edit")}>Go to source →</PrimaryButton>
         </div>
         {/* Tabs */}
         <div className="flex items-end px-4">
@@ -1714,6 +1850,7 @@ function MissingBranchGraphic() {
 // ---------------------------------------------------------------------------
 
 type PreviewTab = "Assets" | "Review";
+type McpPreviewTab = "Tools" | "Configuration";
 
 function PreviewPanel({
   onClose,
@@ -1730,6 +1867,8 @@ function PreviewPanel({
   isReviewed = false,
   skillFile,
   onSkillSave,
+  readOnly = false,
+  mcpServer = null,
 }: {
   onClose: () => void;
   selectedAsset: ReviewAsset | null;
@@ -1745,7 +1884,20 @@ function PreviewPanel({
   isReviewed?: boolean;
   skillFile?: string | null;
   onSkillSave?: (file: string, content: string) => void;
+  readOnly?: boolean;
+  mcpServer?: McpServer | null;
 }) {
+  const [mcpTab, setMcpTab] = React.useState<McpPreviewTab>("Tools");
+  const [mcpSearch, setMcpSearch] = React.useState("");
+  const [mcpToolEnabled, setMcpToolEnabled] = React.useState<Record<string, boolean>>({});
+
+  // Reset MCP state when server changes
+  React.useEffect(() => {
+    if (!mcpServer) return;
+    setMcpTab("Tools");
+    setMcpSearch("");
+    setMcpToolEnabled(Object.fromEntries(mcpServer.tools.map((t) => [t.id, t.enabled])));
+  }, [mcpServer?.id]);
 
   // Open or switch to asset tab when selectedAsset changes
   React.useEffect(() => {
@@ -1818,7 +1970,23 @@ function PreviewPanel({
       <div className="flex h-10 shrink-0 items-center gap-xs pr-3">
         {/* Tabs / skill title */}
         <div className="relative flex min-w-0 flex-1 items-center overflow-hidden">
-          {skillFile ? (
+          {mcpServer ? (
+            (["Tools", "Configuration"] as McpPreviewTab[]).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setMcpTab(tab)}
+                className={cx(
+                  "flex h-7 shrink-0 items-center justify-center rounded-md px-3 text-paragraph",
+                  mcpTab === tab
+                    ? "bg-action-default-background-hover font-medium text-text-primary"
+                    : "text-text-secondary hover:bg-action-default-background-hover",
+                )}
+              >
+                {tab}
+              </button>
+            ))
+          ) : skillFile ? (
             <span className="truncate pl-3 text-paragraph font-medium text-text-primary">{skillFile.replace(".md", "")}</span>
           ) : (
             (["Assets", "Review"] as PreviewTab[]).map((tab) => (
@@ -1853,7 +2021,7 @@ function PreviewPanel({
               >
                 Save file
               </PrimaryButton>
-            ) : (
+            ) : !readOnly ? (
               <DefaultButton
                 size="small"
                 leadingIcon={<Icon name="pencilIcon" size={12} />}
@@ -1861,7 +2029,7 @@ function PreviewPanel({
               >
                 Edit file
               </DefaultButton>
-            )}
+            ) : null}
             <IconButton
               aria-label="Close preview panel"
               icon={<Icon name="closeIcon" size={14} />}
@@ -1912,7 +2080,68 @@ function PreviewPanel({
 
       {/* Pane */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden pb-3 pr-3">
-        {skillFile ? (
+        {mcpServer ? (
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border bg-background-primary">
+            {mcpTab === "Tools" ? (
+              <>
+                {/* Search + count */}
+                <div className="flex shrink-0 items-center gap-xs border-b border-border px-3 py-2">
+                  <div className="flex min-w-0 flex-1 items-center gap-xs rounded-sm border border-border px-2 py-1">
+                    <Icon name="searchIcon" size={12} className="shrink-0 text-text-secondary" />
+                    <input
+                      type="text"
+                      placeholder="Search tools..."
+                      value={mcpSearch}
+                      onChange={(e) => setMcpSearch(e.target.value)}
+                      className="min-w-0 flex-1 bg-transparent text-hint text-text-primary placeholder:text-text-placeholder outline-none"
+                    />
+                  </div>
+                  <span className="shrink-0 text-hint text-text-secondary">
+                    {mcpServer.tools.filter((t) => mcpToolEnabled[t.id] ?? t.enabled).length}/{mcpServer.tools.length} on
+                  </span>
+                </div>
+                {/* Tool list */}
+                <div className="min-h-0 flex-1 overflow-y-auto">
+                  {mcpServer.tools
+                    .filter((t) => !mcpSearch || t.name.toLowerCase().includes(mcpSearch.toLowerCase()) || t.description.toLowerCase().includes(mcpSearch.toLowerCase()))
+                    .map((tool) => (
+                      <div key={tool.id} className="flex items-start gap-sm border-b border-border px-3 py-2.5 last:border-0">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-hint font-medium text-text-primary" style={{ fontFamily: "monospace" }}>{tool.name}</p>
+                          <p className="mt-0.5 text-hint text-text-secondary">{tool.description}</p>
+                        </div>
+                        <Toggle
+                          checked={mcpToolEnabled[tool.id] ?? tool.enabled}
+                          onChange={(v) => setMcpToolEnabled((prev) => ({ ...prev, [tool.id]: v }))}
+                        />
+                      </div>
+                    ))}
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col divide-y divide-border overflow-y-auto">
+                <div className="flex flex-col gap-xs px-4 py-3">
+                  <span className="text-hint text-text-secondary">Name</span>
+                  <span className="text-paragraph text-text-primary">{mcpServer.name}</span>
+                </div>
+                <div className="flex flex-col gap-xs px-4 py-3">
+                  <span className="text-hint text-text-secondary">Transport</span>
+                  <span className="text-paragraph text-text-primary">stdio</span>
+                </div>
+                <div className="flex flex-col gap-xs px-4 py-3">
+                  <span className="text-hint text-text-secondary">Status</span>
+                  <span className="text-paragraph text-green-600">Connected</span>
+                </div>
+                <div className="flex flex-col gap-xs px-4 py-3">
+                  <span className="text-hint text-text-secondary">Tools</span>
+                  <span className="text-paragraph text-text-primary">
+                    {mcpServer.tools.filter((t) => mcpToolEnabled[t.id] ?? t.enabled).length} of {mcpServer.tools.length} enabled
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : skillFile ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border bg-background-primary">
             {skillEditMode ? (
               <textarea
@@ -2078,6 +2307,8 @@ export default function ChatPage() {
   const [mainView, setMainView] = React.useState<MainView>("thread");
   const [selectedSkillFile, setSelectedSkillFile] = React.useState<string | null>(null);
   const [skills, setSkills] = React.useState(() => [...SKILLS]);
+  const [toolsScope, setToolsScope] = React.useState<"user" | "workspace">("user");
+  const [selectedMcpServerId, setSelectedMcpServerId] = React.useState<string | null>(null);
 
   const handleSkillSave = React.useCallback((file: string, newContent: string) => {
     SKILL_FILE_CONTENT[file] = newContent;
@@ -2092,6 +2323,9 @@ export default function ChatPage() {
 
   const handleSetMainView = React.useCallback((view: MainView) => {
     setMainView(view);
+    if (view !== "connections") {
+      setSelectedMcpServerId(null);
+    }
     if (view !== "tools") {
       setSelectedSkillFile(null);
     } else {
@@ -2150,9 +2384,12 @@ export default function ChatPage() {
         />
 
         {mainView === "tools" ? (
-          <ToolsMainView onSkillClick={handleSkillClick} selectedSkillFile={selectedSkillFile} skills={skills} />
+          <ToolsMainView onSkillClick={handleSkillClick} selectedSkillFile={selectedSkillFile} skills={skills} scope={toolsScope} onScopeChange={setToolsScope} />
         ) : mainView === "connections" ? (
-          <ConnectionsMainView />
+          <ConnectionsMainView
+            selectedServerId={selectedMcpServerId}
+            onServerClick={(id) => setSelectedMcpServerId((prev) => (prev === id ? null : id))}
+          />
         ) : (
           <GenieChatBody
             state={state}
@@ -2168,9 +2405,9 @@ export default function ChatPage() {
           />
         )}
 
-        {(previewOpen || (mainView === "tools" && selectedSkillFile)) && (
+        {(previewOpen || (mainView === "tools" && selectedSkillFile) || (mainView === "connections" && selectedMcpServerId)) && (
           <PreviewPanel
-            onClose={() => { setPreviewOpen(false); setSelectedSkillFile(null); }}
+            onClose={() => { setPreviewOpen(false); setSelectedSkillFile(null); setSelectedMcpServerId(null); }}
             selectedAsset={selectedAsset}
             activeThreadId={state.activeThreadId}
             initialWidth={initialPreviewWidth}
@@ -2184,6 +2421,8 @@ export default function ChatPage() {
             isReviewed={isReviewed}
             skillFile={mainView === "tools" ? selectedSkillFile : null}
             onSkillSave={handleSkillSave}
+            readOnly={mainView === "tools" && toolsScope === "workspace"}
+            mcpServer={mainView === "connections" ? (MCP_SERVERS.find((s) => s.id === selectedMcpServerId) ?? null) : null}
           />
         )}
       </div>

@@ -348,6 +348,7 @@ function toThumbnailCardItem(model: SearchLayoutCardModel): ThumbnailCardItem {
     metadataRow: model.metadata ? [{ label: model.metadata, separator: false }] : undefined,
     description: model.description,
     thumbnail: thumbnailFromModel(model.thumbnail, model.title.icon),
+    href: model.href,
   };
 }
 

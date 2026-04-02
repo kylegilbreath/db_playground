@@ -58,7 +58,7 @@ export const ASSET_SPECS: AssetEntry[] = [
     label: "Dashboards",
     iconName: "dashboardIcon",
     assetType: AssetTypes.Dashboards,
-    sampleNames: ["Q1 Revenue Summary", "Marketing Attribution", "Ops Health"],
+    sampleNames: ["Ski Resort Dashboard", "Marketing Attribution", "Ops Health"],
     one: {
       grid: ["Name", "Certified, Favorite", "Owner", "Thumbnail", "Domain", "Last viewed", "Views"],
       table: ["Name", "Certified, Favorite", "Owner", "Updated", "Description", "Last viewed", "Views", "Domain"],
