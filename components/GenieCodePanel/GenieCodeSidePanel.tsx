@@ -76,6 +76,8 @@ export type GenieCodeSidePanelProps = {
   onRailItemToggle?: (id: string) => void;
   /** When true, removes border radius and drop shadow (e.g. when flush with editor chrome). */
   flat?: boolean;
+  /** Optional externally-managed state. If omitted, the panel manages its own state. */
+  state?: ReturnType<typeof useGenieChatState>;
 };
 
 // ---------------------------------------------------------------------------
@@ -197,9 +199,11 @@ export function GenieCodeSidePanel({
   activeRailItem = "sparkle",
   onRailItemToggle,
   flat = false,
+  state: externalState,
 }: GenieCodeSidePanelProps) {
   const router = useRouter();
-  const state = useGenieChatState();
+  const internalState = useGenieChatState();
+  const state = externalState ?? internalState;
   const [threadSidebarOpen, setThreadSidebarOpen] = React.useState(false);
   const focusTitleInputRef = React.useRef<(() => void) | null>(null);
   const handleFocusTitleInputReady = React.useCallback((fn: () => void) => { focusTitleInputRef.current = fn; }, []);

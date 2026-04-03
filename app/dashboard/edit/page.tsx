@@ -1,9 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { DefaultButton } from "@/components/DefaultButton";
 import { Icon } from "@/components/icons";
+import { GenieCodeSidePanel } from "@/components/GenieCodePanel/GenieCodeSidePanel";
+import { useGenieChatState } from "@/components/GenieCodePanel/GenieChatCore";
 
 function cx(...parts: Array<string | undefined | false>) {
   return parts.filter(Boolean).join(" ");
@@ -148,8 +150,38 @@ function DashboardContent({ selectedWidget, setSelectedWidget }: { selectedWidge
 
 export default function DashboardEditPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const threadParam = searchParams.get("thread");
   const [activeTab, setActiveTab] = React.useState("Ski Resort Dashboard");
   const [selectedWidget, setSelectedWidget] = React.useState<string | null>(null);
+  const [genieOpen, setGenieOpen] = React.useState(false);
+  const [panelWidth, setPanelWidth] = React.useState(360);
+  const dragStartX = React.useRef<number | null>(null);
+  const dragStartWidth = React.useRef<number>(360);
+  const genieState = useGenieChatState();
+
+  // Switch to the thread from the URL param on mount
+  React.useEffect(() => {
+    if (threadParam) {
+      genieState.handleSelectThread(threadParam);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleResizeStart = React.useCallback((e: React.MouseEvent) => {
+    dragStartX.current = e.clientX;
+    dragStartWidth.current = panelWidth;
+    const onMove = (ev: MouseEvent) => {
+      const delta = dragStartX.current! - ev.clientX;
+      setPanelWidth(Math.max(280, Math.min(600, dragStartWidth.current + delta)));
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, [panelWidth]);
 
   return (
     <div className="flex h-full flex-col bg-background-primary">
@@ -208,46 +240,59 @@ export default function DashboardEditPage() {
         </div>
       </div>
 
-      {/* Body: filters sidebar + canvas + config panel */}
-      <div className="flex min-h-0 flex-1">
-        {/* Global filters sidebar */}
-        <div className="flex w-[200px] shrink-0 flex-col border-r border-border bg-background-primary px-3 py-3">
-          <div className="flex items-center justify-between">
-            <span className="text-paragraph font-medium text-text-primary">Global filters</span>
-            <div className="flex items-center gap-xs">
-              <button type="button" className="flex h-6 w-6 items-center justify-center rounded-sm text-text-secondary hover:bg-background-secondary hover:text-text-primary">
-                <Icon name="plusIcon" size={14} />
+      {/* Body: filters sidebar + canvas + config panel + optional Genie sidebar */}
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <div className="flex min-h-0 flex-1">
+          {/* Global filters sidebar */}
+          <div className="flex w-[200px] shrink-0 flex-col border-r border-border bg-background-primary px-3 py-3">
+            <div className="flex items-center justify-between">
+              <span className="text-paragraph font-medium text-text-primary">Global filters</span>
+              <div className="flex items-center gap-xs">
+                <button type="button" className="flex h-6 w-6 items-center justify-center rounded-sm text-text-secondary hover:bg-background-secondary hover:text-text-primary">
+                  <Icon name="plusIcon" size={14} />
+                </button>
+                <button type="button" className="flex h-6 w-6 items-center justify-center rounded-sm text-text-secondary hover:bg-background-secondary hover:text-text-primary">
+                  <Icon name="filterIcon" size={14} />
+                </button>
+              </div>
+            </div>
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
+              {/* Arrow graphic */}
+              <svg width="48" height="64" viewBox="0 0 48 64" fill="none" aria-hidden>
+                <path d="M24 56 C24 40, 40 32, 40 16" stroke="#cbcbcb" strokeWidth="1.5" strokeLinecap="round" fill="none" strokeDasharray="4 3" />
+                <path d="M36 12 L40 16 L44 12" stroke="#cbcbcb" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </svg>
+              <button type="button" className="text-hint text-text-secondary hover:text-text-primary">
+                Add a global filter
               </button>
-              <button type="button" className="flex h-6 w-6 items-center justify-center rounded-sm text-text-secondary hover:bg-background-secondary hover:text-text-primary">
-                <Icon name="filterIcon" size={14} />
-              </button>
+              <span className="text-hint text-text-secondary">No global filters.</span>
             </div>
           </div>
-          <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
-            {/* Arrow graphic */}
-            <svg width="48" height="64" viewBox="0 0 48 64" fill="none" aria-hidden>
-              <path d="M24 56 C24 40, 40 32, 40 16" stroke="#cbcbcb" strokeWidth="1.5" strokeLinecap="round" fill="none" strokeDasharray="4 3" />
-              <path d="M36 12 L40 16 L44 12" stroke="#cbcbcb" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-            </svg>
-            <button type="button" className="text-hint text-text-secondary hover:text-text-primary">
-              Add a global filter
-            </button>
-            <span className="text-hint text-text-secondary">No global filters.</span>
+
+          {/* Canvas */}
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+            <DashboardContent selectedWidget={selectedWidget} setSelectedWidget={setSelectedWidget} />
+          </div>
+
+          {/* Widget config panel */}
+          <div className="flex w-[200px] shrink-0 flex-col items-center justify-center border-l border-border bg-background-primary">
+            {selectedWidget
+              ? <span className="text-paragraph text-text-secondary px-4 text-center">Widget selected</span>
+              : <span className="text-paragraph text-text-secondary px-4 text-center">Select a widget to configure</span>
+            }
           </div>
         </div>
 
-        {/* Canvas */}
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          <DashboardContent selectedWidget={selectedWidget} setSelectedWidget={setSelectedWidget} />
-        </div>
-
-        {/* Widget config panel */}
-        <div className="flex w-[200px] shrink-0 flex-col items-center justify-center border-l border-border bg-background-primary">
-          {selectedWidget
-            ? <span className="text-paragraph text-text-secondary px-4 text-center">Widget selected</span>
-            : <span className="text-paragraph text-text-secondary px-4 text-center">Select a widget to configure</span>
-          }
-        </div>
+        {/* Genie chat sidebar */}
+        {genieOpen && (
+          <GenieCodeSidePanel
+            state={genieState}
+            onClose={() => setGenieOpen(false)}
+            width={panelWidth}
+            onResizeStart={handleResizeStart}
+            flat
+          />
+        )}
       </div>
     </div>
   );

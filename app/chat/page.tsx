@@ -283,6 +283,22 @@ Deep frontend code review agent for React applications. Analyzes code for access
 - **P0** — Breaks functionality or accessibility
 - **P1** — Significant performance or UX degradation
 - **P2** — Code quality and maintainability`,
+  ".assistant_instructions": `# User Instructions
+
+You are a staff product designer at Databricks focused on AI assistant and agent experiences.
+
+## Preferences
+
+- Be direct and opinionated. Skip basics unless asked.
+- Concise but substantive — bullet lists, tables, and frameworks preferred.
+- Call out risks and tradeoffs explicitly.
+- No fluff, no excessive apologies.
+
+## Context
+
+- Working on Genie, the AI assistant within Databricks notebooks and SQL tools.
+- Key focus areas: agentic UX patterns, skill-status UI, loading states, empty states.
+- Design system: internal Databricks system — consistency across surfaces matters.`,
 };
 
 function SkillFileViewer({ skillFile, content: contentProp }: { skillFile: string; content?: string }) {
@@ -290,7 +306,7 @@ function SkillFileViewer({ skillFile, content: contentProp }: { skillFile: strin
   const lines = content.split("\n");
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6 py-5">
+    <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-6 py-5">
       {lines.map((line, i) => {
         if (line.startsWith("# ")) {
           return <h1 key={i} className="mb-3 text-title3 font-semibold text-text-primary">{line.slice(2)}</h1>;
@@ -489,14 +505,18 @@ function ToolsMainView({ onSkillClick, selectedSkillFile, skills, scope, onScope
               <p className="text-paragraph text-text-secondary">
                 Instructions lets you provide system-level instructions to Genie Code. It&apos;s a persistent way to share context, preferences, or preferred ways of authoring.
               </p>
-              <div className="flex items-center gap-xs rounded-sm border border-border bg-background-primary px-mid">
-                <span className="min-w-0 flex-1 truncate py-[7px] text-paragraph text-text-secondary">
-                  /Users/kyle.gilbreath@databricks.com/.assistant_instructions.md
-                </span>
-                <Icon name="lockOutlinedIcon" size={14} className="shrink-0 text-text-secondary" />
-              </div>
+              <button
+                type="button"
+                onClick={() => onSkillClick(".assistant_instructions")}
+                className={cx(
+                  "flex w-full items-center gap-xs rounded-sm px-sm py-xs text-left text-paragraph transition-colors hover:bg-action-default-background-hover",
+                  selectedSkillFile === ".assistant_instructions" ? "bg-action-default-background-hover" : "", "font-medium text-text-primary",
+                )}
+              >
+                .assistant_instructions.md
+              </button>
               <div>
-                <PrimaryButton size="default">Open instructions file</PrimaryButton>
+                <DefaultButton size="small">Go to file</DefaultButton>
               </div>
               <p className="text-paragraph text-text-secondary">
                 The fastest way to add instructions is to start your input with the <strong className="font-semibold text-text-primary">#</strong> character.
@@ -509,7 +529,7 @@ function ToolsMainView({ onSkillClick, selectedSkillFile, skills, scope, onScope
                 <span className="cursor-pointer text-action-default-text hover:underline">Learn more</span>
               </p>
               <div>
-                <DefaultButton size="default" leadingIcon={<Icon name="ArrowInIcon" size={14} />}>View file</DefaultButton>
+                <DefaultButton size="small" leadingIcon={<Icon name="plusIcon" size={12} />}>Add file</DefaultButton>
               </div>
             </>
           )}
@@ -534,10 +554,21 @@ function ConnectionsMainView({
     Object.fromEntries(MCP_SERVERS.map((s) => [s.id, true])),
   );
 
+  const AVAILABLE_CONNECTORS = [
+    { name: "Sharepoint", description: "Access and search files across SharePoint sites and libraries" },
+    { name: "GitHub", description: "Read and write code, issues, and pull requests" },
+    { name: "Slack", description: "Search messages, channels, and send updates" },
+    { name: "Jira", description: "Manage issues, projects, and team workflows" },
+    { name: "Google Drive", description: "Access and search files across Drive and Docs" },
+    { name: "Glean", description: "Search and surface knowledge across your company's tools" },
+    { name: "Linear", description: "Manage issues, projects, and team workflows in Linear" },
+    { name: "Confluence", description: "Search and read documentation from Confluence spaces" },
+  ];
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-8 py-6">
       <div className="flex items-center">
-        <span className="flex-1 text-title3 font-semibold text-text-primary">MCP Servers</span>
+        <span className="flex-1 text-title3 font-semibold text-text-primary">Connections</span>
         <DefaultButton size="small" leadingIcon={<Icon name="plusIcon" size={12} />}>Add</DefaultButton>
       </div>
       <div className="flex flex-col gap-3">
@@ -577,6 +608,32 @@ function ConnectionsMainView({
             </div>
           );
         })}
+      </div>
+
+      <div className="h-px w-full bg-border" />
+
+      {/* Available connectors */}
+      <div className="flex flex-col gap-3">
+        <p className="text-title4 font-semibold text-text-primary">Available connectors</p>
+        <div className="grid grid-cols-2 gap-3">
+          {AVAILABLE_CONNECTORS.map((connector) => (
+            <div
+              key={connector.name}
+              className="flex flex-col gap-xs rounded-md border border-border bg-background-primary p-3 transition-colors hover:border-action-default-border-hover"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex h-7 w-7 items-center justify-center rounded bg-background-secondary">
+                  <Icon name="AppsIcon" size={14} className="text-text-secondary" />
+                </div>
+                <button type="button" className="flex h-6 w-6 items-center justify-center rounded-sm text-text-secondary hover:bg-background-secondary hover:text-text-primary">
+                  <Icon name="plusIcon" size={14} />
+                </button>
+              </div>
+              <p className="text-paragraph font-medium text-text-primary">{connector.name}</p>
+              <p className="text-hint text-text-secondary">{connector.description}</p>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -882,7 +939,7 @@ function PythonFilePreview({ asset }: { asset: ReviewAsset }) {
         <div className="flex shrink-0 items-center gap-2">
           <DefaultButton size="small" leadingIcon={<Icon name="playIcon" size={12} />}>Run</DefaultButton>
           <DefaultButton size="small">Save</DefaultButton>
-          <PrimaryButton size="small" onClick={() => router.push("/editor")}>Go to source →</PrimaryButton>
+          <PrimaryButton size="small" onClick={() => router.push("/editor")}>View source →</PrimaryButton>
         </div>
       </div>
       {/* Code */}
@@ -930,7 +987,7 @@ function NotebookPreview({ asset }: { asset: ReviewAsset }) {
           </DefaultButton>
           <DefaultButton size="small">Schedule</DefaultButton>
           <DefaultButton size="small">Share</DefaultButton>
-          <PrimaryButton size="small" onClick={() => router.push("/editor")}>Go to source →</PrimaryButton>
+          <PrimaryButton size="small" onClick={() => router.push("/editor")}>View source →</PrimaryButton>
         </div>
       </div>
 
@@ -1017,7 +1074,7 @@ function NotebookPreview({ asset }: { asset: ReviewAsset }) {
 // Dashboard preview
 // ---------------------------------------------------------------------------
 
-function DashboardPreview() {
+function DashboardPreview({ activeThreadId }: { activeThreadId?: string | null }) {
   // Sparkline path helpers
   const dauPoints = [18, 24, 22, 30, 28, 35, 32, 40, 38, 44, 42, 48, 46, 52, 50, 58, 55, 62, 60, 68, 65, 70, 68, 74, 72, 78, 76, 82, 80, 86];
   const wauPoints = [120, 128, 125, 134, 130, 140, 137, 145, 142, 150, 148, 156, 153, 162, 158, 168, 164, 174, 170, 180, 176, 184, 181, 190, 186, 196, 192, 202, 198, 208];
@@ -1115,12 +1172,12 @@ function DashboardPreview() {
           <button type="button" className="flex shrink-0 items-center justify-center h-7 w-7 rounded-sm text-text-secondary hover:bg-background-secondary hover:text-text-primary">
             <Icon name="refreshIcon" size={14} />
           </button>
-          <DefaultButton size="small" leadingIcon={<span className="inline-block h-2 w-2 shrink-0 rounded-full bg-green-500" />} menu className="max-w-[120px]">
+          <DefaultButton size="small" leadingIcon={<span className="inline-block h-2 w-2 shrink-0 rounded-full bg-green-500" />} menu className="min-w-0 max-w-[120px]">
             <span className="truncate">0 - Shared SQL Warehouse</span>
           </DefaultButton>
-          <DefaultButton size="small">Publish</DefaultButton>
-          <DefaultButton size="small" onClick={() => router.push("/dashboard/edit")}>Share</DefaultButton>
-          <PrimaryButton size="small" onClick={() => router.push("/dashboard/edit")}>Go to source →</PrimaryButton>
+          <DefaultButton size="small" className="shrink-0">Publish</DefaultButton>
+          <DefaultButton size="small" className="shrink-0" onClick={() => router.push("/dashboard/edit")}>Share</DefaultButton>
+          <PrimaryButton size="small" className="shrink-0" onClick={() => router.push(`/dashboard/edit${activeThreadId ? `?thread=${activeThreadId}` : ""}`)}>View source →</PrimaryButton>
         </div>
         {/* Tabs */}
         <div className="flex items-end px-4">
@@ -2214,7 +2271,7 @@ function PreviewPanel({
               </button>
             </div>
             {activeAsset?.kind === "dashboard" ? (
-              <DashboardPreview />
+              <DashboardPreview activeThreadId={activeThreadId} />
             ) : activeAsset?.kind === "file" ? (
               <PythonFilePreview asset={activeAsset} />
             ) : activeAsset ? (
@@ -2325,6 +2382,9 @@ export default function ChatPage() {
     setMainView(view);
     if (view !== "connections") {
       setSelectedMcpServerId(null);
+    }
+    if (view === "connections") {
+      setPreviewOpen(false);
     }
     if (view !== "tools") {
       setSelectedSkillFile(null);
