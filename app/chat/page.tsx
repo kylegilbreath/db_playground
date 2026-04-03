@@ -2307,9 +2307,20 @@ export default function ChatPage() {
   const [navCollapsed, setNavCollapsed] = React.useState(false);
 
   const initialPrompt = searchParams.get("prompt");
+  const initialThread = searchParams.get("thread");
+  const isNew = searchParams.get("new") === "1";
   const handleSubmitRef = React.useRef(state.handleSubmit);
   handleSubmitRef.current = state.handleSubmit;
+  const handleNewChatRef = React.useRef(state.handleNewChat);
+  handleNewChatRef.current = state.handleNewChat;
+  const handleSelectThreadRef = React.useRef(state.handleSelectThread);
+  handleSelectThreadRef.current = state.handleSelectThread;
   React.useEffect(() => {
+    if (isNew) {
+      handleNewChatRef.current();
+    } else if (initialThread) {
+      handleSelectThreadRef.current(initialThread);
+    }
     if (!initialPrompt) return;
     const t = setTimeout(() => handleSubmitRef.current(initialPrompt, "ski"), 200);
     return () => clearTimeout(t);

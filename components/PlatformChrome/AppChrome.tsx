@@ -242,7 +242,8 @@ function AppChromeInner({ className, children }: AppChromeProps) {
         router.push(`/search?template=${encodeURIComponent(next)}`);
       }
       if (next === "chat" || next === "new-chat" || next.startsWith("chat-")) {
-        router.push(isOne || isExpanded || isNoTopbar || isM2 ? `${basePrefix}/chat` : "/chat");
+        const base = isOne || isExpanded || isNoTopbar || isM2 ? `${basePrefix}/chat` : "/chat";
+        router.push(`${base}?new=1`);
       }
       if (next === "agents") {
         router.push("/agents");

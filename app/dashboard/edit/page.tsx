@@ -193,10 +193,7 @@ export default function DashboardEditPage() {
           <button type="button" aria-label="Bookmark" className="shrink-0 text-text-secondary hover:text-text-primary">
             <Icon name="starIcon" size={16} />
           </button>
-          <DefaultButton size="small" leadingIcon={<Icon name="queryListViewIcon" size={14} />}>
-            View published
-          </DefaultButton>
-          <div className="flex-1" />
+<div className="flex-1" />
           <button type="button" aria-label="More options" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-sm text-text-secondary hover:bg-background-secondary hover:text-text-primary">
             <Icon name="overflowIcon" size={16} />
           </button>

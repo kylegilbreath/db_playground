@@ -229,7 +229,7 @@ export function GenieCodeSidePanel({
       <GenieChatBody
         state={state}
         size="compact"
-        onFullScreen={() => { onClose(); router.push("/chat"); }}
+        onFullScreen={() => { onClose(); router.push(state.activeThreadId ? `/chat?thread=${state.activeThreadId}` : "/chat"); }}
         threadSidebarOpen={threadSidebarOpen}
         onThreadSidebarChange={setThreadSidebarOpen}
         onClosePanel={onClose}
