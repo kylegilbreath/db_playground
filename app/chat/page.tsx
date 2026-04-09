@@ -29,7 +29,7 @@ const MIN_PREVIEW_WIDTH = 240;
 const MAX_PREVIEW_WIDTH = 600;
 
 type SidePanel = "threads";
-type MainView = "thread" | "tools" | "connections";
+type MainView = "thread" | "tools" | "connections" | "scheduled";
 
 // ---------------------------------------------------------------------------
 // Toggle switch (inline, no external component needed)
@@ -542,6 +542,148 @@ function ToolsMainView({ onSkillClick, selectedSkillFile, skills, scope, onScope
 // ---------------------------------------------------------------------------
 // Connections main view — placeholder
 // ---------------------------------------------------------------------------
+// Scheduled tasks main view
+// ---------------------------------------------------------------------------
+
+const SUGGESTED_TASKS = [
+  { icon: "refreshIcon", title: "Refresh weekly dashboard", description: "Re-run all dashboard queries and send a Slack summary every Monday morning" },
+  { icon: "searchIcon", title: "Monitor data quality", description: "Scan key tables for nulls, duplicates, and schema drift on a daily schedule" },
+  { icon: "notebookIcon", title: "Generate EDA report", description: "Run exploratory analysis on new data arrivals and append findings to a shared notebook" },
+  { icon: "alertIcon", title: "Alert on metric drops", description: "Check DAU and WAU thresholds each hour and notify the team if they fall below baseline" },
+  { icon: "queryListViewIcon", title: "Archive stale queries", description: "Identify queries unused for 30+ days and move them to an archive schema" },
+  { icon: "calendarIcon", title: "Weekly model retraining", description: "Kick off the feature pipeline and retrain the forecast model every Sunday night" },
+];
+
+type ScheduledTask = {
+  id: string;
+  title: string;
+  schedule: string;
+  lastRun: string;
+  status: "success" | "failed" | "running";
+};
+
+const SCHEDULED_TASKS: ScheduledTask[] = [
+  { id: "t1", title: "Weekly dashboard refresh", schedule: "Every Mon 8:00 AM", lastRun: "2d ago", status: "success" },
+  { id: "t2", title: "Data quality scan", schedule: "Daily 6:00 AM", lastRun: "14h ago", status: "success" },
+  { id: "t3", title: "Forecast model retrain", schedule: "Every Sun 11:00 PM", lastRun: "4d ago", status: "failed" },
+];
+
+function ScheduledTasksMainView({
+  selectedTaskId,
+  onTaskClick,
+}: {
+  selectedTaskId: string | null;
+  onTaskClick: (id: string) => void;
+}) {
+  const [activeTab, setActiveTab] = React.useState<"mine" | "all">("mine");
+
+  const statusColor = (s: ScheduledTask["status"]) =>
+    s === "success" ? "bg-green-500" : s === "failed" ? "bg-red-500" : "bg-yellow-500";
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+      {/* Header */}
+      <div className="shrink-0 px-8 pt-6 pb-4">
+        <h1 className="text-title3 font-semibold text-text-primary">Scheduled tasks</h1>
+      </div>
+
+      {/* Stats row */}
+      <div className="shrink-0 grid grid-cols-3 gap-3 px-8 pb-5">
+        {[
+          { label: "Total tasks", value: String(SCHEDULED_TASKS.length) },
+          { label: "Successful · 7d", value: "11" },
+          { label: "Failed · 7d", value: "1" },
+        ].map((stat) => (
+          <div key={stat.label} className="flex flex-col gap-xs rounded-md border border-border bg-background-primary px-4 py-3">
+            <span className="text-hint text-text-secondary">{stat.label}</span>
+            <span className="text-title2 font-semibold text-text-primary">{stat.value}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Tab bar + task list */}
+      <div className="shrink-0 flex items-center gap-sm border-b border-border px-8 pb-0">
+        {(["mine", "all"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setActiveTab(t)}
+            className={cx(
+              "pb-2 text-paragraph border-b-2 transition-colors",
+              activeTab === t ? "border-action-default-border-focus font-medium text-text-primary" : "border-transparent text-text-secondary hover:text-text-primary",
+            )}
+          >
+            {t === "mine" ? "Mine" : "All"}
+          </button>
+        ))}
+        <div className="flex-1" />
+        <button type="button" className="mb-2 flex h-7 w-7 items-center justify-center rounded-sm text-text-secondary hover:bg-background-secondary hover:text-text-primary">
+          <Icon name="searchIcon" size={14} />
+        </button>
+        <div className="mb-2">
+          <PrimaryButton size="small" leadingIcon={<Icon name="plusIcon" size={12} />}>New</PrimaryButton>
+        </div>
+      </div>
+
+      <div className="flex-1 px-8 py-4">
+        {SCHEDULED_TASKS.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+            <Icon name="clockIcon" size={32} className="text-text-placeholder" />
+            <p className="text-paragraph font-medium text-text-primary">No scheduled tasks yet</p>
+            <p className="text-paragraph text-text-secondary">Run Genie Code tasks on a schedule or in response to events.</p>
+            <PrimaryButton size="default">Create task</PrimaryButton>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {SCHEDULED_TASKS.map((task) => {
+              const isSelected = selectedTaskId === task.id;
+              return (
+                <button
+                  key={task.id}
+                  type="button"
+                  onClick={() => onTaskClick(task.id)}
+                  className={cx(
+                    "flex w-full items-center gap-sm rounded-md border px-4 py-3 text-left transition-colors",
+                    isSelected
+                      ? "border-action-default-border-focus bg-action-default-background-hover"
+                      : "border-border bg-background-primary hover:border-action-default-border-hover",
+                  )}
+                >
+                  <span className={cx("h-2 w-2 shrink-0 rounded-full", statusColor(task.status))} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-paragraph font-medium text-text-primary">{task.title}</p>
+                    <p className="text-hint text-text-secondary">{task.schedule} · Last run {task.lastRun}</p>
+                  </div>
+                  <IconButton aria-label="More" icon={<Icon name="overflowIcon" size={14} />} size="small" tone="neutral" onClick={(e) => e.stopPropagation()} />
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Suggested */}
+      <div className="shrink-0 border-t border-border px-8 py-5">
+        <p className="mb-3 text-title4 font-semibold text-text-primary">Suggested</p>
+        <div className="grid grid-cols-2 gap-3">
+          {SUGGESTED_TASKS.map((task) => (
+            <button
+              key={task.title}
+              type="button"
+              className="flex flex-col gap-xs rounded-md border border-border bg-background-primary p-4 text-left transition-colors hover:border-action-default-border-hover"
+            >
+              <Icon name={task.icon as Parameters<typeof Icon>[0]["name"]} size={16} className="text-text-secondary" />
+              <p className="text-paragraph font-medium text-text-primary">{task.title}</p>
+              <p className="text-hint text-text-secondary">{task.description}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 
 function ConnectionsMainView({
   selectedServerId,
@@ -762,6 +904,17 @@ function ChatLeftNav({
           >
             <Icon name="plugIcon" size={14} className="shrink-0 text-text-secondary" />
             Connections
+          </button>
+          <button
+            type="button"
+            onClick={() => onSetMainView(activeMainView === "scheduled" ? "thread" : "scheduled")}
+            className={cx(
+              "flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-paragraph hover:bg-background-secondary",
+              activeMainView === "scheduled" ? "bg-action-default-background-hover font-medium text-text-primary" : "text-text-primary",
+            )}
+          >
+            <Icon name="clockIcon" size={14} className="shrink-0 text-text-secondary" />
+            Scheduled tasks
           </button>
           {searchActive ? (
             <div className="mt-xs flex w-full items-center gap-2 rounded-md border border-[#1A6FCC] bg-background-secondary px-2 py-2">
@@ -1909,6 +2062,48 @@ function MissingBranchGraphic() {
 type PreviewTab = "Assets" | "Review";
 type McpPreviewTab = "Tools" | "Configuration";
 
+function ScheduledTaskConfigPanel({ task }: { task: ScheduledTask }) {
+  const statusLabel = task.status === "success" ? "Success" : task.status === "failed" ? "Failed" : "Running";
+  const statusColor = task.status === "success" ? "text-green-600" : task.status === "failed" ? "text-red-600" : "text-yellow-600";
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto rounded-md border border-border bg-background-primary">
+      {/* Status banner */}
+      <div className="flex shrink-0 items-center gap-sm border-b border-border px-4 py-3">
+        <span className={cx("h-2 w-2 shrink-0 rounded-full", task.status === "success" ? "bg-green-500" : task.status === "failed" ? "bg-red-500" : "bg-yellow-500")} />
+        <span className={cx("text-hint font-medium", statusColor)}>{statusLabel}</span>
+        <span className="text-hint text-text-secondary">· Last run {task.lastRun}</span>
+      </div>
+
+      {/* Config fields */}
+      <div className="flex flex-col divide-y divide-border">
+        <div className="flex flex-col gap-xs px-4 py-3">
+          <span className="text-hint text-text-secondary">Task name</span>
+          <span className="text-paragraph text-text-primary">{task.title}</span>
+        </div>
+        <div className="flex flex-col gap-xs px-4 py-3">
+          <span className="text-hint text-text-secondary">Schedule</span>
+          <span className="text-paragraph text-text-primary">{task.schedule}</span>
+        </div>
+        <div className="flex flex-col gap-xs px-4 py-3">
+          <span className="text-hint text-text-secondary">Trigger</span>
+          <span className="text-paragraph text-text-primary">Time-based</span>
+        </div>
+        <div className="flex flex-col gap-xs px-4 py-3">
+          <span className="text-hint text-text-secondary">Notification</span>
+          <span className="text-paragraph text-text-primary">On failure only</span>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex shrink-0 gap-sm border-t border-border px-4 py-3 mt-auto">
+        <DefaultButton size="small">Edit task</DefaultButton>
+        <DefaultButton size="small">Run now</DefaultButton>
+      </div>
+    </div>
+  );
+}
+
 function PreviewPanel({
   onClose,
   selectedAsset,
@@ -1926,6 +2121,7 @@ function PreviewPanel({
   onSkillSave,
   readOnly = false,
   mcpServer = null,
+  scheduledTask = null,
 }: {
   onClose: () => void;
   selectedAsset: ReviewAsset | null;
@@ -1943,6 +2139,7 @@ function PreviewPanel({
   onSkillSave?: (file: string, content: string) => void;
   readOnly?: boolean;
   mcpServer?: McpServer | null;
+  scheduledTask?: ScheduledTask | null;
 }) {
   const [mcpTab, setMcpTab] = React.useState<McpPreviewTab>("Tools");
   const [mcpSearch, setMcpSearch] = React.useState("");
@@ -2027,7 +2224,9 @@ function PreviewPanel({
       <div className="flex h-10 shrink-0 items-center gap-xs pr-3">
         {/* Tabs / skill title */}
         <div className="relative flex min-w-0 flex-1 items-center overflow-hidden">
-          {mcpServer ? (
+          {scheduledTask ? (
+            <span className="truncate pl-3 text-paragraph font-medium text-text-primary">{scheduledTask.title}</span>
+          ) : mcpServer ? (
             (["Tools", "Configuration"] as McpPreviewTab[]).map((tab) => (
               <button
                 key={tab}
@@ -2066,7 +2265,17 @@ function PreviewPanel({
           <div className="pointer-events-none absolute right-0 top-0 h-full w-8 bg-gradient-to-r from-transparent to-background-primary" />
         </div>
         {/* Right actions */}
-        {skillFile ? (
+        {scheduledTask ? (
+          <div className="flex shrink-0 items-center gap-xs">
+            <IconButton
+              aria-label="Close preview panel"
+              icon={<Icon name="closeIcon" size={14} />}
+              size="small"
+              tone="neutral"
+              onClick={onClose}
+            />
+          </div>
+        ) : skillFile ? (
           <div className="flex shrink-0 items-center gap-xs">
             {skillEditMode ? (
               <PrimaryButton
@@ -2137,7 +2346,9 @@ function PreviewPanel({
 
       {/* Pane */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden pb-3 pr-3">
-        {mcpServer ? (
+        {scheduledTask ? (
+          <ScheduledTaskConfigPanel task={scheduledTask} />
+        ) : mcpServer ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border bg-background-primary">
             {mcpTab === "Tools" ? (
               <>
@@ -2377,6 +2588,7 @@ export default function ChatPage() {
   const [skills, setSkills] = React.useState(() => [...SKILLS]);
   const [toolsScope, setToolsScope] = React.useState<"user" | "workspace">("user");
   const [selectedMcpServerId, setSelectedMcpServerId] = React.useState<string | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = React.useState<string | null>(null);
 
   const handleSkillSave = React.useCallback((file: string, newContent: string) => {
     SKILL_FILE_CONTENT[file] = newContent;
@@ -2394,7 +2606,10 @@ export default function ChatPage() {
     if (view !== "connections") {
       setSelectedMcpServerId(null);
     }
-    if (view === "connections") {
+    if (view !== "scheduled") {
+      setSelectedTaskId(null);
+    }
+    if (view === "connections" || view === "scheduled") {
       setPreviewOpen(false);
     }
     if (view !== "tools") {
@@ -2456,6 +2671,14 @@ export default function ChatPage() {
 
         {mainView === "tools" ? (
           <ToolsMainView onSkillClick={handleSkillClick} selectedSkillFile={selectedSkillFile} skills={skills} scope={toolsScope} onScopeChange={setToolsScope} />
+        ) : mainView === "scheduled" ? (
+          <ScheduledTasksMainView
+            selectedTaskId={selectedTaskId}
+            onTaskClick={(id) => {
+              setSelectedTaskId((prev) => (prev === id ? null : id));
+              if (containerRef.current) setInitialPreviewWidth(Math.round(containerRef.current.offsetWidth * 0.45));
+            }}
+          />
         ) : mainView === "connections" ? (
           <ConnectionsMainView
             selectedServerId={selectedMcpServerId}
@@ -2476,9 +2699,9 @@ export default function ChatPage() {
           />
         )}
 
-        {(previewOpen || (mainView === "tools" && selectedSkillFile) || (mainView === "connections" && selectedMcpServerId)) && (
+        {(previewOpen || (mainView === "tools" && selectedSkillFile) || (mainView === "connections" && selectedMcpServerId) || (mainView === "scheduled" && selectedTaskId)) && (
           <PreviewPanel
-            onClose={() => { setPreviewOpen(false); setSelectedSkillFile(null); setSelectedMcpServerId(null); }}
+            onClose={() => { setPreviewOpen(false); setSelectedSkillFile(null); setSelectedMcpServerId(null); setSelectedTaskId(null); }}
             selectedAsset={selectedAsset}
             activeThreadId={state.activeThreadId}
             initialWidth={initialPreviewWidth}
@@ -2494,6 +2717,7 @@ export default function ChatPage() {
             onSkillSave={handleSkillSave}
             readOnly={mainView === "tools" && toolsScope === "workspace"}
             mcpServer={mainView === "connections" ? (MCP_SERVERS.find((s) => s.id === selectedMcpServerId) ?? null) : null}
+            scheduledTask={mainView === "scheduled" ? (SCHEDULED_TASKS.find((t) => t.id === selectedTaskId) ?? null) : null}
           />
         )}
       </div>
