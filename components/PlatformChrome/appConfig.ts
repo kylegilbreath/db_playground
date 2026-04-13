@@ -52,7 +52,7 @@ const LAKEHOUSE_CONFIG: AppConfig = {
         { id: "chat", label: "Genie Chat", iconName: "genieIcon" },
         { id: "editor", label: "Editor", iconName: "QueryEditorIcon" },
         { id: "discover", label: "Discover", iconName: "discoverIcon" },
-        { id: "workspace", label: "Workspace", iconName: "workspacesIcon", disabled: true },
+        { id: "workspace", label: "Workspace", iconName: "workspacesIcon" },
         { id: "catalog", label: "Catalog", iconName: "catalogIcon", disabled: true },
         { id: "workflows", label: "Workflows", iconName: "WorkflowsIcon", disabled: true },
         { id: "compute", label: "Compute", iconName: "cloudIcon", disabled: true },

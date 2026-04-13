@@ -154,6 +154,8 @@ function AppChromeInner({ className, children }: AppChromeProps) {
         ? "ai-gateway"
       : pathname === "/editor"
         ? "editor"
+      : pathname.startsWith("/workspace")
+        ? "workspace"
       : pathname.startsWith("/dashboard")
         ? "dashboards"
       : pathname === "/one" || pathname === "/one/"
@@ -265,6 +267,9 @@ function AppChromeInner({ className, children }: AppChromeProps) {
       }
       if (next === "editor") {
         router.push("/editor");
+      }
+      if (next === "workspace") {
+        router.push("/workspace");
       }
       if (next === "insights") {
         router.push(isOne || isExpanded || isNoTopbar || isM2 ? `${basePrefix}/insights` : "/one/insights");

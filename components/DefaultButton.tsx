@@ -23,6 +23,8 @@ export type DefaultButtonProps = Omit<
   radius?: DefaultButtonRadius;
   /** Optional leading icon (16x16). */
   leadingIcon?: React.ReactNode;
+  /** Optional trailing icon (16x16). */
+  trailingIcon?: React.ReactNode;
   /** If true, shows trailing chevron to indicate a menu affordance (no dropdown behavior here). */
   menu?: boolean;
 };
@@ -44,6 +46,7 @@ export function DefaultButton({
   size = "default",
   radius = "default",
   leadingIcon,
+  trailingIcon,
   menu = false,
   className,
   disabled,
@@ -95,6 +98,15 @@ export function DefaultButton({
       ) : null}
 
       <span className="min-w-0 truncate text-paragraph leading-5">{children}</span>
+
+      {trailingIcon ? (
+        <span
+          className={cx("inline-flex size-4 items-center justify-center", mutedIconClasses)}
+          aria-hidden="true"
+        >
+          {trailingIcon}
+        </span>
+      ) : null}
 
       {menu ? (
         <span
