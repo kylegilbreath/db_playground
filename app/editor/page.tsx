@@ -588,6 +588,27 @@ Structure your review with P0/P1/P2 sections, file:line references, current code
 - **Large refactor**: Focus on architectural issues, not style
 - **Bug fix**: Ensure fix doesn't introduce new issues
 - **Performance optimization**: Verify measurements, not just theory`,
+
+  ".assistant_instructions": `# User Instructions
+
+These instructions are applied to every Genie Code conversation. Use this file to share persistent context, preferences, or authoring guidelines.
+
+## Persona & Role
+
+- I'm a Staff Product Designer at Databricks focused on AI assistant and agentic UX
+- I work closely with PMs, engineers, and content designers on Genie and related surfaces
+
+## Preferences
+
+- Be direct and opinionated — skip hedging and excessive caveats
+- Prefer bullet lists, tables, and frameworks over long prose
+- Use semantic Tailwind tokens from the design system (not hardcoded values)
+- Keep changes small and focused — one logical change at a time
+
+## Context
+
+- This project is a Next.js prototype for testing design concepts
+- The design system uses custom Tailwind tokens defined in tailwind.config.ts`,
 };
 
 function SkillFileView({ skillFile }: { skillFile: string }) {
