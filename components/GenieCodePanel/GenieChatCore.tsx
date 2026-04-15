@@ -594,9 +594,9 @@ function Tip({ label, children, align = "right" }: { label: string; children: Re
 // Editor settings drawer
 // ---------------------------------------------------------------------------
 
-type SettingsTab = "General" | "Tools" | "Connections";
+type SettingsTab = "General" | "Skills & instructions" | "MCP servers";
 
-const SETTINGS_TABS: SettingsTab[] = ["General", "Tools", "Connections"];
+const SETTINGS_TABS: SettingsTab[] = ["General", "Skills & instructions", "MCP servers"];
 
 type ToggleSetting = {
   type?: "toggle";
@@ -734,7 +734,7 @@ function SettingsToolsTab({ onClose }: { onClose?: () => void }) {
     <div className="flex flex-col gap-4">
       {/* Header row */}
       <div className="flex items-center">
-        <h3 className="flex-1 text-title3 font-semibold text-text-primary">Tools</h3>
+        <h3 className="flex-1 text-title3 font-semibold text-text-primary">Skills &amp; instructions</h3>
         <div className="flex w-fit rounded-sm border border-border bg-background-tertiary p-0.5">
           {(["user", "workspace"] as const).map((s) => (
             <button key={s} type="button" onClick={() => setScope(s)}
@@ -812,10 +812,9 @@ function SettingsConnectionsTab() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h3 className="text-title3 font-semibold text-text-primary">Connections</h3>
+      <h3 className="text-title3 font-semibold text-text-primary">MCP servers</h3>
       <div className="flex flex-col gap-xs">
         <div className="flex items-center pb-xs">
-          <span className="flex-1 text-paragraph font-semibold text-text-primary">MCP Servers</span>
         </div>
         <p className="text-paragraph text-text-secondary">Manage your installed servers.</p>
         <div className="mt-1 flex flex-col gap-xs">
@@ -1024,9 +1023,9 @@ function EditorSettingsDrawer({ onClose }: { onClose: () => void }) {
 
           {/* Content */}
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6 py-4">
-            {activeTab === "Tools" ? (
+            {activeTab === "Skills & instructions" ? (
               <SettingsToolsTab onClose={onClose} />
-            ) : activeTab === "Connections" ? (
+            ) : activeTab === "MCP servers" ? (
               <SettingsConnectionsTab />
             ) : (
               <>

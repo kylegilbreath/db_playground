@@ -450,7 +450,7 @@ function ToolsMainView({ onSkillClick, selectedSkillFile, skills, scope, onScope
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Header */}
       <div className="flex shrink-0 items-center px-8 py-3">
-        <span className="flex-1 text-title3 font-semibold text-text-primary">Tools</span>
+        <span className="flex-1 text-title3 font-semibold text-text-primary">Skills &amp; instructions</span>
         <div className="flex w-fit rounded-sm border border-border bg-background-tertiary p-0.5">
           {(["user", "workspace"] as const).map((s) => (
             <button
@@ -710,7 +710,7 @@ function ConnectionsMainView({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-8 py-6">
       <div className="flex items-center">
-        <span className="flex-1 text-title3 font-semibold text-text-primary">Connections</span>
+        <span className="flex-1 text-title3 font-semibold text-text-primary">MCP servers</span>
         <DefaultButton size="small" leadingIcon={<Icon name="plusIcon" size={12} />}>Add</DefaultButton>
       </div>
       <div className="flex flex-col gap-3">
@@ -892,7 +892,7 @@ function ChatLeftNav({
             )}
           >
             <Icon name="WrenchIcon" size={14} className="shrink-0 text-text-secondary" />
-            Tools
+            Skills & instructions
           </button>
           <button
             type="button"
@@ -903,7 +903,7 @@ function ChatLeftNav({
             )}
           >
             <Icon name="plugIcon" size={14} className="shrink-0 text-text-secondary" />
-            Connections
+            MCP servers
           </button>
           <button
             type="button"
