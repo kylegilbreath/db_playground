@@ -1117,21 +1117,15 @@ export function MoreOptionsMenu({
     >
       {/* Top actions */}
       <div className="pb-1">
-        {!isFullScreen && onTogglePanel && (
-          <button
-            type="button"
-            onClick={() => { onTogglePanel(); onClose(); }}
-            className="flex w-full items-center justify-between px-2 py-1 text-left text-paragraph text-text-primary hover:bg-background-secondary"
-          >
-            <span>Close chat pane</span>
-          </button>
-        )}
         <button
           type="button"
           onClick={() => { onFullScreen?.(); onClose(); }}
           className="flex w-full items-center justify-between px-2 py-1 text-left text-paragraph text-text-primary hover:bg-background-secondary"
         >
-          <span>{isFullScreen ? "Minimize chat" : "Maximize chat"}</span>
+          <span className="flex items-center gap-xs">
+            <Icon name={isFullScreen ? "arrowsCollapseIcon" : "arrowsExpandIcon"} size={14} className="text-text-secondary" />
+            {isFullScreen ? "Minimize chat" : "Maximize chat"}
+          </span>
           <span className="text-hint text-text-secondary">⌥⌘M</span>
         </button>
       </div>
@@ -1251,23 +1245,35 @@ export function GenieChatBody({
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Header */}
         <div className={cx("relative flex h-10 shrink-0 items-center gap-xs px-3", size === "compact" && "border-b border-border")}>
-          {(size === "compact" || activeThreadTitle) && (
-            activeThreadId && activeThreadTitle ? (
-              <input
-                key={activeThreadId}
-                ref={titleInputRef}
-                className="min-w-0 flex-1 truncate rounded bg-transparent px-1 text-paragraph font-medium text-text-primary outline-none hover:ring-1 hover:ring-border focus:ring-2 focus:ring-action-default-border-focus"
-                defaultValue={activeThreadTitle}
-                onBlur={(e) => handleRenameThread(activeThreadId, e.currentTarget.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+          {onFullScreen && size !== "full" && (
+            <div className="group relative">
+              <IconButton
+                aria-label="Maximize chat"
+                icon={<Icon name="arrowsExpandIcon" size={14} />}
+                tone="neutral"
+                size="small"
+                onClick={onFullScreen}
               />
-            ) : (
-              <span className="min-w-0 flex-1 truncate text-paragraph font-medium text-text-primary">
-                {activeThreadTitle ?? "Genie Code"}
-              </span>
-            )
+              <div className="pointer-events-none absolute left-0 top-full z-50 mt-1.5 whitespace-nowrap rounded bg-[#161616] px-2 py-1 text-hint text-white opacity-0 transition-opacity group-hover:opacity-100">
+                <span className="absolute bottom-full left-2 border-4 border-transparent border-b-[#161616]" />
+                Maximize chat
+              </div>
+            </div>
           )}
-          {size === "full" && !activeThreadTitle && <div className="flex-1" />}
+          {size === "full" && activeThreadId && activeThreadTitle ? (
+            <input
+              key={activeThreadId}
+              ref={titleInputRef}
+              className="min-w-0 flex-1 truncate rounded bg-transparent px-1 text-paragraph font-medium text-text-primary outline-none hover:ring-1 hover:ring-border focus:ring-2 focus:ring-action-default-border-focus"
+              defaultValue={activeThreadTitle}
+              onBlur={(e) => handleRenameThread(activeThreadId, e.currentTarget.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+            />
+          ) : (
+            <span className="min-w-0 flex-1 truncate text-paragraph font-medium text-text-primary">
+              {size === "full" ? (activeThreadTitle ?? "Genie Code") : "Genie Code"}
+            </span>
+          )}
           {!previewOpen && (
             <Tip label="Connected to Serverless compute">
               <IconButton
@@ -1340,21 +1346,14 @@ export function GenieChatBody({
               </div>
             </div>
           )}
-          {onFullScreen && size !== "full" && (
-            <div className="group relative">
-              <IconButton
-                aria-label="Maximize chat"
-                icon={<Icon name="fullscreenIcon" size={14} />}
-                tone="neutral"
-                size="small"
-                onClick={onFullScreen}
-              />
-              {/* Tooltip */}
-              <div className="pointer-events-none absolute right-0 top-full z-50 mt-1.5 whitespace-nowrap rounded bg-[#161616] px-2 py-1 text-hint text-white opacity-0 transition-opacity group-hover:opacity-100">
-                <span className="absolute bottom-full right-2 border-4 border-transparent border-b-[#161616]" />
-                Maximize chat
-              </div>
-            </div>
+          {onClosePanel && (
+            <IconButton
+              aria-label="Close panel"
+              icon={<Icon name="closeIcon" size={14} />}
+              size="small"
+              tone="neutral"
+              onClick={onClosePanel}
+            />
           )}
         </div>
 
