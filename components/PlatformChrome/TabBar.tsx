@@ -9,7 +9,7 @@ function cx(...parts: Array<string | undefined | false>) {
   return parts.filter(Boolean).join(" ");
 }
 
-export type TabBarTab = { id: string; label: string; modified?: boolean };
+export type TabBarTab = { id: string; label: string; modified?: boolean; icon?: string };
 
 export type TabBarProps = {
   tabs: TabBarTab[];
@@ -38,7 +38,7 @@ export function TabBar({ tabs, activeId, onSelect, onClose, onNewTab }: TabBarPr
           )}
         >
           <Icon
-            name={tab.label.endsWith(".py") ? "fileCodeIcon" : tab.label.endsWith(".md") ? "fileDocumentIcon" : "notebookIcon"}
+            name={tab.icon ?? (tab.label.endsWith(".py") ? "fileCodeIcon" : tab.label.endsWith(".md") ? "fileDocumentIcon" : "notebookIcon")}
             size={14}
             className={tab.id === activeId ? "text-text-primary" : "text-text-secondary"}
           />

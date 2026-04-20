@@ -17,42 +17,35 @@ import { Tag } from "@/components/Tag/Tag";
 import { DefaultButton } from "@/components/DefaultButton";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { TertiaryButton } from "@/components/TertiaryButton";
+import { VisualDataPrepView } from "./components/VisualDataPrepView";
 
 
 // ---------------------------------------------------------------------------
 // Notebook toolbar
 // ---------------------------------------------------------------------------
 
-const MENU_ITEMS = ["File", "Edit", "View", "Run", "Help"];
-
-function NotebookToolbar({ language = "Python" }: { language?: string }) {
+function NotebookToolbar() {
   return (
-    <div className="flex shrink-0 items-center border-b border-border bg-background-primary px-4">
-      {/* Menu items */}
-      <div className="flex items-center">
-        {MENU_ITEMS.map((item) => (
-          <button
-            key={item}
-            type="button"
-            className="px-2 py-2 text-paragraph leading-5 text-text-secondary hover:text-text-primary"
-          >
-            {item}
-          </button>
-        ))}
+    <div className="flex h-9 shrink-0 items-center border-b border-border bg-background-primary px-3">
+      {/* Left: panel + undo/redo + star */}
+      <div className="flex items-center gap-xs">
+        <IconButton icon={<Icon name="sidebarIcon" size={14} />} aria-label="Toggle panel" size="small" tone="neutral" />
+        <IconButton icon={<Icon name="undoIcon" size={14} />} aria-label="Undo" size="small" tone="neutral" />
+        <IconButton icon={<Icon name="redoIcon" size={14} />} aria-label="Redo" size="small" tone="neutral" />
+        <IconButton icon={<Icon name="starIcon" size={14} />} aria-label="Favorite" size="small" tone="neutral" />
       </div>
 
       <div className="flex-1" />
 
-      {/* Right-side actions */}
-      <div className="flex items-center gap-sm py-1">
-        <DefaultButton size="small" leadingIcon={<Icon name="playIcon" size={14} />}>
-          Run all
-        </DefaultButton>
-        <DefaultButton size="small" leadingIcon={<span className="inline-block h-2 w-2 rounded-full bg-green-500" />} menu>
-          Serverless
-        </DefaultButton>
-        <DefaultButton size="small">Schedule</DefaultButton>
-        <DefaultButton size="small">Share</DefaultButton>
+      {/* Right: chat + overflow + run status + schedule + share */}
+      <div className="flex items-center gap-xs">
+        <IconButton icon={<Icon name="speechBubbleIcon" size={14} />} aria-label="Comments" size="small" tone="neutral" />
+        <IconButton icon={<Icon name="overflowIcon" size={14} />} aria-label="More options" size="small" tone="neutral" />
+        <button type="button" className="flex items-center justify-center rounded-sm border border-border p-1 hover:bg-background-secondary">
+          <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+        </button>
+        <IconButton icon={<Icon name="calendarIcon" size={14} />} aria-label="Schedule" size="small" tone="neutral" />
+        <IconButton icon={<Icon name="uploadIcon" size={14} />} aria-label="Share" size="small" tone="neutral" />
       </div>
     </div>
   );
@@ -65,6 +58,7 @@ function NotebookToolbar({ language = "Python" }: { language?: string }) {
 const NOTEBOOK_TABS: TabBarTab[] = [
   { id: "tab-eda", label: "Ski Resort EDA" },
   { id: "tab-py", label: "file-name.py" },
+  { id: "tab-vdp", label: "Visual data prep", icon: "DAGIcon" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -929,6 +923,8 @@ export default function EditorPage() {
 
         {activeTabId === "tab-skill" && skillFile ? (
           <SkillFileView skillFile={skillFile} />
+        ) : activeTabId === "tab-vdp" ? (
+          <VisualDataPrepView />
         ) : activeTabId === "tab-py" ? (
           <FileEditorView />
         ) : (
