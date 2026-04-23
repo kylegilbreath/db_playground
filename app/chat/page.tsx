@@ -29,7 +29,8 @@ const MIN_PREVIEW_WIDTH = 240;
 const MAX_PREVIEW_WIDTH = 600;
 
 type SidePanel = "threads";
-type MainView = "thread" | "tools" | "connections" | "scheduled";
+type MainView = "thread" | "customizations" | "scheduled";
+type CustomizationsTab = "skills" | "connections";
 
 // ---------------------------------------------------------------------------
 // Toggle switch (inline, no external component needed)
@@ -456,11 +457,7 @@ function ToolsMainView({ onSkillClick, selectedSkillFile, skills, scope, onScope
             <button
               key={s}
               type="button"
-              onClick={() => {
-                onScopeChange(s);
-                const firstSkill = s === "workspace" ? WORKSPACE_SKILLS[0] : skills[0];
-                if (firstSkill) onSkillClick(firstSkill.primaryFile);
-              }}
+              onClick={() => { onScopeChange(s); }}
               className={cx(
                 "rounded-[3px] px-3 py-1 text-paragraph transition-colors",
                 scope === s
@@ -756,7 +753,7 @@ function ConnectionsMainView({
 
       {/* Available connectors */}
       <div className="flex flex-col gap-3">
-        <p className="text-title4 font-semibold text-text-primary">Available connectors</p>
+        <p className="text-title4 font-semibold text-text-primary">Additional connectors</p>
         <div className="grid grid-cols-2 gap-3">
           {AVAILABLE_CONNECTORS.map((connector) => (
             <div
@@ -777,6 +774,60 @@ function ConnectionsMainView({
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Customizations main view — tabbed wrapper for Skills and MCP servers
+// ---------------------------------------------------------------------------
+
+function CustomizationsMainView({
+  activeTab,
+  onTabChange,
+  onSkillClick,
+  selectedSkillFile,
+  skills,
+  scope,
+  onScopeChange,
+  selectedServerId,
+  onServerClick,
+}: {
+  activeTab: CustomizationsTab;
+  onTabChange: (tab: CustomizationsTab) => void;
+  onSkillClick: (file: string) => void;
+  selectedSkillFile: string | null;
+  skills: Skill[];
+  scope: "user" | "workspace";
+  onScopeChange: (s: "user" | "workspace") => void;
+  selectedServerId: string | null;
+  onServerClick: (id: string) => void;
+}) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* Tab bar */}
+      <div className="flex shrink-0 items-center border-b border-border px-8">
+        {([["skills", "Skills & instructions"], ["connections", "MCP servers"]] as const).map(([tab, label]) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => onTabChange(tab)}
+            className={cx(
+              "border-b-2 px-1 pb-2 pt-3 text-paragraph transition-colors mr-6",
+              activeTab === tab
+                ? "border-action-primary-background-default font-medium text-text-primary"
+                : "border-transparent text-text-secondary hover:text-text-primary",
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {activeTab === "skills" ? (
+        <ToolsMainView onSkillClick={onSkillClick} selectedSkillFile={selectedSkillFile} skills={skills} scope={scope} onScopeChange={onScopeChange} />
+      ) : (
+        <ConnectionsMainView selectedServerId={selectedServerId} onServerClick={onServerClick} />
+      )}
     </div>
   );
 }
@@ -885,25 +936,14 @@ function ChatLeftNav({
           </button>
           <button
             type="button"
-            onClick={() => onSetMainView(activeMainView === "tools" ? "thread" : "tools")}
+            onClick={() => onSetMainView(activeMainView === "customizations" ? "thread" : "customizations")}
             className={cx(
               "flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-paragraph hover:bg-background-secondary",
-              activeMainView === "tools" ? "bg-action-default-background-hover font-medium text-text-primary" : "text-text-primary",
+              activeMainView === "customizations" ? "bg-action-default-background-hover font-medium text-text-primary" : "text-text-primary",
             )}
           >
             <Icon name="WrenchIcon" size={14} className="shrink-0 text-text-secondary" />
-            Skills & instructions
-          </button>
-          <button
-            type="button"
-            onClick={() => onSetMainView(activeMainView === "connections" ? "thread" : "connections")}
-            className={cx(
-              "flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-paragraph hover:bg-background-secondary",
-              activeMainView === "connections" ? "bg-action-default-background-hover font-medium text-text-primary" : "text-text-primary",
-            )}
-          >
-            <Icon name="plugIcon" size={14} className="shrink-0 text-text-secondary" />
-            MCP servers
+            Customizations
           </button>
           <button
             type="button"
@@ -2584,6 +2624,7 @@ export default function ChatPage() {
   const handleFocusTitleInputReady = React.useCallback((fn: () => void) => { focusTitleInputRef.current = fn; }, []);
 
   const [mainView, setMainView] = React.useState<MainView>("thread");
+  const [customizationsTab, setCustomizationsTab] = React.useState<CustomizationsTab>("skills");
   const [selectedSkillFile, setSelectedSkillFile] = React.useState<string | null>(null);
   const [skills, setSkills] = React.useState(() => [...SKILLS]);
   const [toolsScope, setToolsScope] = React.useState<"user" | "workspace">("user");
@@ -2603,24 +2644,17 @@ export default function ChatPage() {
 
   const handleSetMainView = React.useCallback((view: MainView) => {
     setMainView(view);
-    if (view !== "connections") {
+    if (view !== "customizations") {
       setSelectedMcpServerId(null);
+      setSelectedSkillFile(null);
     }
     if (view !== "scheduled") {
       setSelectedTaskId(null);
     }
-    if (view === "connections" || view === "scheduled") {
+    if (view === "customizations" || view === "scheduled") {
       setPreviewOpen(false);
     }
-    if (view !== "tools") {
-      setSelectedSkillFile(null);
-    } else {
-      // Auto-select first skill's primary file and open preview
-      const firstFile = SKILLS[0]?.primaryFile ?? null;
-      setSelectedSkillFile(firstFile);
-      if (containerRef.current) setInitialPreviewWidth(Math.round(containerRef.current.offsetWidth * 0.45));
-    }
-  }, []);
+  }, [customizationsTab]);
 
   const handleSkillClick = React.useCallback((file: string) => {
     setSelectedSkillFile(file);
@@ -2669,8 +2703,22 @@ export default function ChatPage() {
           onSetMainView={handleSetMainView}
         />
 
-        {mainView === "tools" ? (
-          <ToolsMainView onSkillClick={handleSkillClick} selectedSkillFile={selectedSkillFile} skills={skills} scope={toolsScope} onScopeChange={setToolsScope} />
+        {mainView === "customizations" ? (
+          <CustomizationsMainView
+            activeTab={customizationsTab}
+            onTabChange={(tab) => {
+              setCustomizationsTab(tab);
+              setSelectedSkillFile(null);
+              setSelectedMcpServerId(null);
+            }}
+            onSkillClick={handleSkillClick}
+            selectedSkillFile={selectedSkillFile}
+            skills={skills}
+            scope={toolsScope}
+            onScopeChange={(s) => { setToolsScope(s); setSelectedSkillFile(null); }}
+            selectedServerId={selectedMcpServerId}
+            onServerClick={(id) => setSelectedMcpServerId((prev) => (prev === id ? null : id))}
+          />
         ) : mainView === "scheduled" ? (
           <ScheduledTasksMainView
             selectedTaskId={selectedTaskId}
@@ -2678,11 +2726,6 @@ export default function ChatPage() {
               setSelectedTaskId((prev) => (prev === id ? null : id));
               if (containerRef.current) setInitialPreviewWidth(Math.round(containerRef.current.offsetWidth * 0.45));
             }}
-          />
-        ) : mainView === "connections" ? (
-          <ConnectionsMainView
-            selectedServerId={selectedMcpServerId}
-            onServerClick={(id) => setSelectedMcpServerId((prev) => (prev === id ? null : id))}
           />
         ) : (
           <GenieChatBody
@@ -2699,7 +2742,7 @@ export default function ChatPage() {
           />
         )}
 
-        {(previewOpen || (mainView === "tools" && selectedSkillFile) || (mainView === "connections" && selectedMcpServerId) || (mainView === "scheduled" && selectedTaskId)) && (
+        {(previewOpen || (mainView === "customizations" && customizationsTab === "skills" && selectedSkillFile) || (mainView === "customizations" && customizationsTab === "connections" && selectedMcpServerId) || (mainView === "scheduled" && selectedTaskId)) && (
           <PreviewPanel
             onClose={() => { setPreviewOpen(false); setSelectedSkillFile(null); setSelectedMcpServerId(null); setSelectedTaskId(null); }}
             selectedAsset={selectedAsset}
@@ -2713,10 +2756,10 @@ export default function ChatPage() {
             activeTab={activeTab}
             setActiveTab={setActiveTab}
             isReviewed={isReviewed}
-            skillFile={mainView === "tools" ? selectedSkillFile : null}
+            skillFile={mainView === "customizations" && customizationsTab === "skills" ? selectedSkillFile : null}
             onSkillSave={handleSkillSave}
-            readOnly={mainView === "tools" && toolsScope === "workspace"}
-            mcpServer={mainView === "connections" ? (MCP_SERVERS.find((s) => s.id === selectedMcpServerId) ?? null) : null}
+            readOnly={mainView === "customizations" && customizationsTab === "skills" && toolsScope === "workspace"}
+            mcpServer={mainView === "customizations" && customizationsTab === "connections" ? (MCP_SERVERS.find((s) => s.id === selectedMcpServerId) ?? null) : null}
             scheduledTask={mainView === "scheduled" ? (SCHEDULED_TASKS.find((t) => t.id === selectedTaskId) ?? null) : null}
           />
         )}

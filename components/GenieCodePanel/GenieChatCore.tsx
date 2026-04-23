@@ -715,7 +715,7 @@ function SkillPreviewDialog({ file, skillName, onClose, onOpenInEditor }: { file
         {/* Footer */}
         <div className="flex shrink-0 items-center justify-end gap-sm border-t border-border px-lg py-md">
           <DefaultButton onClick={onClose}>Close</DefaultButton>
-          <PrimaryButton trailingIcon={<PhIcon icon={ArrowSquareOut} size={12} />} onClick={onOpenInEditor}>Open in editor</PrimaryButton>
+          <PrimaryButton leadingIcon={<PhIcon icon={ArrowSquareOut} size={12} />} onClick={onOpenInEditor}>Open in editor</PrimaryButton>
         </div>
       </div>
     </div>,
