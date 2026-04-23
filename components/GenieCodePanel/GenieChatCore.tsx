@@ -12,10 +12,12 @@ import { EDA_STEPS, EDA_DELAYS } from "@/components/AgentChat/data/edaRun";
 import { FIND_DATA_STEPS, FIND_DATA_DELAYS } from "@/components/AgentChat/data/findDataRun";
 import { ASSISTANT_DASHBOARD_STEPS, ASSISTANT_DASHBOARD_REVIEW_ASSETS } from "@/components/AgentChat/data/assistantDashboardRun";
 import { DefaultButton } from "@/components/DefaultButton";
+import { PrimaryButton } from "@/components/PrimaryButton";
 import { GenieChatIcon } from "@/components/GenieChatIcon";
 import { IconButton } from "@/components/IconButton";
 import { Icon, PhIcon } from "@/components/icons";
 import { ArrowSquareOut } from "@phosphor-icons/react";
+import { SKILL_CONTENTS } from "@/app/editor/page";
 
 // ---------------------------------------------------------------------------
 // Shared data
@@ -665,18 +667,87 @@ const SETTINGS_WORKSPACE_SKILLS: SettingsSkill[] = [
   { id: "unit-tests", name: "unit-tests", primaryFile: "unit-tests.md", entries: [{ name: "SKILL.md", file: "unit-tests.md" }, { name: "README.md", file: "unit-tests-readme.md" }] },
 ];
 
+function SkillPreviewDialog({ file, skillName, onClose, onOpenInEditor }: { file: string; skillName: string; onClose: () => void; onOpenInEditor: () => void }) {
+  const content = SKILL_CONTENTS[file] ?? `# ${file}\n\nNo content available.`;
+
+  const renderContent = (text: string) => {
+    const lines = text.split("\n");
+    let inFrontmatter = false;
+    let frontmatterCount = 0;
+    return lines.map((line, i) => {
+      if (line === "---") {
+        frontmatterCount++;
+        inFrontmatter = frontmatterCount === 1;
+        if (frontmatterCount === 2) inFrontmatter = false;
+        return <div key={i} className="text-text-secondary font-mono text-hint leading-5">{line}</div>;
+      }
+      if (frontmatterCount === 1) return <div key={i} className="text-text-secondary font-mono text-hint leading-5">{line || " "}</div>;
+      if (line.startsWith("# ")) return <h1 key={i} className="text-title3 font-semibold text-text-primary mt-md mb-xs">{line.slice(2)}</h1>;
+      if (line.startsWith("## ")) return <h2 key={i} className="text-paragraph font-semibold text-text-primary mt-md mb-xs">{line.slice(3)}</h2>;
+      if (line.startsWith("### ")) return <h3 key={i} className="text-paragraph font-medium text-text-primary mt-sm mb-xs">{line.slice(4)}</h3>;
+      if (line.trimStart().startsWith("- ")) return <div key={i} className="flex gap-xs text-paragraph text-text-primary leading-5 ml-md"><span className="shrink-0 text-text-secondary">•</span><span>{line.trimStart().slice(2)}</span></div>;
+      if (/^\d+\./.test(line.trimStart())) return <div key={i} className="text-paragraph text-text-primary leading-5 ml-md">{line.trimStart()}</div>;
+      if (line === "") return <div key={i} className="h-2" />;
+      return <div key={i} className="text-paragraph text-text-primary leading-5">{line}</div>;
+    });
+  };
+
+  return ReactDOM.createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div
+        className="flex h-[600px] w-[560px] flex-col overflow-hidden rounded-md bg-background-primary shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex shrink-0 items-start justify-between border-b border-border px-lg py-md">
+          <div className="flex flex-col gap-xs">
+            <span className="text-title3 font-semibold text-text-primary">{skillName}</span>
+            <span className="text-hint text-text-secondary">/Workspace/assistant/skills/{skillName}</span>
+          </div>
+          <button type="button" onClick={onClose} className="mt-0.5 rounded-sm p-0.5 text-text-secondary hover:bg-action-default-background-hover hover:text-text-primary">
+            <Icon name="closeIcon" size={16} />
+          </button>
+        </div>
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-lg py-md">
+          {renderContent(content)}
+        </div>
+        {/* Footer */}
+        <div className="flex shrink-0 items-center justify-end gap-sm border-t border-border px-lg py-md">
+          <DefaultButton onClick={onClose}>Close</DefaultButton>
+          <PrimaryButton trailingIcon={<PhIcon icon={ArrowSquareOut} size={12} />} onClick={onOpenInEditor}>Open in editor</PrimaryButton>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 function SettingsSkillRow({ skill, selectedFile, onSelect, onClose }: { skill: SettingsSkill; selectedFile: string | null; onSelect: (f: string) => void; onClose?: () => void }) {
   const router = useRouter();
   const allFiles = skill.entries.flatMap((e) => isSkillFolder(e) ? e.children.map((c) => c.file) : [e.file]);
   const hasMany = skill.entries.length > 1;
   const [expanded, setExpanded] = React.useState(() => hasMany && allFiles.includes(selectedFile ?? ""));
+  const [previewFile, setPreviewFile] = React.useState<string | null>(null);
+
+  const openPreview = (file: string) => { onSelect(file); setPreviewFile(file); };
+  const closePreview = () => setPreviewFile(null);
+  const openInEditor = (file: string) => { closePreview(); onClose?.(); router.push(`/editor?skill=${encodeURIComponent(file)}`); };
 
   return (
     <div className="flex flex-col">
+      {previewFile && (
+        <SkillPreviewDialog
+          file={previewFile}
+          skillName={skill.name}
+          onClose={closePreview}
+          onOpenInEditor={() => openInEditor(previewFile)}
+        />
+      )}
       <div className="group flex w-full items-center gap-sm rounded-sm px-sm py-xs transition-colors hover:bg-action-default-background-hover">
         <button
           type="button"
-          onClick={() => { if (hasMany) setExpanded((v) => !v); onSelect(skill.primaryFile); }}
+          onClick={() => { if (hasMany) { setExpanded((v) => !v); } else { openPreview(skill.primaryFile); } }}
           className="flex flex-1 items-center gap-sm text-left overflow-hidden"
         >
           <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border border-border bg-background-primary">
@@ -705,14 +776,14 @@ function SettingsSkillRow({ skill, selectedFile, onSelect, onClose }: { skill: S
               <div key={i} className="flex flex-col">
                 <span className="px-sm py-xs text-hint text-text-secondary">{entry.name}</span>
                 {entry.children.map((child) => (
-                  <button key={child.file} type="button" onClick={() => { onClose?.(); router.push(`/editor?skill=${encodeURIComponent(child.file)}`); }}
+                  <button key={child.file} type="button" onClick={() => openPreview(child.file)}
                     className="flex w-full items-center gap-xs rounded-sm px-sm py-xs text-left text-paragraph text-text-secondary transition-colors hover:bg-action-default-background-hover">
                     {child.name}
                   </button>
                 ))}
               </div>
             ) : (
-              <button key={entry.file} type="button" onClick={() => { onClose?.(); router.push(`/editor?skill=${encodeURIComponent(entry.file)}`); }}
+              <button key={entry.file} type="button" onClick={() => openPreview(entry.file)}
                 className="flex w-full items-center gap-xs rounded-sm px-sm py-xs text-left text-paragraph text-text-secondary transition-colors hover:bg-action-default-background-hover">
                 {entry.name}
               </button>

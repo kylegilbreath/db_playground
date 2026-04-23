@@ -376,7 +376,7 @@ function FileEditorView() {
 // Skill file view
 // ---------------------------------------------------------------------------
 
-const SKILL_CONTENTS: Record<string, string> = {
+export const SKILL_CONTENTS: Record<string, string> = {
   "10x-engineer.md": `---
 name: 10x-engineer
 description: Opinionated workflow constraints for high-leverage engineering — plan-first execution, subagent strategy, self-improvement loops, and autonomous bug fixing. Use when the user invokes /10xEngineer or asks for 10x engineer workflow constraints.
