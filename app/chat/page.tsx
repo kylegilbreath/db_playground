@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import ReactDOM from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DefaultButton } from "@/components/DefaultButton";
 import { PrimaryButton } from "@/components/PrimaryButton";
@@ -344,6 +345,61 @@ function SkillFileViewer({ skillFile, content: contentProp }: { skillFile: strin
 }
 
 // ---------------------------------------------------------------------------
+// Skill preview dialog — modal for customizations view
+// ---------------------------------------------------------------------------
+
+function SkillPreviewDialog({ skillFile, onClose }: { skillFile: string; onClose: () => void }) {
+  const displayName = skillFile.replace(".md", "");
+  const content = SKILL_FILE_CONTENT[skillFile] ?? `# ${skillFile}\n\nSkill file content not available.`;
+
+  const renderContent = (text: string) => {
+    const lines = text.split("\n");
+    let frontmatterCount = 0;
+    return lines.map((line, i) => {
+      if (line === "---") {
+        frontmatterCount++;
+        return <div key={i} className="font-mono text-hint leading-5 text-text-secondary">{line}</div>;
+      }
+      if (frontmatterCount === 1) return <div key={i} className="font-mono text-hint leading-5 text-text-secondary">{line || " "}</div>;
+      if (line.startsWith("# ")) return <h1 key={i} className="mb-xs mt-md text-title3 font-semibold text-text-primary">{line.slice(2)}</h1>;
+      if (line.startsWith("## ")) return <h2 key={i} className="mb-xs mt-md text-paragraph font-semibold text-text-primary">{line.slice(3)}</h2>;
+      if (line.startsWith("### ")) return <h3 key={i} className="mb-xs mt-sm text-paragraph font-medium text-text-primary">{line.slice(4)}</h3>;
+      if (line.trimStart().startsWith("- ")) return <div key={i} className="ml-md flex gap-xs leading-5 text-paragraph text-text-primary"><span className="shrink-0 text-text-secondary">•</span><span>{line.trimStart().slice(2)}</span></div>;
+      if (/^\d+\./.test(line.trimStart())) return <div key={i} className="ml-md leading-5 text-paragraph text-text-primary">{line.trimStart()}</div>;
+      if (line === "") return <div key={i} className="h-2" />;
+      return <div key={i} className="leading-5 text-paragraph text-text-primary">{line}</div>;
+    });
+  };
+
+  return ReactDOM.createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div
+        className="flex h-[600px] w-[560px] flex-col overflow-hidden rounded-md bg-background-primary shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-start justify-between border-b border-border px-lg py-md">
+          <div className="flex flex-col gap-xs">
+            <span className="text-title3 font-semibold text-text-primary">{displayName}</span>
+            <span className="text-hint text-text-secondary">/Workspace/assistant/skills/{displayName}</span>
+          </div>
+          <button type="button" onClick={onClose} className="mt-0.5 rounded-sm p-0.5 text-text-secondary hover:bg-action-default-background-hover hover:text-text-primary">
+            <Icon name="closeIcon" size={16} />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-lg py-md">
+          {renderContent(content)}
+        </div>
+        <div className="flex shrink-0 items-center justify-end gap-sm border-t border-border px-lg py-md">
+          <DefaultButton onClick={onClose}>Close</DefaultButton>
+          <PrimaryButton onClick={onClose}>Open in editor</PrimaryButton>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Tools main view — full-width skills + instructions
 // ---------------------------------------------------------------------------
 
@@ -401,8 +457,11 @@ function SkillTreeRow({ skill, selectedSkillFile, onSkillClick }: { skill: Skill
       <button
         type="button"
         onClick={() => {
-          if (hasMultipleEntries) setExpanded((v) => !v);
-          onSkillClick(skill.primaryFile);
+          if (hasMultipleEntries) {
+            setExpanded((v) => !v);
+          } else {
+            onSkillClick(skill.primaryFile);
+          }
         }}
         className={cx(
           "flex w-full items-center gap-sm rounded-sm px-sm py-xs text-left transition-colors hover:bg-action-default-background-hover",
@@ -2628,6 +2687,7 @@ export default function ChatPage() {
   const [mainView, setMainView] = React.useState<MainView>("thread");
   const [customizationsTab, setCustomizationsTab] = React.useState<CustomizationsTab>("skills");
   const [selectedSkillFile, setSelectedSkillFile] = React.useState<string | null>(null);
+  const [skillDialogFile, setSkillDialogFile] = React.useState<string | null>(null);
   const [skills, setSkills] = React.useState(() => [...SKILLS]);
   const [toolsScope, setToolsScope] = React.useState<"user" | "workspace">("user");
   const [selectedMcpServerId, setSelectedMcpServerId] = React.useState<string | null>(null);
@@ -2660,8 +2720,7 @@ export default function ChatPage() {
 
   const handleSkillClick = React.useCallback((file: string) => {
     setSelectedSkillFile(file);
-    if (containerRef.current) setInitialPreviewWidth(Math.round(containerRef.current.offsetWidth * 0.45));
-    setPreviewOpen(true);
+    setSkillDialogFile(file);
   }, []);
 
   // Auto-switch to Review tab when assets become available, unless opened via asset click
@@ -2744,7 +2803,7 @@ export default function ChatPage() {
           />
         )}
 
-        {(previewOpen || (mainView === "customizations" && customizationsTab === "skills" && selectedSkillFile) || (mainView === "customizations" && customizationsTab === "connections" && selectedMcpServerId) || (mainView === "scheduled" && selectedTaskId)) && (
+        {(previewOpen || (mainView === "customizations" && customizationsTab === "connections" && selectedMcpServerId) || (mainView === "scheduled" && selectedTaskId)) && (
           <PreviewPanel
             onClose={() => { setPreviewOpen(false); setSelectedSkillFile(null); setSelectedMcpServerId(null); setSelectedTaskId(null); }}
             selectedAsset={selectedAsset}
@@ -2758,14 +2817,21 @@ export default function ChatPage() {
             activeTab={activeTab}
             setActiveTab={setActiveTab}
             isReviewed={isReviewed}
-            skillFile={mainView === "customizations" && customizationsTab === "skills" ? selectedSkillFile : null}
+            skillFile={null}
             onSkillSave={handleSkillSave}
-            readOnly={mainView === "customizations" && customizationsTab === "skills" && toolsScope === "workspace"}
+            readOnly={false}
             mcpServer={mainView === "customizations" && customizationsTab === "connections" ? (MCP_SERVERS.find((s) => s.id === selectedMcpServerId) ?? null) : null}
             scheduledTask={mainView === "scheduled" ? (SCHEDULED_TASKS.find((t) => t.id === selectedTaskId) ?? null) : null}
           />
         )}
       </div>
+
+      {skillDialogFile && (
+        <SkillPreviewDialog
+          skillFile={skillDialogFile}
+          onClose={() => setSkillDialogFile(null)}
+        />
+      )}
     </main>
   );
 }
