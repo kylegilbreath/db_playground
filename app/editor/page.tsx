@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 function cx(...parts: Array<string | undefined | false>) {
   return parts.filter(Boolean).join(" ");
@@ -18,6 +18,7 @@ import { DefaultButton } from "@/components/DefaultButton";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { TertiaryButton } from "@/components/TertiaryButton";
 import { VisualDataPrepView } from "./components/VisualDataPrepView";
+import { ASSISTANT_INSTRUCTIONS_FILE, ASSISTANT_INSTRUCTIONS_MARKDOWN } from "@/lib/assistant-instructions";
 
 
 // ---------------------------------------------------------------------------
@@ -583,26 +584,7 @@ Structure your review with P0/P1/P2 sections, file:line references, current code
 - **Bug fix**: Ensure fix doesn't introduce new issues
 - **Performance optimization**: Verify measurements, not just theory`,
 
-  ".assistant_instructions": `# User Instructions
-
-These instructions are applied to every Genie Code conversation. Use this file to share persistent context, preferences, or authoring guidelines.
-
-## Persona & Role
-
-- I'm a Staff Product Designer at Databricks focused on AI assistant and agentic UX
-- I work closely with PMs, engineers, and content designers on Genie and related surfaces
-
-## Preferences
-
-- Be direct and opinionated — skip hedging and excessive caveats
-- Prefer bullet lists, tables, and frameworks over long prose
-- Use semantic Tailwind tokens from the design system (not hardcoded values)
-- Keep changes small and focused — one logical change at a time
-
-## Context
-
-- This project is a Next.js prototype for testing design concepts
-- The design system uses custom Tailwind tokens defined in tailwind.config.ts`,
+  [ASSISTANT_INSTRUCTIONS_FILE]: ASSISTANT_INSTRUCTIONS_MARKDOWN,
 };
 
 function SkillFileView({ skillFile }: { skillFile: string }) {
@@ -797,15 +779,61 @@ const LEFT_RAIL_ITEMS = [
 
 export default function EditorPage() {
   const genieCode = useGenieCode();
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const skillFile = searchParams.get("skill");
 
-  const tabs: TabBarTab[] = skillFile
-    ? [...NOTEBOOK_TABS, { id: "tab-skill", label: skillFile }]
-    : NOTEBOOK_TABS;
+  const [dismissedNotebookTabIds, setDismissedNotebookTabIds] = React.useState<Set<string>>(() => new Set());
+
+  const tabs = React.useMemo(() => {
+    const openNotebook = NOTEBOOK_TABS.filter((t) => !dismissedNotebookTabIds.has(t.id));
+    const out: TabBarTab[] = [...openNotebook];
+    if (skillFile) out.push({ id: "tab-skill", label: skillFile });
+    return out;
+  }, [skillFile, dismissedNotebookTabIds]);
 
   const [activeTabId, setActiveTabId] = React.useState(() =>
     skillFile ? "tab-skill" : NOTEBOOK_TABS[0]!.id,
+  );
+
+  // Keep active tab valid when URL or dismissed set changes (e.g. skill tab removed from address bar).
+  React.useEffect(() => {
+    if (tabs.length === 0) return;
+    const ids = new Set(tabs.map((t) => t.id));
+    if (ids.has(activeTabId)) return;
+    setActiveTabId(tabs[0]!.id);
+  }, [tabs, activeTabId]);
+
+  const handleCloseTab = React.useCallback(
+    (id: string) => {
+      const notebookVisible = NOTEBOOK_TABS.filter((t) => !dismissedNotebookTabIds.has(t.id));
+      const visible: TabBarTab[] = [...notebookVisible];
+      if (skillFile) visible.push({ id: "tab-skill", label: skillFile });
+
+      if (visible.length <= 1) return;
+
+      if (id === "tab-skill") {
+        const p = new URLSearchParams(searchParams.toString());
+        p.delete("skill");
+        const qs = p.toString();
+        router.replace(qs ? `${pathname}?${qs}` : pathname);
+        setActiveTabId((active) => {
+          if (active !== "tab-skill") return active;
+          const remaining = visible.filter((t) => t.id !== "tab-skill");
+          return remaining[0]!.id;
+        });
+        return;
+      }
+
+      setDismissedNotebookTabIds((prev) => new Set([...prev, id]));
+      setActiveTabId((active) => {
+        if (active !== id) return active;
+        const remaining = visible.filter((t) => t.id !== id);
+        return remaining[0]!.id;
+      });
+    },
+    [dismissedNotebookTabIds, pathname, router, searchParams, skillFile],
   );
   const [activePanel, setActivePanel] = React.useState<string | null>(genieCode.isOpen ? "sparkle" : null);
   const [rightPanel, setRightPanel] = React.useState<string | null>(null);
@@ -918,7 +946,7 @@ export default function EditorPage() {
 
       {/* Notebook area */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <TabBar tabs={tabs} activeId={activeTabId} onSelect={setActiveTabId} />
+        <TabBar tabs={tabs} activeId={activeTabId} onSelect={setActiveTabId} onClose={handleCloseTab} />
         <NotebookToolbar />
 
         {activeTabId === "tab-skill" && skillFile ? (

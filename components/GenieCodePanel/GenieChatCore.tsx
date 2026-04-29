@@ -17,6 +17,8 @@ import { GenieChatIcon } from "@/components/GenieChatIcon";
 import { IconButton } from "@/components/IconButton";
 import { Icon, PhIcon } from "@/components/icons";
 import { ArrowSquareOut } from "@phosphor-icons/react";
+import { AssistantInstructionsCard, RenderSkillDialogMarkdown } from "@/components/AssistantInstructions/AssistantInstructionsCard";
+import { ASSISTANT_INSTRUCTIONS_FILE } from "@/lib/assistant-instructions";
 import { SKILL_CONTENTS } from "@/app/editor/page";
 
 // ---------------------------------------------------------------------------
@@ -670,28 +672,6 @@ const SETTINGS_WORKSPACE_SKILLS: SettingsSkill[] = [
 function SkillPreviewDialog({ file, skillName, onClose, onOpenInEditor }: { file: string; skillName: string; onClose: () => void; onOpenInEditor: () => void }) {
   const content = SKILL_CONTENTS[file] ?? `# ${file}\n\nNo content available.`;
 
-  const renderContent = (text: string) => {
-    const lines = text.split("\n");
-    let inFrontmatter = false;
-    let frontmatterCount = 0;
-    return lines.map((line, i) => {
-      if (line === "---") {
-        frontmatterCount++;
-        inFrontmatter = frontmatterCount === 1;
-        if (frontmatterCount === 2) inFrontmatter = false;
-        return <div key={i} className="text-text-secondary font-mono text-hint leading-5">{line}</div>;
-      }
-      if (frontmatterCount === 1) return <div key={i} className="text-text-secondary font-mono text-hint leading-5">{line || " "}</div>;
-      if (line.startsWith("# ")) return <h1 key={i} className="text-title3 font-semibold text-text-primary mt-md mb-xs">{line.slice(2)}</h1>;
-      if (line.startsWith("## ")) return <h2 key={i} className="text-paragraph font-semibold text-text-primary mt-md mb-xs">{line.slice(3)}</h2>;
-      if (line.startsWith("### ")) return <h3 key={i} className="text-paragraph font-medium text-text-primary mt-sm mb-xs">{line.slice(4)}</h3>;
-      if (line.trimStart().startsWith("- ")) return <div key={i} className="flex gap-xs text-paragraph text-text-primary leading-5 ml-md"><span className="shrink-0 text-text-secondary">•</span><span>{line.trimStart().slice(2)}</span></div>;
-      if (/^\d+\./.test(line.trimStart())) return <div key={i} className="text-paragraph text-text-primary leading-5 ml-md">{line.trimStart()}</div>;
-      if (line === "") return <div key={i} className="h-2" />;
-      return <div key={i} className="text-paragraph text-text-primary leading-5">{line}</div>;
-    });
-  };
-
   return ReactDOM.createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
       <div
@@ -710,7 +690,7 @@ function SkillPreviewDialog({ file, skillName, onClose, onOpenInEditor }: { file
         </div>
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-lg py-md">
-          {renderContent(content)}
+          <RenderSkillDialogMarkdown text={content} />
         </div>
         {/* Footer */}
         <div className="flex shrink-0 items-center justify-end gap-sm border-t border-border px-lg py-md">
@@ -838,11 +818,14 @@ function SettingsToolsTab({ onClose }: { onClose?: () => void }) {
         {scope === "user" ? (
           <>
             <p className="text-paragraph text-text-secondary">Instructions lets you provide system-level instructions to Genie Code. It&apos;s a persistent way to share context, preferences, or preferred ways of authoring.</p>
-            <button type="button" onClick={() => setSelectedFile(".assistant_instructions")}
-              className={cx("flex w-full items-center gap-xs rounded-sm px-sm py-xs text-left text-paragraph font-medium transition-colors hover:bg-action-default-background-hover", selectedFile === ".assistant_instructions" ? "bg-action-default-background-hover" : "text-text-primary")}>
-              .assistant_instructions.md
-            </button>
-            <div><DefaultButton size="small" onClick={() => { onClose?.(); router.push("/editor?skill=.assistant_instructions"); }}>Go to file</DefaultButton></div>
+            <AssistantInstructionsCard
+              compact
+              content={SKILL_CONTENTS[ASSISTANT_INSTRUCTIONS_FILE]}
+              onOpenFile={() => {
+                onClose?.();
+                router.push(`/editor?skill=${encodeURIComponent(ASSISTANT_INSTRUCTIONS_FILE)}`);
+              }}
+            />
             <p className="text-paragraph text-text-secondary">The fastest way to add instructions is to start your input with the <strong className="font-semibold text-text-primary">#</strong> character.</p>
           </>
         ) : (
@@ -1330,6 +1313,18 @@ export function GenieChatBody({
                 Maximize chat
               </div>
             </div>
+          )}
+          {size === "full" && onFullScreen && (
+            <Tip label="Minimize to side panel" align="left">
+              <IconButton
+                aria-label="Minimize to side panel"
+                icon={<Icon name="arrowsCollapseIcon" size={14} />}
+                tone="neutral"
+                size="small"
+                className="shrink-0"
+                onClick={onFullScreen}
+              />
+            </Tip>
           )}
           {size === "full" && activeThreadId && activeThreadTitle ? (
             <input

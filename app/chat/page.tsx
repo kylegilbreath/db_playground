@@ -9,7 +9,9 @@ import { Icon } from "@/components/icons";
 import { IconButton } from "@/components/IconButton";
 import { TextInput } from "@/components/TextInput";
 
+import { AssistantInstructionsCard, RenderSkillDialogMarkdown } from "@/components/AssistantInstructions/AssistantInstructionsCard";
 import { useGenieChatState, GenieChatBody, GenieChatThreadList, MoreOptionsMenu } from "@/components/GenieCodePanel/GenieChatCore";
+import { ASSISTANT_INSTRUCTIONS_FILE, ASSISTANT_INSTRUCTIONS_MARKDOWN } from "@/lib/assistant-instructions";
 import { ASSISTANT_DASHBOARD_REVIEW_ASSETS } from "@/components/AgentChat/data/assistantDashboardRun";
 import type { ReviewAsset } from "@/components/AgentChat";
 
@@ -285,22 +287,7 @@ Deep frontend code review agent for React applications. Analyzes code for access
 - **P0** — Breaks functionality or accessibility
 - **P1** — Significant performance or UX degradation
 - **P2** — Code quality and maintainability`,
-  ".assistant_instructions": `# User Instructions
-
-You are a staff product designer at Databricks focused on AI assistant and agent experiences.
-
-## Preferences
-
-- Be direct and opinionated. Skip basics unless asked.
-- Concise but substantive — bullet lists, tables, and frameworks preferred.
-- Call out risks and tradeoffs explicitly.
-- No fluff, no excessive apologies.
-
-## Context
-
-- Working on Genie, the AI assistant within Databricks notebooks and SQL tools.
-- Key focus areas: agentic UX patterns, skill-status UI, loading states, empty states.
-- Design system: internal Databricks system — consistency across surfaces matters.`,
+  [ASSISTANT_INSTRUCTIONS_FILE]: ASSISTANT_INSTRUCTIONS_MARKDOWN,
 };
 
 function SkillFileViewer({ skillFile, content: contentProp }: { skillFile: string; content?: string }) {
@@ -349,26 +336,13 @@ function SkillFileViewer({ skillFile, content: contentProp }: { skillFile: strin
 // ---------------------------------------------------------------------------
 
 function SkillPreviewDialog({ skillFile, onClose }: { skillFile: string; onClose: () => void }) {
+  const router = useRouter();
   const displayName = skillFile.replace(".md", "");
   const content = SKILL_FILE_CONTENT[skillFile] ?? `# ${skillFile}\n\nSkill file content not available.`;
 
-  const renderContent = (text: string) => {
-    const lines = text.split("\n");
-    let frontmatterCount = 0;
-    return lines.map((line, i) => {
-      if (line === "---") {
-        frontmatterCount++;
-        return <div key={i} className="font-mono text-hint leading-5 text-text-secondary">{line}</div>;
-      }
-      if (frontmatterCount === 1) return <div key={i} className="font-mono text-hint leading-5 text-text-secondary">{line || " "}</div>;
-      if (line.startsWith("# ")) return <h1 key={i} className="mb-xs mt-md text-title3 font-semibold text-text-primary">{line.slice(2)}</h1>;
-      if (line.startsWith("## ")) return <h2 key={i} className="mb-xs mt-md text-paragraph font-semibold text-text-primary">{line.slice(3)}</h2>;
-      if (line.startsWith("### ")) return <h3 key={i} className="mb-xs mt-sm text-paragraph font-medium text-text-primary">{line.slice(4)}</h3>;
-      if (line.trimStart().startsWith("- ")) return <div key={i} className="ml-md flex gap-xs leading-5 text-paragraph text-text-primary"><span className="shrink-0 text-text-secondary">•</span><span>{line.trimStart().slice(2)}</span></div>;
-      if (/^\d+\./.test(line.trimStart())) return <div key={i} className="ml-md leading-5 text-paragraph text-text-primary">{line.trimStart()}</div>;
-      if (line === "") return <div key={i} className="h-2" />;
-      return <div key={i} className="leading-5 text-paragraph text-text-primary">{line}</div>;
-    });
+  const openInEditor = () => {
+    onClose();
+    router.push(`/editor?skill=${encodeURIComponent(skillFile)}`);
   };
 
   return ReactDOM.createPortal(
@@ -387,11 +361,11 @@ function SkillPreviewDialog({ skillFile, onClose }: { skillFile: string; onClose
           </button>
         </div>
         <div className="flex-1 overflow-y-auto px-lg py-md">
-          {renderContent(content)}
+          <RenderSkillDialogMarkdown text={content} />
         </div>
         <div className="flex shrink-0 items-center justify-end gap-sm border-t border-border px-lg py-md">
           <DefaultButton onClick={onClose}>Close</DefaultButton>
-          <PrimaryButton onClick={onClose}>Open in editor</PrimaryButton>
+          <PrimaryButton onClick={openInEditor}>Open in editor</PrimaryButton>
         </div>
       </div>
     </div>,
@@ -503,7 +477,21 @@ function SkillTreeRow({ skill, selectedSkillFile, onSkillClick }: { skill: Skill
   );
 }
 
-function ToolsMainView({ onSkillClick, selectedSkillFile, skills, scope, onScopeChange }: { onSkillClick: (file: string) => void; selectedSkillFile: string | null; skills: Skill[]; scope: "user" | "workspace"; onScopeChange: (s: "user" | "workspace") => void }) {
+function ToolsMainView({
+  onSkillClick,
+  selectedSkillFile,
+  skills,
+  scope,
+  onScopeChange,
+  onOpenAssistantInstructionsFile,
+}: {
+  onSkillClick: (file: string) => void;
+  selectedSkillFile: string | null;
+  skills: Skill[];
+  scope: "user" | "workspace";
+  onScopeChange: (s: "user" | "workspace") => void;
+  onOpenAssistantInstructionsFile: () => void;
+}) {
   const visibleSkills = scope === "workspace" ? WORKSPACE_SKILLS : skills;
 
   return (
@@ -561,19 +549,7 @@ function ToolsMainView({ onSkillClick, selectedSkillFile, skills, scope, onScope
               <p className="text-paragraph text-text-secondary">
                 Instructions lets you provide system-level instructions to Genie Code. It&apos;s a persistent way to share context, preferences, or preferred ways of authoring.
               </p>
-              <button
-                type="button"
-                onClick={() => onSkillClick(".assistant_instructions")}
-                className={cx(
-                  "flex w-full items-center gap-xs rounded-sm px-sm py-xs text-left text-paragraph transition-colors hover:bg-action-default-background-hover",
-                  selectedSkillFile === ".assistant_instructions" ? "bg-action-default-background-hover" : "", "font-medium text-text-primary",
-                )}
-              >
-                .assistant_instructions.md
-              </button>
-              <div>
-                <DefaultButton size="small">Go to file</DefaultButton>
-              </div>
+              <AssistantInstructionsCard onOpenFile={onOpenAssistantInstructionsFile} />
               <p className="text-paragraph text-text-secondary">
                 The fastest way to add instructions is to start your input with the <strong className="font-semibold text-text-primary">#</strong> character.
               </p>
@@ -851,6 +827,7 @@ function CustomizationsMainView({
   onScopeChange,
   selectedServerId,
   onServerClick,
+  onOpenAssistantInstructionsFile,
 }: {
   activeTab: CustomizationsTab;
   onTabChange: (tab: CustomizationsTab) => void;
@@ -861,6 +838,7 @@ function CustomizationsMainView({
   onScopeChange: (s: "user" | "workspace") => void;
   selectedServerId: string | null;
   onServerClick: (id: string) => void;
+  onOpenAssistantInstructionsFile: () => void;
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -883,7 +861,14 @@ function CustomizationsMainView({
         ))}
       </div>
       {activeTab === "skills" ? (
-        <ToolsMainView onSkillClick={onSkillClick} selectedSkillFile={selectedSkillFile} skills={skills} scope={scope} onScopeChange={onScopeChange} />
+        <ToolsMainView
+          onSkillClick={onSkillClick}
+          selectedSkillFile={selectedSkillFile}
+          skills={skills}
+          scope={scope}
+          onScopeChange={onScopeChange}
+          onOpenAssistantInstructionsFile={onOpenAssistantInstructionsFile}
+        />
       ) : (
         <ConnectionsMainView selectedServerId={selectedServerId} onServerClick={onServerClick} />
       )}
@@ -2720,8 +2705,14 @@ export default function ChatPage() {
 
   const handleSkillClick = React.useCallback((file: string) => {
     setSelectedSkillFile(file);
-    setSkillDialogFile(file);
+    if (file !== ASSISTANT_INSTRUCTIONS_FILE) {
+      setSkillDialogFile(file);
+    }
   }, []);
+
+  const handleOpenAssistantInstructionsInEditor = React.useCallback(() => {
+    router.push(`/editor?skill=${encodeURIComponent(ASSISTANT_INSTRUCTIONS_FILE)}`);
+  }, [router]);
 
   // Auto-switch to Review tab when assets become available, unless opened via asset click
   React.useEffect(() => {
@@ -2779,6 +2770,7 @@ export default function ChatPage() {
             onScopeChange={(s) => { setToolsScope(s); setSelectedSkillFile(null); }}
             selectedServerId={selectedMcpServerId}
             onServerClick={(id) => setSelectedMcpServerId((prev) => (prev === id ? null : id))}
+            onOpenAssistantInstructionsFile={handleOpenAssistantInstructionsInEditor}
           />
         ) : mainView === "scheduled" ? (
           <ScheduledTasksMainView
