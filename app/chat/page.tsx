@@ -4,6 +4,13 @@ import * as React from "react";
 import ReactDOM from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DefaultButton } from "@/components/DefaultButton";
+import {
+  ConnectionsMainView,
+  MCP_SERVERS,
+  McpToolsConfigDialog,
+  McpToggle,
+  type McpServer,
+} from "@/components/McpConnectionsPanel";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { Icon } from "@/components/icons";
 import { IconButton } from "@/components/IconButton";
@@ -35,10 +42,6 @@ type SidePanel = "threads";
 type MainView = "thread" | "customizations" | "scheduled";
 type CustomizationsTab = "skills" | "connections";
 
-// ---------------------------------------------------------------------------
-// Toggle switch (inline, no external component needed)
-// ---------------------------------------------------------------------------
-
 function Tooltip({ label, children, align = "center" }: { label: string; children: React.ReactNode; align?: "center" | "left" | "right" }) {
   const posClass =
     align === "left" ? "left-0" :
@@ -58,64 +61,6 @@ function Tooltip({ label, children, align = "center" }: { label: string; childre
     </div>
   );
 }
-
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className={cx(
-        "relative inline-flex h-[18px] w-[32px] shrink-0 cursor-pointer rounded-full transition-colors",
-        checked ? "bg-action-default-background-press" : "bg-background-tertiary",
-      )}
-    >
-      <span
-        className={cx(
-          "absolute top-[2px] h-[14px] w-[14px] rounded-full bg-white shadow-sm transition-transform",
-          checked ? "translate-x-[16px]" : "translate-x-[2px]",
-        )}
-      />
-    </button>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Tools panel (MCP Servers)
-// ---------------------------------------------------------------------------
-
-type McpTool = { id: string; name: string; description: string; enabled: boolean };
-type McpServer = { id: string; name: string; tools: McpTool[]; iconBg: string; icon: string };
-
-const MCP_SERVERS: McpServer[] = [
-  {
-    id: "uc-fn",
-    name: "UC Function: chloe-chan.mcp-function-with-long-name",
-    iconBg: "bg-[#f0f9f6]",
-    icon: "AppsIcon",
-    tools: [
-      { id: "execute_sql", name: "execute_sql", description: "Run a SQL query against a catalog", enabled: true },
-      { id: "list_tables", name: "list_tables", description: "List tables in a schema", enabled: true },
-      { id: "describe_table", name: "describe_table", description: "Get schema details for a table", enabled: true },
-      { id: "get_row_count", name: "get_row_count", description: "Return approximate row count", enabled: false },
-      { id: "sample_rows", name: "sample_rows", description: "Return a sample of rows from a table", enabled: true },
-    ],
-  },
-  {
-    id: "gdrive",
-    name: "Google Drive search",
-    iconBg: "bg-[#f1f3f4]",
-    icon: "driveIcon",
-    tools: [
-      { id: "search_files", name: "search_files", description: "Search for files across Google Drive", enabled: true },
-      { id: "read_file", name: "read_file", description: "Read the contents of a Drive file", enabled: true },
-      { id: "list_folder", name: "list_folder", description: "List files in a Drive folder", enabled: true },
-      { id: "create_doc", name: "create_doc", description: "Create a new Google Doc", enabled: false },
-      { id: "share_file", name: "share_file", description: "Share a file with specified users", enabled: false },
-    ],
-  },
-];
 
 type SkillFile = { name: string; file: string };
 type SkillFolder = { name: string; children: SkillFile[] };
@@ -716,104 +661,6 @@ function ScheduledTasksMainView({
 }
 
 // ---------------------------------------------------------------------------
-
-function ConnectionsMainView({
-  selectedServerId,
-  onServerClick,
-}: {
-  selectedServerId: string | null;
-  onServerClick: (id: string) => void;
-}) {
-  const [serverEnabled, setServerEnabled] = React.useState<Record<string, boolean>>(
-    Object.fromEntries(MCP_SERVERS.map((s) => [s.id, true])),
-  );
-
-  const AVAILABLE_CONNECTORS = [
-    { name: "Sharepoint", description: "Access and search files across SharePoint sites and libraries" },
-    { name: "GitHub", description: "Read and write code, issues, and pull requests" },
-    { name: "Slack", description: "Search messages, channels, and send updates" },
-    { name: "Jira", description: "Manage issues, projects, and team workflows" },
-    { name: "Google Drive", description: "Access and search files across Drive and Docs" },
-    { name: "Glean", description: "Search and surface knowledge across your company's tools" },
-    { name: "Linear", description: "Manage issues, projects, and team workflows in Linear" },
-    { name: "Confluence", description: "Search and read documentation from Confluence spaces" },
-  ];
-
-  return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-8 py-6">
-      <div className="flex items-center">
-        <span className="flex-1 text-title3 font-semibold text-text-primary">MCP servers</span>
-        <DefaultButton size="small" leadingIcon={<Icon name="plusIcon" size={12} />}>Add</DefaultButton>
-      </div>
-      <div className="flex flex-col gap-3">
-        {MCP_SERVERS.map((server) => {
-          const enabledCount = server.tools.filter((t) => t.enabled).length;
-          const isSelected = selectedServerId === server.id;
-          return (
-            <div
-              key={server.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => onServerClick(server.id)}
-              onKeyDown={(e) => e.key === "Enter" && onServerClick(server.id)}
-              className={cx(
-                "flex w-full cursor-pointer items-center gap-sm rounded-md border px-3 py-3 transition-colors",
-                isSelected
-                  ? "border-action-default-border-focus ring-1 ring-action-default-border-focus"
-                  : "border-border hover:border-action-default-border-hover",
-              )}
-            >
-              <div className={cx("flex h-8 w-8 shrink-0 items-center justify-center rounded", server.iconBg)}>
-                <Icon name="AppsIcon" size={16} className="text-text-secondary" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-paragraph font-medium text-text-primary">{server.name}</p>
-                <p className="text-hint text-action-default-text">{enabledCount} tools enabled</p>
-              </div>
-              <div onClick={(e) => e.stopPropagation()}>
-                <Toggle
-                  checked={serverEnabled[server.id] ?? true}
-                  onChange={(v) => setServerEnabled((prev) => ({ ...prev, [server.id]: v }))}
-                />
-              </div>
-              <div onClick={(e) => e.stopPropagation()}>
-                <IconButton aria-label="More" icon={<Icon name="overflowIcon" size={14} />} size="small" tone="neutral" />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="h-px w-full bg-border" />
-
-      {/* Available connectors */}
-      <div className="flex flex-col gap-3">
-        <p className="text-title4 font-semibold text-text-primary">Additional connectors</p>
-        <div className="grid grid-cols-2 gap-3">
-          {AVAILABLE_CONNECTORS.map((connector) => (
-            <div
-              key={connector.name}
-              className="flex flex-col gap-xs rounded-md border border-border bg-background-primary p-3 transition-colors hover:border-action-default-border-hover"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex h-7 w-7 items-center justify-center rounded bg-background-secondary">
-                  <Icon name="AppsIcon" size={14} className="text-text-secondary" />
-                </div>
-                <button type="button" className="flex h-6 w-6 items-center justify-center rounded-sm text-text-secondary hover:bg-background-secondary hover:text-text-primary">
-                  <Icon name="plusIcon" size={14} />
-                </button>
-              </div>
-              <p className="text-paragraph font-medium text-text-primary">{connector.name}</p>
-              <p className="text-hint text-text-secondary">{connector.description}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Customizations main view — tabbed wrapper for Skills and MCP servers
 // ---------------------------------------------------------------------------
 
@@ -827,6 +674,7 @@ function CustomizationsMainView({
   onScopeChange,
   selectedServerId,
   onServerClick,
+  onConfigureMcpTools,
   onOpenAssistantInstructionsFile,
 }: {
   activeTab: CustomizationsTab;
@@ -838,40 +686,47 @@ function CustomizationsMainView({
   onScopeChange: (s: "user" | "workspace") => void;
   selectedServerId: string | null;
   onServerClick: (id: string) => void;
+  onConfigureMcpTools: (id: string) => void;
   onOpenAssistantInstructionsFile: () => void;
 }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      {/* Tab bar */}
-      <div className="flex shrink-0 items-center border-b border-border px-8">
-        {([["skills", "Skills & instructions"], ["connections", "MCP servers"]] as const).map(([tab, label]) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => onTabChange(tab)}
-            className={cx(
-              "border-b-2 px-1 pb-2 pt-3 text-paragraph transition-colors mr-6",
-              activeTab === tab
-                ? "border-action-primary-background-default font-medium text-text-primary"
-                : "border-transparent text-text-secondary hover:text-text-primary",
-            )}
-          >
-            {label}
-          </button>
-        ))}
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col px-mid">
+      <div className="mx-auto flex min-h-0 w-full max-w-6xl min-w-0 flex-1 flex-col">
+        {/* Tab bar */}
+        <div className="flex shrink-0 items-center border-b border-border px-8">
+          {([["skills", "Skills & instructions"], ["connections", "MCP servers"]] as const).map(([tab, label]) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => onTabChange(tab)}
+              className={cx(
+                "border-b-2 px-1 pb-2 pt-3 text-paragraph transition-colors mr-6",
+                activeTab === tab
+                  ? "border-action-primary-background-default font-medium text-text-primary"
+                  : "border-transparent text-text-secondary hover:text-text-primary",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {activeTab === "skills" ? (
+          <ToolsMainView
+            onSkillClick={onSkillClick}
+            selectedSkillFile={selectedSkillFile}
+            skills={skills}
+            scope={scope}
+            onScopeChange={onScopeChange}
+            onOpenAssistantInstructionsFile={onOpenAssistantInstructionsFile}
+          />
+        ) : (
+          <ConnectionsMainView
+            selectedServerId={selectedServerId}
+            onServerClick={onServerClick}
+            onConfigureMcpTools={onConfigureMcpTools}
+          />
+        )}
       </div>
-      {activeTab === "skills" ? (
-        <ToolsMainView
-          onSkillClick={onSkillClick}
-          selectedSkillFile={selectedSkillFile}
-          skills={skills}
-          scope={scope}
-          onScopeChange={onScopeChange}
-          onOpenAssistantInstructionsFile={onOpenAssistantInstructionsFile}
-        />
-      ) : (
-        <ConnectionsMainView selectedServerId={selectedServerId} onServerClick={onServerClick} />
-      )}
     </div>
   );
 }
@@ -955,7 +810,7 @@ function ChatLeftNav({
     <div className="relative flex h-full shrink-0 flex-col border-r border-border" style={{ width }}>
       {/* Header */}
       <div className="flex h-10 w-full min-w-0 shrink-0 items-center gap-xs px-3">
-        <span className="min-w-0 flex-1 truncate text-paragraph font-semibold text-text-primary">Genie Chat</span>
+        <span className="min-w-0 flex-1 truncate text-paragraph font-semibold text-text-primary">Genie Code</span>
         <div className="shrink-0">
           <Tooltip label="Close sidebar" align="right">
             <IconButton
@@ -2464,7 +2319,7 @@ function PreviewPanel({
                           <p className="text-hint font-medium text-text-primary" style={{ fontFamily: "monospace" }}>{tool.name}</p>
                           <p className="mt-0.5 text-hint text-text-secondary">{tool.description}</p>
                         </div>
-                        <Toggle
+                        <McpToggle
                           checked={mcpToolEnabled[tool.id] ?? tool.enabled}
                           onChange={(v) => setMcpToolEnabled((prev) => ({ ...prev, [tool.id]: v }))}
                         />
@@ -2770,6 +2625,7 @@ export default function ChatPage() {
             onScopeChange={(s) => { setToolsScope(s); setSelectedSkillFile(null); }}
             selectedServerId={selectedMcpServerId}
             onServerClick={(id) => setSelectedMcpServerId((prev) => (prev === id ? null : id))}
+            onConfigureMcpTools={(id) => setSelectedMcpServerId(id)}
             onOpenAssistantInstructionsFile={handleOpenAssistantInstructionsInEditor}
           />
         ) : mainView === "scheduled" ? (
@@ -2795,7 +2651,7 @@ export default function ChatPage() {
           />
         )}
 
-        {(previewOpen || (mainView === "customizations" && customizationsTab === "connections" && selectedMcpServerId) || (mainView === "scheduled" && selectedTaskId)) && (
+        {mainView !== "customizations" && (previewOpen || (mainView === "scheduled" && selectedTaskId)) && (
           <PreviewPanel
             onClose={() => { setPreviewOpen(false); setSelectedSkillFile(null); setSelectedMcpServerId(null); setSelectedTaskId(null); }}
             selectedAsset={selectedAsset}
@@ -2812,7 +2668,7 @@ export default function ChatPage() {
             skillFile={null}
             onSkillSave={handleSkillSave}
             readOnly={false}
-            mcpServer={mainView === "customizations" && customizationsTab === "connections" ? (MCP_SERVERS.find((s) => s.id === selectedMcpServerId) ?? null) : null}
+            mcpServer={null}
             scheduledTask={mainView === "scheduled" ? (SCHEDULED_TASKS.find((t) => t.id === selectedTaskId) ?? null) : null}
           />
         )}
@@ -2824,6 +2680,13 @@ export default function ChatPage() {
           onClose={() => setSkillDialogFile(null)}
         />
       )}
+
+      {mainView === "customizations" && customizationsTab === "connections" && selectedMcpServerId ? (
+        <McpToolsConfigDialog
+          server={MCP_SERVERS.find((s) => s.id === selectedMcpServerId)!}
+          onClose={() => setSelectedMcpServerId(null)}
+        />
+      ) : null}
     </main>
   );
 }

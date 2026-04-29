@@ -12,6 +12,11 @@ import { EDA_STEPS, EDA_DELAYS } from "@/components/AgentChat/data/edaRun";
 import { FIND_DATA_STEPS, FIND_DATA_DELAYS } from "@/components/AgentChat/data/findDataRun";
 import { ASSISTANT_DASHBOARD_STEPS, ASSISTANT_DASHBOARD_REVIEW_ASSETS } from "@/components/AgentChat/data/assistantDashboardRun";
 import { DefaultButton } from "@/components/DefaultButton";
+import {
+  ConnectionsMainView,
+  MCP_SERVERS,
+  McpToolsConfigDialog,
+} from "@/components/McpConnectionsPanel";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { GenieChatIcon } from "@/components/GenieChatIcon";
 import { IconButton } from "@/components/IconButton";
@@ -801,7 +806,7 @@ function SettingsToolsTab({ onClose }: { onClose?: () => void }) {
         <div className="flex flex-col gap-xs pb-xs">
           <div className="flex items-center">
             <span className="flex-1 text-paragraph font-semibold text-text-primary">{scope === "user" ? "User skills" : "Workspace skills"}</span>
-            <DefaultButton size="small" trailingIcon={<PhIcon icon={ArrowSquareOut} size={12} />} onClick={() => { onClose?.(); router.push("/workspace"); }}>Open skills folder</DefaultButton>
+            <DefaultButton size="small" trailingIcon={<PhIcon icon={ArrowSquareOut} size={12} />} onClick={() => { onClose?.(); router.push("/workspace"); }}>Go to skills folder</DefaultButton>
           </div>
           <p className="text-paragraph text-text-secondary">Skills let you teach Genie Code new capabilities by providing markdown files with instructions and examples. Create skill files in your skills folder to extend what Genie Code can do. <a href="#" className="text-action-tertiary-text-default hover:underline">Learn more</a></p>
         </div>
@@ -836,81 +841,24 @@ function SettingsToolsTab({ onClose }: { onClose?: () => void }) {
   );
 }
 
-type SettingsServer = {
-  id: string;
-  name: string;
-  icon: string;
-  iconBg: string;
-  status: "connect" | "connected";
-  toolsEnabled?: number;
-};
-
-const SETTINGS_MCP_SERVERS: SettingsServer[] = [
-  { id: "jira", name: "Jira", icon: "JiraIcon", iconBg: "bg-[#e8f0fe]", status: "connect" },
-  { id: "confluence", name: "Confluence", icon: "ConfluenceIcon", iconBg: "bg-[#e8f0fe]", status: "connect" },
-  { id: "glean", name: "Glean", icon: "gleanIcon", iconBg: "bg-[#f5f0eb]", status: "connect" },
-  { id: "sharepoint", name: "SharePoint", icon: "SharePointIcon", iconBg: "bg-[#e8f4ea]", status: "connect" },
-  { id: "gdrive", name: "Google Drive", icon: "driveIcon", iconBg: "bg-[#f1f3f4]", status: "connected", toolsEnabled: 2 },
-  { id: "github", name: "GitHub", icon: "githubIcon", iconBg: "bg-[#f0f0f0]", status: "connected", toolsEnabled: 44 },
-  { id: "genie-space", name: "Genie Space: chloe's genie space", icon: "AppsIcon", iconBg: "bg-[#f0f9f6]", status: "connected", toolsEnabled: 2 },
-];
-
 function SettingsConnectionsTab() {
-  const [servers, setServers] = React.useState(SETTINGS_MCP_SERVERS);
-
-  const toggle = (id: string) => {
-    setServers((prev) => prev.map((s) =>
-      s.id === id ? { ...s, status: s.status === "connected" ? "connect" : "connected" } : s
-    ));
-  };
+  const [selectedMcpServerId, setSelectedMcpServerId] = React.useState<string | null>(null);
 
   return (
-    <div className="flex flex-col gap-4">
-      <h3 className="text-title3 font-semibold text-text-primary">MCP servers</h3>
-      <div className="flex flex-col gap-xs">
-        <div className="flex items-center pb-xs">
-        </div>
-        <p className="text-paragraph text-text-secondary">Manage your installed servers.</p>
-        <div className="mt-1 flex flex-col gap-xs">
-          {servers.map((server) => (
-            <div key={server.id} className="flex items-center gap-sm py-1">
-              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${server.iconBg}`}>
-                <Icon name={server.icon as Parameters<typeof Icon>[0]["name"]} size={16} className="text-text-secondary" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-paragraph text-text-primary">{server.name}</p>
-                {server.status === "connected" && server.toolsEnabled !== undefined && (
-                  <p className="text-hint text-action-tertiary-text-default">{server.toolsEnabled} tools enabled</p>
-                )}
-              </div>
-              {server.status === "connect" ? (
-                <button
-                  type="button"
-                  onClick={() => toggle(server.id)}
-                  className="shrink-0 rounded-sm border border-border px-3 py-1 text-hint font-medium text-text-primary hover:bg-action-default-background-hover"
-                >
-                  Connect
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked
-                  onClick={() => toggle(server.id)}
-                  className="relative inline-flex h-[18px] w-[32px] shrink-0 cursor-pointer rounded-full bg-blue-600 transition-colors"
-                >
-                  <span className="absolute top-[2px] h-[14px] w-[14px] translate-x-[16px] rounded-full bg-white shadow-sm transition-transform" />
-                </button>
-              )}
-              <IconButton aria-label="More" icon={<Icon name="overflowIcon" size={14} />} size="small" tone="neutral" />
-            </div>
-          ))}
-        </div>
-        <div className="mt-1">
-          <DefaultButton size="small" leadingIcon={<Icon name="plusIcon" size={12} />}>Add Server</DefaultButton>
-        </div>
-      </div>
-    </div>
+    <>
+      <ConnectionsMainView
+        layout="drawer"
+        selectedServerId={selectedMcpServerId}
+        onServerClick={(id) => setSelectedMcpServerId((prev) => (prev === id ? null : id))}
+        onConfigureMcpTools={(id) => setSelectedMcpServerId(id)}
+      />
+      {selectedMcpServerId ? (
+        <McpToolsConfigDialog
+          server={MCP_SERVERS.find((s) => s.id === selectedMcpServerId)!}
+          onClose={() => setSelectedMcpServerId(null)}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -932,7 +880,7 @@ function isSelectCheckboxesSetting(s: AnySetting): s is SelectWithCheckboxesSett
   return (s as SelectWithCheckboxesSetting).type === "select-checkboxes";
 }
 
-function Toggle({ defaultOn }: { defaultOn: boolean }) {
+function SettingsFormToggle({ defaultOn }: { defaultOn: boolean }) {
   const [on, setOn] = React.useState(defaultOn);
   return (
     <button
@@ -1100,7 +1048,7 @@ function EditorSettingsDrawer({ onClose }: { onClose: () => void }) {
                         <div key={setting.title} className="flex flex-col gap-xs py-4 first:pt-0">
                           <div className="flex items-start justify-between gap-md">
                             <span className="text-paragraph font-medium text-text-primary">{setting.title}</span>
-                            <Toggle defaultOn={setting.defaultOn} />
+                            <SettingsFormToggle defaultOn={setting.defaultOn} />
                           </div>
                           <p className="text-hint text-text-secondary">{setting.description}</p>
                         </div>

@@ -23,6 +23,8 @@ export type DropdownMenuItem = {
   onSelect?: () => void;
   /** When true, render a divider line above this item. */
   separatorAbove?: boolean;
+  /** Destructive action styling (e.g. delete). */
+  danger?: boolean;
 };
 
 export type DropdownMenuAlign = "start" | "end";
@@ -246,7 +248,9 @@ export function DropdownMenu({
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-action-default-border-focus",
                   disabled
                     ? "cursor-not-allowed text-action-disabled-text"
-                    : "text-text-primary hover:bg-background-secondary active:bg-action-default-background-press",
+                    : it.danger
+                      ? "text-action-danger-default-text-default hover:bg-action-danger-default-background-hover active:bg-action-danger-default-background-press"
+                      : "text-text-primary hover:bg-background-secondary active:bg-action-default-background-press",
                 )}
                 onMouseEnter={() => {
                   if (disabled) return;

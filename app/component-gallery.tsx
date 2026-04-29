@@ -120,6 +120,14 @@ export async function ComponentGallery() {
               "threadAttentionIcon",
               "forkIcon",
               "branchCheckIn",
+              "githubIcon",
+              "JiraIcon",
+              "slackIcon",
+              "driveIcon",
+              "ConfluenceIcon",
+              "linearIcon",
+              "SharePointIcon",
+              "gleanIcon",
             ] as const
           ).map((name) => (
             <div key={name} className="flex flex-col items-center gap-xs">
