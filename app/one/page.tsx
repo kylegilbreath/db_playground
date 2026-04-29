@@ -56,9 +56,9 @@ export default function Home() {
 
       <div className="flex w-full flex-col items-center text-center">
         <img
-          src="/logos/Nike.png"
-          alt="Nike"
-          className="mb-sm size-14 object-contain dark:invert hidden"
+          src="/logos/Databricks.svg"
+          alt="Databricks"
+          className="mb-sm size-14 object-contain hidden"
         />
         <h1 className="text-title1 font-semibold tracking-tight">
           What’s next for the Databricks One team?

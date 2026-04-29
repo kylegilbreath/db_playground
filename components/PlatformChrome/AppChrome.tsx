@@ -12,7 +12,6 @@ import { GenieCodeSidePanel } from "@/components/GenieCodePanel/GenieCodeSidePan
 import { GenieCodeContext } from "@/components/GenieCodePanel/GenieCodeContext";
 
 import { Avatar } from "./Avatar";
-import { DatabricksLockup } from "./DatabricksLockup";
 import { LeftNav } from "./LeftNav";
 import { NavDrawer } from "./NavDrawer";
 import { resolveAppConfig } from "./appConfig";
@@ -355,7 +354,7 @@ function AppChromeInner({ className, children }: AppChromeProps) {
               header={
                 <div className="flex w-full items-center gap-md pl-sm">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={isM2 ? "/logos/Nike.png" : "/logos/Databricks.svg"} alt={isM2 ? "Nike" : "Databricks"} className={isM2 ? "block h-6 w-auto shrink-0 object-contain dark:invert" : "block size-4 shrink-0"} />
+                  <img src="/logos/Databricks.svg" alt="Databricks" className="block size-4 shrink-0" />
                   <div className="flex-1" />
                   <IconButton
                     aria-label="Close navigation"
@@ -451,7 +450,7 @@ function AppChromeInner({ className, children }: AppChromeProps) {
                     ) : (
                       <div className="flex w-full items-center gap-md pl-mid">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={isM2 ? "/logos/Nike.png" : "/logos/Databricks.svg"} alt={isM2 ? "Nike" : "Databricks"} className={isM2 ? "block h-6 w-auto shrink-0 object-contain dark:invert" : "block size-4 shrink-0"} />
+                        <img src="/logos/Databricks.svg" alt="Databricks" className="block size-4 shrink-0" />
                         <div className="flex-1" />
                         <IconButton
                           aria-label="Close sidebar"
