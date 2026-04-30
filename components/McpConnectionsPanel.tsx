@@ -286,21 +286,21 @@ export function ConnectionsMainView({
           {AVAILABLE_CONNECTORS.map((connector) => (
             <div
               key={connector.id}
-              className="flex flex-col gap-xs rounded-md border border-border bg-background-primary p-3 transition-colors hover:border-action-default-border-hover"
+              className="flex items-start gap-sm rounded-md border border-border bg-background-primary p-3 transition-colors hover:border-action-default-border-hover"
             >
-              <div className="flex items-center justify-between">
-                <div className="flex h-7 w-7 items-center justify-center rounded bg-background-secondary">
-                  <Icon name={connector.icon as Parameters<typeof Icon>[0]["name"]} size={14} className="text-text-secondary" />
-                </div>
-                <button
-                  type="button"
-                  className="flex h-6 w-6 items-center justify-center rounded-sm text-text-secondary hover:bg-background-secondary hover:text-text-primary"
-                >
-                  <Icon name="plusIcon" size={14} />
-                </button>
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-background-secondary">
+                <Icon name={connector.icon as Parameters<typeof Icon>[0]["name"]} size={14} className="text-text-secondary" />
               </div>
-              <p className="text-paragraph font-medium text-text-primary">{connector.name}</p>
-              <p className="text-hint text-text-secondary">{connector.description}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-paragraph font-medium text-text-primary">{connector.name}</p>
+                <p className="mt-0.5 text-hint text-text-secondary">{connector.description}</p>
+              </div>
+              <button
+                type="button"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-text-secondary hover:bg-background-secondary hover:text-text-primary"
+              >
+                <Icon name="plusIcon" size={14} />
+              </button>
             </div>
           ))}
         </div>
