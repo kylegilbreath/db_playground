@@ -649,8 +649,8 @@ function SkillFileView({ skillFile }: { skillFile: string }) {
 // ---------------------------------------------------------------------------
 
 const WORKSPACE_FILES = [
-  { name: "Ski Resort EDA", icon: "notebookIcon" },
-  { name: "file-name.py", icon: "fileCodeIcon" },
+  { name: "Ski Resort EDA", icon: "notebookIcon", tabId: "tab-eda" },
+  { name: "file-name.py", icon: "fileCodeIcon", tabId: "tab-py" },
   { name: "New Query 2026-03-17", icon: "fileDocumentIcon" },
   { name: "New Query 2026-03-13", icon: "fileDocumentIcon" },
   { name: "New Query 2026-03-09", icon: "fileDocumentIcon" },
@@ -674,7 +674,7 @@ const TOC_ITEMS = [
   { label: "Visualize Trends", level: 1 },
 ];
 
-function WorkspacePanel() {
+function WorkspacePanel({ onOpenTab, onClose }: { onOpenTab?: (tabId: string) => void; onClose?: () => void }) {
   return (
     <div className="flex h-full flex-col">
       <div className="flex h-10 shrink-0 items-center justify-between border-b border-border px-3">
@@ -683,8 +683,8 @@ function WorkspacePanel() {
           <button type="button" className="flex h-5 w-5 items-center justify-center rounded-sm text-text-secondary hover:bg-background-secondary hover:text-text-primary">
             <Icon name="refreshIcon" size={12} />
           </button>
-          <button type="button" className="flex h-5 w-5 items-center justify-center rounded-sm text-text-secondary hover:bg-background-secondary hover:text-text-primary">
-            <Icon name="plusIcon" size={12} />
+          <button type="button" onClick={onClose} className="flex h-5 w-5 items-center justify-center rounded-sm text-text-secondary hover:bg-background-secondary hover:text-text-primary">
+            <Icon name="closeIcon" size={12} />
           </button>
         </div>
       </div>
@@ -701,7 +701,12 @@ function WorkspacePanel() {
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto py-1">
         {WORKSPACE_FILES.map((f, i) => (
-          <button key={i} type="button" className="flex w-full items-center gap-xs px-3 py-1.5 text-left text-hint text-text-primary hover:bg-background-secondary">
+          <button
+            key={i}
+            type="button"
+            onClick={() => f.tabId && onOpenTab?.(f.tabId)}
+            className="flex w-full items-center gap-xs px-3 py-1.5 text-left text-hint text-text-primary hover:bg-background-secondary"
+          >
             <Icon name={f.icon} size={14} className="shrink-0 text-text-secondary" />
             <span className="min-w-0 flex-1 truncate">{f.name}</span>
           </button>
@@ -933,7 +938,10 @@ export default function EditorPage() {
       {/* Left panel */}
       {leftPanel !== null && (
         <div className="relative flex h-full shrink-0 flex-col border-r border-border bg-background-primary overflow-hidden" style={{ width: leftPanelWidth }}>
-          {leftPanel === "workspace" && <WorkspacePanel />}
+          {leftPanel === "workspace" && <WorkspacePanel onClose={() => setLeftPanel(null)} onOpenTab={(tabId) => {
+            setDismissedNotebookTabIds((prev) => { const next = new Set(prev); next.delete(tabId); return next; });
+            setActiveTabId(tabId);
+          }} />}
           {leftPanel === "schema" && <SchemaPanel />}
           {leftPanel === "toc" && <TocPanel />}
           {/* Resize handle */}
