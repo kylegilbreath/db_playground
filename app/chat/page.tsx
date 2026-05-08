@@ -38,6 +38,25 @@ const DEFAULT_PREVIEW_WIDTH = 340;
 const MIN_PREVIEW_WIDTH = 240;
 const MAX_PREVIEW_WIDTH = 600;
 
+const SCHEMA_TABLES_CHAT = [
+  { name: "ski_conditions", cols: ["date", "resort", "snowfall_in", "lifts_open", "visitors"] },
+  { name: "lift_operations", cols: ["lift_id", "name", "status", "capacity"] },
+  { name: "ticket_sales", cols: ["sale_id", "date", "type", "price", "resort"] },
+  { name: "snowfall_history", cols: ["date", "resort", "amount_in", "season"] },
+];
+
+const WORKSPACE_FILES_CHAT: { name: string; icon: string; kind: import("@/components/AgentChat").ReviewAsset["kind"] }[] = [
+  { name: "Ski Resort EDA", icon: "notebookIcon", kind: "notebook" },
+  { name: "file-name.py", icon: "fileCodeIcon", kind: "file" },
+  { name: "New Query 2026-03-17", icon: "fileDocumentIcon", kind: "file" },
+  { name: "New Query 2026-03-13", icon: "fileDocumentIcon", kind: "file" },
+  { name: "New Query 2026-03-09", icon: "fileDocumentIcon", kind: "file" },
+  { name: "New Query 2026-03-02", icon: "fileDocumentIcon", kind: "file" },
+  { name: "Untitled Notebook", icon: "notebookIcon", kind: "notebook" },
+  { name: "Untitled Notebook", icon: "notebookIcon", kind: "notebook" },
+  { name: "test.py", icon: "fileCodeIcon", kind: "file" },
+];
+
 type SidePanel = "threads";
 type MainView = "thread" | "customizations" | "scheduled";
 type CustomizationsTab = "skills" | "connections";
@@ -52,7 +71,7 @@ function Tooltip({ label, children, align = "center" }: { label: string; childre
     align === "right" ? "right-2" :
     "left-1/2 -translate-x-1/2";
   return (
-    <div className="group relative">
+    <div className="group relative inline-flex items-center">
       {children}
       <div className={`pointer-events-none absolute top-full z-50 mt-1.5 whitespace-nowrap rounded bg-[#161616] px-2 py-1 text-hint text-white opacity-0 transition-opacity group-hover:opacity-100 ${posClass}`}>
         <span className={`absolute bottom-full border-4 border-transparent border-b-[#161616] ${caretClass}`} />
@@ -615,12 +634,14 @@ function ScheduledTasksMainView({
             {SCHEDULED_TASKS.map((task) => {
               const isSelected = selectedTaskId === task.id;
               return (
-                <button
+                <div
                   key={task.id}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => onTaskClick(task.id)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onTaskClick(task.id); }}
                   className={cx(
-                    "flex w-full items-center gap-sm rounded-md border px-4 py-3 text-left transition-colors",
+                    "flex w-full cursor-pointer items-center gap-sm rounded-md border px-4 py-3 text-left transition-colors",
                     isSelected
                       ? "border-action-default-border-focus bg-action-default-background-hover"
                       : "border-border bg-background-primary hover:border-action-default-border-hover",
@@ -632,7 +653,7 @@ function ScheduledTasksMainView({
                     <p className="text-hint text-text-secondary">{task.schedule} · Last run {task.lastRun}</p>
                   </div>
                   <IconButton aria-label="More" icon={<Icon name="overflowIcon" size={14} />} size="small" tone="neutral" onClick={(e) => e.stopPropagation()} />
-                </button>
+                </div>
               );
             })}
           </div>
@@ -792,7 +813,7 @@ function ChatLeftNav({
 
   if (collapsed) {
     return (
-      <div className="flex h-full w-9 shrink-0 flex-col items-center border-r border-border py-2">
+      <div className="flex h-full w-9 shrink-0 flex-col items-center border-r border-border py-2 gap-sm">
         <Tooltip label="Open sidebar" align="left">
           <IconButton
             aria-label="Expand thread panel"
@@ -800,6 +821,35 @@ function ChatLeftNav({
             size="small"
             tone="neutral"
             onClick={() => setCollapsed(false)}
+          />
+        </Tooltip>
+        <Tooltip label="New chat" align="left">
+          <IconButton
+            aria-label="New chat"
+            icon={<Icon name="newThreadIcon" size={14} />}
+            size="small"
+            tone="neutral"
+            onClick={() => { onNewChat(); onSetMainView("thread"); setCollapsed(false); }}
+          />
+        </Tooltip>
+        <Tooltip label="Customizations" align="left">
+          <IconButton
+            aria-label="Customizations"
+            icon={<Icon name="WrenchIcon" size={14} />}
+            size="small"
+            tone="neutral"
+            className={activeMainView === "customizations" ? "!bg-background-tertiary" : ""}
+            onClick={() => { onSetMainView(activeMainView === "customizations" ? "thread" : "customizations"); setCollapsed(false); }}
+          />
+        </Tooltip>
+        <Tooltip label="Scheduled tasks" align="left">
+          <IconButton
+            aria-label="Scheduled tasks"
+            icon={<Icon name="clockIcon" size={14} />}
+            size="small"
+            tone="neutral"
+            className={activeMainView === "scheduled" ? "!bg-background-tertiary" : ""}
+            onClick={() => { onSetMainView(activeMainView === "scheduled" ? "thread" : "scheduled"); setCollapsed(false); }}
           />
         </Tooltip>
       </div>
@@ -1090,77 +1140,104 @@ function NotebookPreview({ asset }: { asset: ReviewAsset }) {
         <div className="flex flex-col gap-3">
           {/* Text cell */}
           <div className="shrink-0 rounded-md border border-border bg-background-primary p-4">
-          <p className="mb-2 text-[15px] font-semibold leading-6 text-text-primary">{asset.name} - Last 3 Months</p>
-          <p className="mb-2 text-paragraph text-text-secondary">This notebook analyzes Databricks Assistant usage metrics including:</p>
-          <ul className="mb-2 flex flex-col gap-0.5 pl-4 text-paragraph text-text-secondary">
-            <li>Daily Active Users (DAU) and Weekly Active Users (WAU)</li>
-            <li>Engagement metrics (code adoption, feedback, modality usage)</li>
-            <li>Workspace adoption trends</li>
-            <li>User retention patterns</li>
-          </ul>
-          <p className="text-paragraph text-text-secondary">
-            <span className="font-semibold text-text-primary">Data Sources: </span>
-            <code className="rounded bg-background-secondary px-1 text-hint">`main.metric_store.fct_assistant_chat_window_interactions`</code>
-            {" - Chat window interactions"}
-          </p>
-        </div>
+            <p className="mb-2 text-[15px] font-semibold leading-6 text-text-primary">Ski Resort EDA — Snowfall &amp; Revenue Analysis</p>
+            <p className="mb-2 text-paragraph text-text-secondary">Exploratory analysis of ski resort operational data across the 2025–26 season, including:</p>
+            <ul className="mb-2 flex flex-col gap-0.5 pl-4 text-paragraph text-text-secondary">
+              <li>Snowfall trends and lift operations by resort</li>
+              <li>Ticket sales volume and revenue by day type</li>
+              <li>Visitor traffic vs. snowfall correlation</li>
+              <li>6-month forecast using seasonal decomposition</li>
+            </ul>
+            <p className="text-paragraph text-text-secondary">
+              <span className="font-semibold text-text-primary">Data Sources: </span>
+              <code className="rounded bg-background-secondary px-1 text-hint">`ski_catalog.operations.ski_conditions`</code>
+              {" · "}
+              <code className="rounded bg-background-secondary px-1 text-hint">`ski_catalog.sales.ticket_sales`</code>
+            </p>
+          </div>
 
-          {/* Code cell */}
+          {/* Code cell 1 — SQL */}
           <div className="shrink-0 overflow-hidden rounded-md border border-border bg-background-primary">
-          {/* Cell toolbar */}
-          <div className="flex h-8 items-center gap-2 border-b border-border px-2">
-            <IconButton aria-label="Run" icon={<Icon name="playIcon" size={12} />} size="small" tone="neutral" className="text-green-600" />
-            <span className="text-hint text-text-secondary">✓ Just now (1s)</span>
-            <div className="flex-1" />
-            <span className="rounded bg-background-secondary px-1.5 py-0.5 text-hint font-medium text-text-secondary">SQL</span>
-            <IconButton aria-label="AI" icon={<Icon name="SparkleIcon" size={12} />} size="small" tone="neutral" />
-            <IconButton aria-label="Expand" icon={<Icon name="fullscreenIcon" size={12} />} size="small" tone="neutral" />
-            <IconButton aria-label="More" icon={<Icon name="overflowIcon" size={12} />} size="small" tone="neutral" />
-            <IconButton aria-label="Delete" icon={<Icon name="closeIcon" size={12} />} size="small" tone="neutral" />
+            <div className="flex h-8 items-center gap-2 border-b border-border px-2">
+              <IconButton aria-label="Run" icon={<Icon name="playIcon" size={12} />} size="small" tone="neutral" className="text-green-600" />
+              <span className="text-hint text-text-secondary">✓ 0.8s</span>
+              <div className="flex-1" />
+              <span className="rounded bg-background-secondary px-1.5 py-0.5 text-hint font-medium text-text-secondary">SQL</span>
+              <IconButton aria-label="AI" icon={<Icon name="SparkleIcon" size={12} />} size="small" tone="neutral" />
+              <IconButton aria-label="Expand" icon={<Icon name="fullscreenIcon" size={12} />} size="small" tone="neutral" />
+              <IconButton aria-label="More" icon={<Icon name="overflowIcon" size={12} />} size="small" tone="neutral" />
+              <IconButton aria-label="Delete" icon={<Icon name="closeIcon" size={12} />} size="small" tone="neutral" />
+            </div>
+            <div className="overflow-hidden p-3 font-mono text-[12px] leading-5">
+              {[
+                "%sql",
+                "-- Aggregate snowfall and visitor counts by resort and month",
+                "SELECT",
+                "    resort,",
+                "    DATE_TRUNC('month', date) AS month,",
+                "    SUM(snowfall_in)          AS total_snowfall_in,",
+                "    AVG(lifts_open)           AS avg_lifts_open,",
+                "    SUM(visitors)             AS total_visitors",
+                "FROM ski_catalog.operations.ski_conditions",
+                "WHERE date >= '2025-11-01'",
+                "GROUP BY resort, month",
+                "ORDER BY resort, month",
+              ].map((line, i) => (
+                <div key={i} className="flex gap-4">
+                  <span className="w-6 shrink-0 select-none text-right text-text-secondary opacity-40">{line ? i + 1 : ""}</span>
+                  <span className={cx(
+                    "min-w-0 flex-1 whitespace-pre text-text-primary",
+                    line.startsWith("--") && "text-text-secondary",
+                    line.startsWith("%") && "text-[#7c3aed]",
+                    (line.trim().startsWith("SELECT") || line.trim().startsWith("FROM") || line.trim().startsWith("WHERE") || line.trim().startsWith("GROUP") || line.trim().startsWith("ORDER")) && "text-blue-600",
+                  )}>{line || " "}</span>
+                </div>
+              ))}
+            </div>
           </div>
-          {/* Code content */}
-          <div className="overflow-hidden p-3 font-mono text-[12px] leading-5">
-            {[
-              "%sql",
-              "-- Use the specified catalog",
-              "USE CATALOG `wanderbricks-bugbash-1`;",
-              "",
-              "-- Select the top countries and average number of bedrooms",
-              "WITH CountryStats AS (",
-              "    SELECT",
-              "        country,",
-              "        COUNT(*) AS property_count,",
-              "        AVG(bedrooms) AS avg_bedrooms",
-              "    FROM `wbschema1`.`properties`",
-              "    GROUP BY country",
-              "    ORDER BY property_count DESC",
-              "    LIMIT 10",
-              ")",
-              "",
-              "-- Compare these stats to the overall properties list",
-              "SELECT",
-              "    cs.country,",
-              "    cs.property_count,",
-              "    cs.avg_bedrooms,",
-              "    overall.avg_bedrooms AS overall_avg_bedrooms",
-              "FROM CountryStats cs",
-              "CROSS JOIN (",
-              "    SELECT AVG(bedrooms) AS avg_bedrooms",
-            ].map((line, i) => (
-              <div key={i} className="flex gap-4">
-                <span className="w-6 shrink-0 select-none text-right text-text-secondary opacity-40">{line ? i + 1 : ""}</span>
-                <span className={cx(
-                  "min-w-0 flex-1 whitespace-pre-wrap break-all text-text-primary",
-                  line.startsWith("--") && "text-text-secondary",
-                  line.startsWith("%") && "text-[#7c3aed]",
-                )}>{line || "\u00a0"}</span>
-              </div>
-            ))}
+
+          {/* Code cell 2 — Python */}
+          <div className="shrink-0 overflow-hidden rounded-md border border-border bg-background-primary">
+            <div className="flex h-8 items-center gap-2 border-b border-border px-2">
+              <IconButton aria-label="Run" icon={<Icon name="playIcon" size={12} />} size="small" tone="neutral" className="text-green-600" />
+              <span className="text-hint text-text-secondary">✓ 1.2s</span>
+              <div className="flex-1" />
+              <span className="rounded bg-background-secondary px-1.5 py-0.5 text-hint font-medium text-text-secondary">Python</span>
+              <IconButton aria-label="AI" icon={<Icon name="SparkleIcon" size={12} />} size="small" tone="neutral" />
+              <IconButton aria-label="Expand" icon={<Icon name="fullscreenIcon" size={12} />} size="small" tone="neutral" />
+              <IconButton aria-label="More" icon={<Icon name="overflowIcon" size={12} />} size="small" tone="neutral" />
+              <IconButton aria-label="Delete" icon={<Icon name="closeIcon" size={12} />} size="small" tone="neutral" />
+            </div>
+            <div className="overflow-hidden p-3 font-mono text-[12px] leading-5">
+              {[
+                "import pandas as pd",
+                "import matplotlib.pyplot as plt",
+                "from statsmodels.tsa.seasonal import seasonal_decompose",
+                "",
+                "# Load query result into DataFrame",
+                "df = spark.sql(\"SELECT * FROM ski_monthly\").toPandas()",
+                "df['month'] = pd.to_datetime(df['month'])",
+                "df = df.set_index('month').sort_index()",
+                "",
+                "# Run seasonal decomposition for visitor forecast",
+                "result = seasonal_decompose(df['total_visitors'], model='additive', period=3)",
+                "result.plot()",
+                "plt.tight_layout()",
+                "plt.show()",
+              ].map((line, i) => (
+                <div key={i} className="flex gap-4">
+                  <span className="w-6 shrink-0 select-none text-right text-text-secondary opacity-40">{line ? i + 1 : ""}</span>
+                  <span className={cx(
+                    "min-w-0 flex-1 whitespace-pre text-text-primary",
+                    line.startsWith("#") && "text-text-secondary",
+                    (line.startsWith("import") || line.startsWith("from")) && "text-[#7c3aed]",
+                  )}>{line || " "}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-        </div>
-      </div>
-    </div>
+      </div>    </div>
   );
 }
 
@@ -1277,7 +1354,7 @@ function DashboardPreview({ activeThreadId }: { activeThreadId?: string | null }
         <div className="flex items-end px-4">
           <button
             type="button"
-            onClick={() => setActiveTab("Data")}
+            onClick={() => setActiveTab(activeTab === "Data" ? "Ski Resort Dashboard" : "Data")}
             className={cx(
               "mr-2 flex items-center gap-xs pb-2 text-paragraph border-b-2 transition-colors",
               activeTab === "Data"
@@ -1852,7 +1929,7 @@ function FileDiffSection({
       "border-border bg-background-primary",
     )}>
       {/* File header */}
-      <div className="flex items-center gap-2 border-b border-border bg-background-secondary px-3 py-1.5">
+      <div className="flex items-center gap-2 border-b border-border px-3 py-1.5">
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
@@ -2045,11 +2122,100 @@ function ScheduledTaskConfigPanel({ task }: { task: ScheduledTask }) {
   );
 }
 
+function RightBrowserPanel({ kind, onClose, schemaExpanded, setSchemaExpanded, onOpenAsset }: {
+  kind: "workspace" | "schema";
+  onClose: () => void;
+  schemaExpanded: string | null;
+  setSchemaExpanded: (v: string | null) => void;
+  onOpenAsset?: (asset: ReviewAsset) => void;
+}) {
+  return (
+    <div className="flex h-full w-[200px] shrink-0 flex-col border-l border-border">
+      {kind === "workspace" ? (
+        <>
+          <div className="flex h-8 shrink-0 items-center justify-between border-b border-border px-3">
+            <span className="text-hint font-medium text-text-primary">Workspace</span>
+            <div className="flex items-center gap-xs">
+              <button type="button" className="flex h-5 w-5 items-center justify-center rounded-sm text-text-secondary hover:bg-background-tertiary hover:text-text-primary">
+                <Icon name="refreshIcon" size={12} />
+              </button>
+              <button type="button" onClick={onClose} className="flex h-5 w-5 items-center justify-center rounded-sm text-text-secondary hover:bg-background-tertiary hover:text-text-primary">
+                <Icon name="closeIcon" size={12} />
+              </button>
+            </div>
+          </div>
+          <div className="shrink-0 border-b border-border px-2 py-1.5">
+            <div className="flex items-center gap-xs rounded-sm border border-border bg-background-primary px-2 py-1">
+              <Icon name="searchIcon" size={12} className="shrink-0 text-text-secondary" />
+              <input type="text" placeholder="Search..." className="min-w-0 flex-1 bg-transparent text-hint text-text-primary placeholder:text-text-placeholder outline-none" />
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-xs border-b border-border px-3 py-1.5 text-hint text-text-secondary">
+            <Icon name="chevronLeftIcon" size={12} />
+            <Icon name="folderOutlinedIcon" size={12} />
+            <span className="truncate">Drafts</span>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto py-1">
+            {WORKSPACE_FILES_CHAT.map((f, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => onOpenAsset?.({ id: `workspace-${i}`, name: f.name, kind: f.kind })}
+                className="flex w-full items-center gap-xs px-3 py-1.5 text-left text-hint text-text-primary hover:bg-background-secondary"
+              >
+                <Icon name={f.icon} size={14} className="shrink-0 text-text-secondary" />
+                <span className="min-w-0 flex-1 truncate">{f.name}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="flex h-8 shrink-0 items-center justify-between border-b border-border px-3">
+            <span className="text-hint font-medium text-text-primary">Catalog</span>
+            <button type="button" onClick={onClose} className="flex h-5 w-5 items-center justify-center rounded-sm text-text-secondary hover:bg-background-tertiary hover:text-text-primary">
+              <Icon name="closeIcon" size={12} />
+            </button>
+          </div>
+          <div className="shrink-0 border-b border-border px-2 py-1.5">
+            <div className="flex items-center gap-xs rounded-sm border border-border bg-background-primary px-2 py-1">
+              <Icon name="searchIcon" size={12} className="shrink-0 text-text-secondary" />
+              <input type="text" placeholder="Search tables..." className="min-w-0 flex-1 bg-transparent text-hint text-text-primary placeholder:text-text-placeholder outline-none" />
+            </div>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto py-1">
+            {SCHEMA_TABLES_CHAT.map((t) => (
+              <div key={t.name}>
+                <button
+                  type="button"
+                  onClick={() => setSchemaExpanded(schemaExpanded === t.name ? null : t.name)}
+                  className="flex w-full items-center gap-xs px-3 py-1.5 text-left text-hint text-text-primary hover:bg-background-secondary"
+                >
+                  <Icon name={schemaExpanded === t.name ? "chevronDownIcon" : "chevronRightIcon"} size={10} className="shrink-0 text-text-secondary" />
+                  <Icon name="tableIcon" size={14} className="shrink-0 text-text-secondary" />
+                  <span className="min-w-0 flex-1 truncate">{t.name}</span>
+                </button>
+                {schemaExpanded === t.name && t.cols.map((col) => (
+                  <div key={col} className="flex items-center gap-xs py-1 pl-9 pr-3 text-hint text-text-secondary hover:bg-background-secondary">
+                    <Icon name="NumbersIcon" size={12} className="shrink-0" />
+                    <span className="truncate">{col}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function PreviewPanel({
   onClose,
   selectedAsset,
   activeThreadId,
   initialWidth = DEFAULT_PREVIEW_WIDTH,
+  initialBrowser = null,
   reviewAssets,
   openAssets,
   setOpenAssets,
@@ -2068,6 +2234,7 @@ function PreviewPanel({
   selectedAsset: ReviewAsset | null;
   activeThreadId: string | null;
   initialWidth?: number;
+  initialBrowser?: "workspace" | "schema" | null;
   reviewAssets?: ReviewAsset[];
   openAssets: ReviewAsset[];
   setOpenAssets: (updater: ReviewAsset[] | ((prev: ReviewAsset[]) => ReviewAsset[])) => void;
@@ -2104,7 +2271,6 @@ function PreviewPanel({
     setActiveAssetId(selectedAsset.id);
   }, [selectedAsset]);
 
-  const [previewMoreMenuOpen, setPreviewMoreMenuOpen] = React.useState(false);
   const [skillEditMode, setSkillEditMode] = React.useState(false);
   const [skillEditContent, setSkillEditContent] = React.useState<string>("");
 
@@ -2126,6 +2292,11 @@ function PreviewPanel({
     });
   };
   const [width, setWidth] = React.useState(initialWidth);
+  const [rightBrowser, setRightBrowser] = React.useState<"workspace" | "schema" | null>(initialBrowser);
+  const workspaceBrowserOpen = rightBrowser === "workspace";
+  const toggleWorkspace = () => setRightBrowser((v) => v === "workspace" ? null : "workspace");
+  const toggleSchema = () => setRightBrowser((v) => v === "schema" ? null : "schema");
+  const [schemaExpanded, setSchemaExpanded] = React.useState<string | null>("ski_conditions");
   const isDragging = React.useRef(false);
   const startX = React.useRef(0);
   const startWidth = React.useRef(initialWidth);
@@ -2159,7 +2330,7 @@ function PreviewPanel({
       {/* Drag handle on left edge */}
       <div
         onMouseDown={handleMouseDown}
-        className="absolute left-0 top-0 h-full w-1 cursor-col-resize hover:bg-action-default-border-hover active:bg-action-default-border-hover"
+        className="absolute left-0 top-0 h-full w-1 cursor-col-resize z-10"
       />
       {/* Header */}
       <div className="flex h-10 shrink-0 items-center gap-xs pr-3">
@@ -2247,46 +2418,46 @@ function PreviewPanel({
           </div>
         ) : (
           <div className="flex shrink-0 items-center gap-xs">
-            <IconButton
-              aria-label="Status"
-              icon={<span className="inline-block h-2.5 w-2.5 rounded-full bg-green-500" />}
-              size="small"
-              tone="neutral"
-            />
-            <div className="relative">
+            {activeTab === "Assets" && (
+              <>
+                <IconButton
+                  aria-label="Browse workspace files"
+                  icon={<Icon name="folderOutlinedIcon" size={14} />}
+                  size="small"
+                  tone="neutral"
+                  className={rightBrowser === "workspace" ? "!bg-background-tertiary" : ""}
+                  onClick={toggleWorkspace}
+                />
+                <IconButton
+                  aria-label="Browse data catalog"
+                  icon={<span className="inline-flex -scale-x-100"><Icon name="catalogShapesIcon" size={14} /></span>}
+                  size="small"
+                  tone="neutral"
+                  className={rightBrowser === "schema" ? "!bg-background-tertiary" : ""}
+                  onClick={toggleSchema}
+                />
+              </>
+            )}
+            <Tooltip label="Close preview panel" align="right">
               <IconButton
-                aria-label="More options"
-                icon={<Icon name="overflowIcon" size={14} />}
+                aria-label="Close preview panel"
+                icon={
+                  <span className="inline-flex rotate-180">
+                    <Icon name="sidebarOpenIcon" size={16} />
+                  </span>
+                }
                 size="small"
                 tone="neutral"
-                onClick={() => setPreviewMoreMenuOpen((v) => !v)}
+                onClick={onClose}
               />
-              {previewMoreMenuOpen && (
-                <MoreOptionsMenu
-                  onClose={() => setPreviewMoreMenuOpen(false)}
-                  onFullScreen={onClose}
-                  isFullScreen={true}
-                />
-              )}
-            </div>
-            <IconButton
-              aria-label="Close preview panel"
-              icon={
-                <span className="inline-flex rotate-180">
-                  <Icon name="sidebarOpenIcon" size={16} />
-                </span>
-              }
-              size="small"
-              tone="neutral"
-              className="!bg-background-tertiary"
-              onClick={onClose}
-            />
+            </Tooltip>
           </div>
         )}
       </div>
 
       {/* Pane */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden pb-3 pr-3">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden pb-3 pr-3 pl-0">
         {scheduledTask ? (
           <ScheduledTaskConfigPanel task={scheduledTask} />
         ) : mcpServer ? (
@@ -2380,69 +2551,79 @@ function PreviewPanel({
           </div>
           )
         ) : activeTab === "Assets" && openAssets.length > 0 ? (
-          <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-md border border-border bg-background-primary">
-            {/* Figma-style soft tab bar */}
-            <div className="flex h-8 shrink-0 items-center overflow-x-auto bg-background-secondary pr-1">
-              {openAssets.map((asset) => {
-                const isActive = asset.id === activeAssetId;
-                const iconName = asset.kind === "notebook" ? "notebookIcon" : asset.kind === "dashboard" ? "dashboardIcon" : "fileCodeIcon";
-                return (
-                  <button
-                    key={asset.id}
-                    type="button"
-                    onClick={() => setActiveAssetId(asset.id)}
-                    className={cx(
-                      "flex h-full shrink-0 items-center gap-1 border-r border-border px-1 text-paragraph",
-                      isActive ? "bg-background-primary text-text-primary" : "text-text-secondary hover:bg-background-tertiary",
-                    )}
-                  >
-                    <div className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-sm">
-                      <Icon name={iconName} size={14} className="text-text-secondary" />
-                    </div>
-                    <span className="max-w-[140px] truncate">{asset.name}</span>
-                    <span
-                      role="button"
-                      tabIndex={0}
-                      aria-label="Close tab"
-                      onClick={(e) => { e.stopPropagation(); closeAssetTab(asset.id); }}
-                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); closeAssetTab(asset.id); } }}
-                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-text-secondary hover:bg-background-tertiary hover:text-text-primary"
+          <div className="flex min-h-0 w-full flex-1 overflow-hidden rounded-md border border-border bg-background-primary">
+            {/* Main asset area */}
+            <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+              {/* Figma-style soft tab bar */}
+              <div className="flex h-8 shrink-0 items-center overflow-x-auto bg-background-secondary pr-1">
+                {openAssets.map((asset) => {
+                  const isActive = asset.id === activeAssetId;
+                  const iconName = asset.kind === "notebook" ? "notebookIcon" : asset.kind === "dashboard" ? "dashboardIcon" : "fileCodeIcon";
+                  return (
+                    <button
+                      key={asset.id}
+                      type="button"
+                      onClick={() => setActiveAssetId(asset.id)}
+                      className={cx(
+                        "flex h-full shrink-0 items-center gap-1 border-r border-border px-1 text-paragraph",
+                        isActive ? "bg-background-primary text-text-primary" : "text-text-secondary hover:bg-background-tertiary",
+                      )}
                     >
-                      <Icon name="closeIcon" size={10} />
-                    </span>
-                  </button>
-                );
-              })}
-              {/* Add tab */}
-              <button
-                type="button"
-                aria-label="New tab"
-                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-text-secondary hover:bg-background-tertiary"
-              >
-                <Icon name="plusIcon" size={14} />
-              </button>
+                      <div className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-sm">
+                        <Icon name={iconName} size={14} className="text-text-secondary" />
+                      </div>
+                      <span className="max-w-[140px] truncate">{asset.name}</span>
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        aria-label="Close tab"
+                        onClick={(e) => { e.stopPropagation(); closeAssetTab(asset.id); }}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); closeAssetTab(asset.id); } }}
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-text-secondary hover:bg-background-tertiary hover:text-text-primary"
+                      >
+                        <Icon name="closeIcon" size={10} />
+                      </span>
+                    </button>
+                  );
+                })}
+                {/* Add tab */}
+                <button
+                  type="button"
+                  aria-label="New tab"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-text-secondary hover:bg-background-tertiary"
+                >
+                  <Icon name="plusIcon" size={14} />
+                </button>
+              </div>
+              {activeAsset?.kind === "dashboard" ? (
+                <DashboardPreview activeThreadId={activeThreadId} />
+              ) : activeAsset?.kind === "file" ? (
+                <PythonFilePreview asset={activeAsset} />
+              ) : activeAsset ? (
+                <NotebookPreview asset={activeAsset} />
+              ) : null}
             </div>
-            {activeAsset?.kind === "dashboard" ? (
-              <DashboardPreview activeThreadId={activeThreadId} />
-            ) : activeAsset?.kind === "file" ? (
-              <PythonFilePreview asset={activeAsset} />
-            ) : activeAsset ? (
-              <NotebookPreview asset={activeAsset} />
-            ) : null}
+            {rightBrowser !== null && <RightBrowserPanel kind={rightBrowser} onClose={() => setRightBrowser(null)} schemaExpanded={schemaExpanded} setSchemaExpanded={setSchemaExpanded} onOpenAsset={(asset) => { setOpenAssets((prev) => prev.find((a) => a.id === asset.id) ? prev : [...prev, asset]); setActiveAssetId(asset.id); setActiveTab("Assets"); }} />}
           </div>
         ) : (
-          <div className="flex w-full flex-1 flex-col items-center justify-center overflow-clip rounded-md border border-border bg-background-primary">
-            <EmptyChartGraphic />
-            <div className="flex flex-col items-center gap-2 px-6 pb-6 text-center">
-              <p className="text-[18px] font-semibold leading-6 text-text-primary">
-                Inspect the assets Genie Code interacts with
-              </p>
-              <p className="text-paragraph text-text-secondary">
-                View all the assets Genie Code generates or uses
-              </p>
+          <div className="flex min-h-0 w-full flex-1 overflow-hidden rounded-md border border-border bg-background-primary">
+            <div className="flex min-w-0 flex-1 flex-col items-center justify-center overflow-clip">
+              <EmptyChartGraphic />
+              <div className="flex flex-col items-center gap-2 px-6 pb-6 text-center">
+                <p className="text-[18px] font-semibold leading-6 text-text-primary">
+                  No assets shown
+                </p>
+                <DefaultButton
+                  onClick={() => setRightBrowser(rightBrowser === "workspace" ? null : "workspace")}
+                >
+                  Open asset
+                </DefaultButton>
+              </div>
             </div>
+            {rightBrowser !== null && activeTab === "Assets" && <RightBrowserPanel kind={rightBrowser} onClose={() => setRightBrowser(null)} schemaExpanded={schemaExpanded} setSchemaExpanded={setSchemaExpanded} onOpenAsset={(asset) => { setOpenAssets((prev) => prev.find((a) => a.id === asset.id) ? prev : [...prev, asset]); setActiveAssetId(asset.id); setActiveTab("Assets"); }} />}
           </div>
         )}
+      </div>
       </div>
     </div>
   );
@@ -2479,6 +2660,7 @@ export default function ChatPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [previewOpen, setPreviewOpen] = React.useState(false);
+  const [initialBrowser, setInitialBrowser] = React.useState<"workspace" | "schema" | null>(null);
   const [selectedAsset, setSelectedAsset] = React.useState<ReviewAsset | null>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [initialPreviewWidth, setInitialPreviewWidth] = React.useState(DEFAULT_PREVIEW_WIDTH);
@@ -2521,6 +2703,7 @@ export default function ChatPage() {
   }, [state.steps, state.runStatus, state.activeThreadId]);
 
   const assetClickRef = React.useRef(false);
+  const manualOpenRef = React.useRef(false);
   const focusTitleInputRef = React.useRef<(() => void) | null>(null);
   const handleFocusTitleInputReady = React.useCallback((fn: () => void) => { focusTitleInputRef.current = fn; }, []);
 
@@ -2569,11 +2752,12 @@ export default function ChatPage() {
     router.push(`/editor?skill=${encodeURIComponent(ASSISTANT_INSTRUCTIONS_FILE)}`);
   }, [router]);
 
-  // Auto-switch to Review tab when assets become available, unless opened via asset click
+  // Auto-switch to Review tab when assets become available, unless opened via asset click or manual toggle
   React.useEffect(() => {
     if (reviewAssets && reviewAssets.length > 0 && previewOpen) {
-      if (!assetClickRef.current) setActiveTab("Review");
+      if (!assetClickRef.current && !manualOpenRef.current) setActiveTab("Review");
       assetClickRef.current = false;
+      manualOpenRef.current = false;
     }
   }, [reviewAssets, previewOpen]);
 
@@ -2590,9 +2774,11 @@ export default function ChatPage() {
   const handleTogglePreview = React.useCallback(() => {
     if (!previewOpen && containerRef.current) {
       setInitialPreviewWidth(Math.round(containerRef.current.offsetWidth / 2));
+      setActiveTab("Assets");
+      manualOpenRef.current = true;
     }
     setPreviewOpen((v) => !v);
-  }, [previewOpen]);
+  }, [previewOpen, setActiveTab]);
 
   return (
     <main className="relative flex h-full min-h-0 w-full p-0">
@@ -2641,7 +2827,6 @@ export default function ChatPage() {
             state={state}
             size="full"
             hideThreadToggle
-            onToggleNav={handleTogglePreview}
             previewOpen={previewOpen}
             onAssetClick={handleAssetClick}
             onFullScreen={() => { sessionStorage.setItem("openGeniePanel", "1"); router.back(); }}
@@ -2651,12 +2836,56 @@ export default function ChatPage() {
           />
         )}
 
+        {/* Right rail — shown when preview panel is closed */}
+        {mainView !== "customizations" && !previewOpen && (
+          <div className="flex h-full w-9 shrink-0 flex-col items-center border-l border-border py-2 gap-sm">
+            <Tooltip label="Open preview panel" align="right">
+              <IconButton
+                aria-label="Open preview panel"
+                icon={<span className="inline-flex scale-x-[-1]"><Icon name="sidebarClosedIcon" size={16} /></span>}
+                size="small"
+                tone="neutral"
+                onClick={handleTogglePreview}
+              />
+            </Tooltip>
+            <Tooltip label="Workspace" align="right">
+              <IconButton
+                aria-label="Open workspace browser"
+                icon={<Icon name="folderOutlinedIcon" size={14} />}
+                size="small"
+                tone="neutral"
+                onClick={() => {
+                  setInitialBrowser("workspace");
+                  setActiveTab("Assets");
+                  if (containerRef.current) setInitialPreviewWidth(Math.round(containerRef.current.offsetWidth / 2));
+                  setPreviewOpen(true);
+                }}
+              />
+            </Tooltip>
+            <Tooltip label="Catalog" align="right">
+              <IconButton
+                aria-label="Open catalog browser"
+                icon={<span className="inline-flex -scale-x-100"><Icon name="catalogShapesIcon" size={14} /></span>}
+                size="small"
+                tone="neutral"
+                onClick={() => {
+                  setInitialBrowser("schema");
+                  setActiveTab("Assets");
+                  if (containerRef.current) setInitialPreviewWidth(Math.round(containerRef.current.offsetWidth / 2));
+                  setPreviewOpen(true);
+                }}
+              />
+            </Tooltip>
+          </div>
+        )}
+
         {mainView !== "customizations" && (previewOpen || (mainView === "scheduled" && selectedTaskId)) && (
           <PreviewPanel
-            onClose={() => { setPreviewOpen(false); setSelectedSkillFile(null); setSelectedMcpServerId(null); setSelectedTaskId(null); }}
+            onClose={() => { setPreviewOpen(false); setSelectedSkillFile(null); setSelectedMcpServerId(null); setSelectedTaskId(null); setInitialBrowser(null); }}
             selectedAsset={selectedAsset}
             activeThreadId={state.activeThreadId}
             initialWidth={initialPreviewWidth}
+            initialBrowser={initialBrowser}
             reviewAssets={reviewAssets}
             openAssets={openAssets}
             setOpenAssets={setOpenAssets}

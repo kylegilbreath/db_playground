@@ -579,6 +579,8 @@ export type GenieChatBodyProps = {
   onReviewed?: () => void;
   /** Called with a function that focuses the thread title input — lets parent trigger rename. */
   onFocusTitleInputReady?: (focusFn: () => void) => void;
+  /** Called when the user clicks the "Open file" button in the header. */
+  onOpenFile?: () => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -1185,6 +1187,7 @@ export function GenieChatBody({
   reviewed = false,
   onReviewed,
   onFocusTitleInputReady,
+  onOpenFile,
 }: GenieChatBodyProps) {
   const titleInputRef = React.useRef<HTMLInputElement>(null);
   const focusTitleInput = React.useCallback(() => {
@@ -1288,16 +1291,14 @@ export function GenieChatBody({
               {size === "full" ? (activeThreadTitle ?? "Genie Code") : "Genie Code"}
             </span>
           )}
-          {!previewOpen && (
-            <Tip label="Connected to Serverless compute">
-              <IconButton
-                aria-label="Status"
-                icon={<span className="inline-block h-2.5 w-2.5 rounded-full bg-green-500" />}
-                size="small"
-                tone="neutral"
-              />
-            </Tip>
-          )}
+          <Tip label="Connected to Serverless compute">
+            <IconButton
+              aria-label="Status"
+              icon={<span className="inline-block h-2.5 w-2.5 rounded-full bg-green-500" />}
+              size="small"
+              tone="neutral"
+            />
+          </Tip>
           {size === "compact" && (
             <Tip label="New chat">
               <IconButton
@@ -1321,44 +1322,34 @@ export function GenieChatBody({
               />
             </Tip>
           )}
-          {!previewOpen && (
-            <>
+          <div className="relative">
+            <IconButton
+              aria-label="More options"
+              icon={<Icon name="overflowIcon" size={14} />}
+              size="small"
+              tone="neutral"
+              onClick={() => setMoreMenuOpen((v) => !v)}
+            />
+            {moreMenuOpen && (
+              <MoreOptionsMenu
+                onClose={() => setMoreMenuOpen(false)}
+                onTogglePanel={onClosePanel}
+                onFullScreen={onFullScreen}
+                isFullScreen={size === "full"}
+                onOpenSettings={() => setSettingsOpen(true)}
+              />
+            )}
+          </div>
+          {onOpenFile && !previewOpen && (
+            <Tip label="Open file">
               <IconButton
-                aria-label="More options"
-                icon={<Icon name="overflowIcon" size={14} />}
+                aria-label="Open file"
+                icon={<Icon name="fileIcon" size={14} />}
                 size="small"
                 tone="neutral"
-                onClick={() => setMoreMenuOpen((v) => !v)}
+                onClick={onOpenFile}
               />
-              {moreMenuOpen && (
-                <MoreOptionsMenu
-                  onClose={() => setMoreMenuOpen(false)}
-                  onTogglePanel={onClosePanel}
-                  onFullScreen={onFullScreen}
-                  isFullScreen={size === "full"}
-                  onOpenSettings={() => setSettingsOpen(true)}
-                />
-              )}
-            </>
-          )}
-          {size === "full" && onToggleNav && !previewOpen && (
-            <div className="group relative">
-              <IconButton
-                aria-label="Toggle preview panel"
-                icon={
-                  <span className="inline-flex rotate-180">
-                    <Icon name="sidebarClosedIcon" size={16} />
-                  </span>
-                }
-                size="small"
-                tone="neutral"
-                onClick={onToggleNav}
-              />
-              <div className="pointer-events-none absolute right-0 top-full z-50 mt-1.5 whitespace-nowrap rounded bg-[#161616] px-2 py-1 text-hint text-white opacity-0 transition-opacity group-hover:opacity-100">
-                <span className="absolute bottom-full right-2 border-4 border-transparent border-b-[#161616]" />
-                Toggle preview panel
-              </div>
-            </div>
+            </Tip>
           )}
           {onClosePanel && (
             <IconButton
