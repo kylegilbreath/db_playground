@@ -99,6 +99,32 @@ export function GenieChatIcon({
 }
 
 /**
+ * Genie Code icon — sparkle with code brackets, used for the Code mode segment.
+ */
+export function StaticGenieCodeIcon({ size = 16 }: { size?: number }) {
+  const id = React.useId().replace(/:/g, "");
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <linearGradient id={`${id}-brackets`} x1="0" y1="4" x2="16" y2="14" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#0EA5E9" />
+          <stop offset="100%" stopColor="#6366F1" />
+        </linearGradient>
+        <linearGradient id={`${id}-sparkle`} x1="7" y1="0" x2="14" y2="8" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#3B82F6" />
+          <stop offset="100%" stopColor="#8B5CF6" />
+        </linearGradient>
+      </defs>
+      {/* Code brackets */}
+      <path d="M5.5 5L2.5 8L5.5 11" stroke={`url(#${id}-brackets)`} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M10.5 5L13.5 8L10.5 11" stroke={`url(#${id}-brackets)`} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      {/* Sparkle */}
+      <path d="M8 1C8.22 1 8.41 1.16 8.44 1.38L8.58 2.2C8.61 2.39 8.76 2.54 8.95 2.57L9.77 2.71C9.99 2.74 10.15 2.93 10.15 3.15C10.15 3.37 9.99 3.56 9.77 3.59L8.95 3.73C8.76 3.76 8.61 3.91 8.58 4.1L8.44 4.92C8.41 5.14 8.22 5.3 8 5.3C7.78 5.3 7.59 5.14 7.56 4.92L7.42 4.1C7.39 3.91 7.24 3.76 7.05 3.73L6.23 3.59C6.01 3.56 5.85 3.37 5.85 3.15C5.85 2.93 6.01 2.74 6.23 2.71L7.05 2.57C7.24 2.54 7.39 2.39 7.42 2.2L7.56 1.38C7.59 1.16 7.78 1 8 1Z" fill={`url(#${id}-sparkle)`}/>
+    </svg>
+  );
+}
+
+/**
  * Static fallback SVG — also exported for use where animation isn't needed.
  */
 export function StaticGenieChatIcon({ size = 56 }: { size?: number }) {

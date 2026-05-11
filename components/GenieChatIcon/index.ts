@@ -1,1 +1,1 @@
-export { GenieChatIcon, StaticGenieChatIcon } from "./GenieChatIcon";
+export { GenieChatIcon, StaticGenieChatIcon, StaticGenieCodeIcon } from "./GenieChatIcon";

@@ -571,7 +571,9 @@ function ScheduledTasksMainView({
   selectedTaskId: string | null;
   onTaskClick: (id: string) => void;
 }) {
-  const [activeTab, setActiveTab] = React.useState<"mine" | "all">("mine");
+  const [searchOpen, setSearchOpen] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
 
   const statusColor = (s: ScheduledTask["status"]) =>
     s === "success" ? "bg-green-500" : s === "failed" ? "bg-red-500" : "bg-yellow-500";
@@ -579,46 +581,38 @@ function ScheduledTasksMainView({
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       {/* Header */}
-      <div className="shrink-0 px-8 pt-6 pb-4">
-        <h1 className="text-title3 font-semibold text-text-primary">Scheduled tasks</h1>
-      </div>
-
-      {/* Stats row */}
-      <div className="shrink-0 grid grid-cols-3 gap-3 px-8 pb-5">
-        {[
-          { label: "Total tasks", value: String(SCHEDULED_TASKS.length) },
-          { label: "Successful · 7d", value: "11" },
-          { label: "Failed · 7d", value: "1" },
-        ].map((stat) => (
-          <div key={stat.label} className="flex flex-col gap-xs rounded-md border border-border bg-background-primary px-4 py-3">
-            <span className="text-hint text-text-secondary">{stat.label}</span>
-            <span className="text-title2 font-semibold text-text-primary">{stat.value}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Tab bar + task list */}
-      <div className="shrink-0 flex items-center gap-sm border-b border-border px-8 pb-0">
-        {(["mine", "all"] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setActiveTab(t)}
-            className={cx(
-              "pb-2 text-paragraph border-b-2 transition-colors",
-              activeTab === t ? "border-action-default-border-focus font-medium text-text-primary" : "border-transparent text-text-secondary hover:text-text-primary",
+      <div className="shrink-0 flex items-center gap-sm px-8 pt-6 pb-4">
+        <h1 className="flex-1 text-title3 font-semibold text-text-primary">Scheduled tasks</h1>
+        {searchOpen ? (
+          <div className="flex items-center gap-xs rounded-md border border-action-default-border-focus bg-background-primary px-2 py-1" style={{ width: 200 }}>
+            <Icon name="searchIcon" size={14} className="shrink-0 text-text-secondary" />
+            <input
+              ref={searchInputRef}
+              autoFocus
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onBlur={() => { if (!searchQuery) { setSearchOpen(false); } }}
+              onKeyDown={(e) => { if (e.key === "Escape") { setSearchOpen(false); setSearchQuery(""); } }}
+              placeholder="Search tasks..."
+              className="w-full bg-transparent text-paragraph text-text-primary outline-none placeholder:text-text-secondary"
+            />
+            {searchQuery && (
+              <button type="button" onClick={() => setSearchQuery("")} className="shrink-0 text-text-secondary hover:text-text-primary">
+                <Icon name="closeSmallIcon" size={14} />
+              </button>
             )}
-          >
-            {t === "mine" ? "Mine" : "All"}
-          </button>
-        ))}
-        <div className="flex-1" />
-        <button type="button" className="mb-2 flex h-7 w-7 items-center justify-center rounded-sm text-text-secondary hover:bg-background-secondary hover:text-text-primary">
-          <Icon name="searchIcon" size={14} />
-        </button>
-        <div className="mb-2">
-          <PrimaryButton size="small" leadingIcon={<Icon name="plusIcon" size={12} />}>New</PrimaryButton>
-        </div>
+          </div>
+        ) : (
+          <IconButton
+            aria-label="Search tasks"
+            icon={<Icon name="searchIcon" size={14} />}
+            size="small"
+            tone="neutral"
+            onClick={() => setSearchOpen(true)}
+          />
+        )}
+        <PrimaryButton size="small" leadingIcon={<Icon name="plusIcon" size={12} />}>New</PrimaryButton>
       </div>
 
       <div className="flex-1 px-8 py-4">
@@ -663,17 +657,26 @@ function ScheduledTasksMainView({
       {/* Suggested */}
       <div className="shrink-0 border-t border-border px-8 py-5">
         <p className="mb-3 text-title4 font-semibold text-text-primary">Suggested</p>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {SUGGESTED_TASKS.map((task) => (
-            <button
+            <div
               key={task.title}
-              type="button"
-              className="flex flex-col gap-xs rounded-md border border-border bg-background-primary p-4 text-left transition-colors hover:border-action-default-border-hover"
+              className="flex items-start gap-sm rounded-md border border-border bg-background-primary p-3 transition-colors hover:border-action-default-border-hover"
             >
-              <Icon name={task.icon as Parameters<typeof Icon>[0]["name"]} size={16} className="text-text-secondary" />
-              <p className="text-paragraph font-medium text-text-primary">{task.title}</p>
-              <p className="text-hint text-text-secondary">{task.description}</p>
-            </button>
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-background-secondary">
+                <Icon name={task.icon as Parameters<typeof Icon>[0]["name"]} size={14} className="text-text-secondary" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-paragraph font-medium text-text-primary">{task.title}</p>
+                <p className="mt-0.5 text-hint text-text-secondary">{task.description}</p>
+              </div>
+              <button
+                type="button"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-text-secondary hover:bg-background-secondary hover:text-text-primary"
+              >
+                <Icon name="plusIcon" size={14} />
+              </button>
+            </div>
           ))}
         </div>
       </div>
@@ -2837,7 +2840,7 @@ export default function ChatPage() {
         )}
 
         {/* Right rail — shown when preview panel is closed */}
-        {mainView !== "customizations" && !previewOpen && (
+        {mainView !== "customizations" && mainView !== "scheduled" && !previewOpen && (
           <div className="flex h-full w-9 shrink-0 flex-col items-center border-l border-border py-2 gap-sm">
             <Tooltip label="Open preview panel" align="right">
               <IconButton

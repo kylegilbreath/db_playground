@@ -148,7 +148,7 @@ function QuickChipsRow({
 export default function Home() {
   const router = useRouter();
   const [query, setQuery] = React.useState("");
-  const [mode, setMode] = React.useState<"search" | "ask">("search");
+  const [mode, setMode] = React.useState<"search" | "ask" | "code">("ask");
   const GOLDEN_DEMO_QUERY = "customer churn";
 
   const quickChips: QuickChip[] = [
@@ -390,11 +390,15 @@ export default function Home() {
         <div className="mt-[48px] w-full max-w-[800px]">
           <AnythingBox
             phase="pre"
-            defaultMode="search"
+            defaultMode="ask"
             value={query}
             onValueChange={setQuery}
             onModeChange={setMode}
             onSubmit={() => {
+              if (mode === "code") {
+                router.push("/chat");
+                return;
+              }
               if (!query.trim()) return;
               if (mode === "ask") {
                 router.push(`/chat?prompt=${encodeURIComponent(query.trim())}`);

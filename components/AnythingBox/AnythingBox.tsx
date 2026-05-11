@@ -249,21 +249,14 @@ export function AnythingBox({
       <div className="flex items-end gap-sm">
         <div className="flex h-8 items-center gap-sm">
           <AnythingBoxModeToggle mode={mode} locked={locked} onModeChange={setMode} />
-          {mode === "ask" ? (
-            <IconButton
-              aria-label="Add"
-              radius="full"
-              icon={<Icon name="plusIcon" size={16} />}
-            />
-          ) : null}
         </div>
         <div className="flex-1" />
-        <AnythingBoxSubmitButton
-          direction="right"
-          disabled={!value.trim()}
-          loading={loading}
-          onClick={onSubmit}
-        />
+        <DefaultButton radius="full" onClick={onSubmit}>
+          <span className="flex items-center gap-xs">
+            Ask Genie
+            <Icon name="newWindowIcon" size={14} />
+          </span>
+        </DefaultButton>
       </div>
     ) : phase === "chat" ? (
       <div className="flex items-end gap-sm">

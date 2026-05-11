@@ -309,26 +309,19 @@ function ThreadStatusIcon({ status }: { status: ThreadStatus }) {
 }
 
 // Group threads by a simple "Today" / "Previous 7 days" bucketing (demo-only).
-function groupThreads(threads: GenieThread[]): Array<{ label: string; threads: GenieThread[] }> {
-  // First 3 seed threads → "Today"; any user-created threads also land in "Today".
-  // Split: seed threads with known IDs go to "Today"; we can just split at index 3 for demo.
-  const today = threads.slice(0, 3);
-  const previous = threads.slice(3);
-  const groups: Array<{ label: string; threads: GenieThread[] }> = [
-    { label: "Today", threads: today },
-  ];
+function groupThreads(threads: GenieThread[], pinnedIds: Set<string>): Array<{ label: string; threads: GenieThread[] }> {
+  const pinned = threads.filter((t) => pinnedIds.has(t.id));
+  const unpinned = threads.filter((t) => !pinnedIds.has(t.id));
+  const today = unpinned.slice(0, 3);
+  const previous = unpinned.slice(3);
+  const groups: Array<{ label: string; threads: GenieThread[] }> = [];
+  if (pinned.length > 0) groups.push({ label: "Pinned", threads: pinned });
+  groups.push({ label: "Today", threads: today });
   if (previous.length > 0) groups.push({ label: "Previous 7 days", threads: previous });
   return groups;
 }
 
-const THREAD_MENU_ITEMS = [
-  { icon: "shareIcon", label: "Share chat thread" },
-  { icon: "BranchIcon", label: "Clone chat thread" },
-  { icon: "pencilIcon", label: "Rename" },
-  { icon: "trashIcon", label: "Delete" },
-] as const;
-
-function ThreadMoreMenu({ onClose, onRename, anchorRef }: { onClose: () => void; onRename: () => void; anchorRef: React.RefObject<HTMLElement | null> }) {
+function ThreadMoreMenu({ onClose, onRename, onPin, isPinned, anchorRef }: { onClose: () => void; onRename: () => void; onPin: () => void; isPinned: boolean; anchorRef: React.RefObject<HTMLElement | null> }) {
   const ref = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -339,16 +332,24 @@ function ThreadMoreMenu({ onClose, onRename, anchorRef }: { onClose: () => void;
     return () => document.removeEventListener("mousedown", handler);
   }, [onClose, anchorRef]);
 
+  const items = [
+    { icon: "pinOutlinedIcon", label: isPinned ? "Unpin" : "Pin", action: () => { onPin(); onClose(); } },
+    { icon: "shareIcon", label: "Share", action: () => onClose() },
+    { icon: "BranchIcon", label: "Clone", action: () => onClose() },
+    { icon: "pencilIcon", label: "Rename", action: () => { onRename(); onClose(); } },
+    { icon: "trashIcon", label: "Delete", action: () => onClose() },
+  ] as const;
+
   return (
     <div
       ref={ref}
       className="absolute right-1 top-8 z-50 min-w-[200px] overflow-hidden rounded border border-border bg-background-primary py-1 shadow-[0px_2px_16px_0px_rgba(0,0,0,0.08)]"
     >
-      {THREAD_MENU_ITEMS.map(({ icon, label }) => (
+      {items.map(({ icon, label, action }) => (
         <button
           key={label}
           type="button"
-          onClick={() => { if (label === "Rename") { onRename(); } onClose(); }}
+          onClick={action}
           className="flex w-full items-center gap-sm px-2 py-1 text-left text-paragraph text-text-primary hover:bg-background-secondary"
         >
           <span className="flex h-6 w-6 shrink-0 items-center justify-center">
@@ -376,9 +377,18 @@ export function GenieChatThreadList({
 }) {
   const [hoveredId, setHoveredId] = React.useState<string | null>(null);
   const [menuOpenId, setMenuOpenId] = React.useState<string | null>(null);
+  const [pinnedIds, setPinnedIds] = React.useState<Set<string>>(new Set());
   const menuButtonRefs = React.useRef<Map<string, HTMLButtonElement>>(new Map());
 
-  const groups = groupThreads(threads);
+  const togglePin = (id: string) => {
+    setPinnedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const groups = groupThreads(threads, pinnedIds);
   return (
     <div className="flex flex-col gap-1 px-1">
       {groups.map((group) => (
@@ -443,6 +453,8 @@ export function GenieChatThreadList({
                   <ThreadMoreMenu
                     onClose={() => { setMenuOpenId(null); setHoveredId(null); }}
                     onRename={() => { if (t.id !== activeThreadId) onSelect(t.id); onRenameActiveThread?.(); }}
+                    onPin={() => togglePin(t.id)}
+                    isPinned={pinnedIds.has(t.id)}
                     anchorRef={{ current: menuButtonRefs.current.get(t.id) ?? null }}
                   />
                 )}

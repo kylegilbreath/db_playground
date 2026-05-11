@@ -2,9 +2,34 @@
 
 import * as React from "react";
 import { Icon } from "@/components/icons";
-import { StaticGenieChatIcon } from "@/components/GenieChatIcon";
 
-export type AnythingBoxMode = "search" | "ask";
+function GradientMaskIcon({ name, size }: { name: string; size: number }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="inline-block shrink-0"
+      style={{
+        width: size,
+        height: size,
+        backgroundImage: "var(--ai-gradient, linear-gradient(45deg, #4299e0 24%, #ca42e0 47%, #ff5f46 76%))",
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "center",
+        backgroundSize: "contain",
+        WebkitMaskImage: `url("/icons/${name}.svg")`,
+        WebkitMaskRepeat: "no-repeat",
+        WebkitMaskPosition: "center",
+        WebkitMaskSize: "contain",
+        maskImage: `url("/icons/${name}.svg")`,
+        maskRepeat: "no-repeat",
+        maskPosition: "center",
+        maskSize: "contain",
+        maskMode: "alpha",
+      }}
+    />
+  );
+}
+
+export type AnythingBoxMode = "ask" | "code" | "search";
 
 export type AnythingBoxModeToggleProps = {
   mode: AnythingBoxMode;
@@ -61,7 +86,7 @@ export function AnythingBoxModeToggle({
   mode,
   onModeChange,
   locked = false,
-  showIcons = false,
+  showIcons = true,
   className,
 }: AnythingBoxModeToggleProps) {
   return (
@@ -74,21 +99,29 @@ export function AnythingBoxModeToggle({
       aria-label="Mode"
     >
       <SegmentButton
+        selected={mode === "ask"}
+        locked={locked}
+        label="Ask"
+        iconName="speechBubbleIcon"
+        showIcon={showIcons}
+        onClick={() => onModeChange?.("ask")}
+      />
+      <SegmentButton
+        selected={mode === "code"}
+        locked={locked}
+        label="Code"
+        iconName="codeIcon"
+        showIcon={showIcons}
+        leadingNode={<GradientMaskIcon name="genieIcon" size={16} />}
+        onClick={() => onModeChange?.("code")}
+      />
+      <SegmentButton
         selected={mode === "search"}
         locked={locked}
         label="Search"
         iconName="searchIcon"
         showIcon={showIcons}
         onClick={() => onModeChange?.("search")}
-      />
-      <SegmentButton
-        selected={mode === "ask"}
-        locked={locked}
-        label="Ask"
-        iconName="SparkleIcon"
-        showIcon={showIcons}
-        leadingNode={<StaticGenieChatIcon size={16} />}
-        onClick={() => onModeChange?.("ask")}
       />
     </div>
   );
