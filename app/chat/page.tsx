@@ -1411,6 +1411,11 @@ function ScheduledTaskDetailView({
   onOpenRun: (threadId: string, label: string) => void;
 }) {
   const [runs, setRuns] = React.useState(TASK_RUN_HISTORY[task.id] ?? []);
+  const handleRunNow = () => {
+    const now = new Date();
+    const label = now.toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+    setRuns((prev) => [{ date: label, status: "pending" as const }, ...prev]);
+  };
   const enabled = task.enabled;
   const [overflowOpen, setOverflowOpen] = React.useState(false);
   const [editOpen, setEditOpen] = React.useState(false);
@@ -1514,11 +1519,7 @@ function ScheduledTaskDetailView({
               </div>
             )}
           </div>
-          <PrimaryButton size="small" leadingIcon={<Icon name="playIcon" size={12} />} onClick={() => {
-            const now = new Date();
-            const label = now.toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-            setRuns((prev) => [{ date: label, status: "pending" }, ...prev]);
-          }}>Run now</PrimaryButton>
+          <PrimaryButton size="small" leadingIcon={<Icon name="playIcon" size={12} />} onClick={handleRunNow}>Run now</PrimaryButton>
         </div>
 
         {/* Status + next run */}
@@ -1611,7 +1612,7 @@ function ScheduledTaskDetailView({
           {runs.length === 0 ? (
             <div className="flex items-center justify-center gap-xs rounded-md border border-dashed border-border px-4 py-4">
               <span className="text-paragraph text-text-secondary">No runs yet.</span>
-              <button type="button" className="text-paragraph text-action-tertiary-text-default hover:underline">Run now</button>
+              <button type="button" onClick={handleRunNow} className="text-paragraph text-action-tertiary-text-default hover:underline">Run now</button>
             </div>
           ) : (
             <div className="rounded-md border border-border bg-background-primary divide-y divide-border">
@@ -1862,9 +1863,8 @@ function ChatLeftNav({
                 className="absolute left-0 top-8 z-50 min-w-[220px] overflow-hidden rounded border border-border bg-background-primary py-1 shadow-[0px_2px_16px_0px_rgba(0,0,0,0.08)]"
               >
                 {[
-                  { icon: "gearOutlinedIcon", label: "Settings" },
-                  { icon: "questionMarkOutlinedIcon", label: "Help" },
-                  { icon: "speechBubbleIcon", label: "Send feedback to Databricks" },
+                  { icon: "shareIcon", label: "Share" },
+                  { icon: "BranchIcon", label: "Clone" },
                 ].map(({ icon, label }) => (
                   <button
                     key={label}
@@ -1876,19 +1876,6 @@ function ChatLeftNav({
                     {label}
                   </button>
                 ))}
-                <div className="mx-3 my-1 border-t border-border" />
-                <div className="flex items-center gap-sm px-3 py-2">
-                  <span className="flex-1 text-paragraph text-text-primary">Incognito</span>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={incognito}
-                    onClick={() => setIncognito((v) => !v)}
-                    className={cx("relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full transition-colors", incognito ? "bg-action-primary-background-default" : "bg-border-accessible")}
-                  >
-                    <span className={cx("absolute top-0.5 h-3 w-3 rounded-full bg-white shadow-sm transition-transform", incognito ? "translate-x-3.5" : "translate-x-0.5")} />
-                  </button>
-                </div>
               </div>
             )}
           </div>

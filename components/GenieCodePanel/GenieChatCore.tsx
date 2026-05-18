@@ -350,11 +350,8 @@ function ThreadMoreMenu({ onClose, onRename, onPin, isPinned, anchorRef }: { onC
   }, [onClose, anchorRef]);
 
   const items = [
-    { icon: "pinOutlinedIcon", label: isPinned ? "Unpin" : "Pin", action: () => { onPin(); onClose(); } },
     { icon: "shareIcon", label: "Share", action: () => onClose() },
     { icon: "BranchIcon", label: "Clone", action: () => onClose() },
-    { icon: "pencilIcon", label: "Rename", action: () => { onRename(); onClose(); } },
-    { icon: "trashIcon", label: "Delete", action: () => onClose() },
   ] as const;
 
   return (
@@ -1116,11 +1113,8 @@ function EditorSettingsDrawer({ onClose }: { onClose: () => void }) {
 // ---------------------------------------------------------------------------
 
 const MORE_OPTIONS_ITEMS = [
-  { icon: "gearOutlinedIcon", label: "Settings" },
-  { icon: "shareIcon", label: "Share chat thread" },
-  { icon: "BranchIcon", label: "Clone chat thread" },
-  { icon: "questionMarkOutlinedIcon", label: "Help" },
-  { icon: "speechBubbleIcon", label: "Send feedback to Databricks" },
+  { icon: "shareIcon", label: "Share" },
+  { icon: "BranchIcon", label: "Clone" },
 ] as const;
 
 export function MoreOptionsMenu({
@@ -1185,23 +1179,6 @@ export function MoreOptionsMenu({
           <span className="py-0.5">{label}</span>
         </button>
       ))}
-      {/* Divider + Incognito toggle */}
-      <div className="mt-1 border-t border-border px-2 pb-1 pt-2">
-        <div className="flex items-center justify-between">
-          <span className="text-paragraph text-text-primary">Incognito</span>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={incognito}
-            onClick={() => setIncognito((v) => !v)}
-            className={`relative inline-flex h-[18px] w-[32px] shrink-0 cursor-pointer rounded-full transition-colors ${incognito ? "bg-action-default-background-press" : "bg-background-tertiary"}`}
-          >
-            <span
-              className={`absolute top-[2px] h-[14px] w-[14px] rounded-full bg-white shadow-sm transition-transform ${incognito ? "translate-x-[16px]" : "translate-x-[2px]"}`}
-            />
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
