@@ -722,7 +722,7 @@ function CreateAutomationDialog({ onClose, onCreate, onSave, initialTask }: {
             <select
               value={triggerType}
               onChange={(e) => setTriggerType(e.target.value as typeof triggerType)}
-              className="rounded-sm border border-border bg-background-primary px-2 py-1.5 text-paragraph text-text-primary outline-none focus:border-action-default-border-focus"
+              className="h-9 w-full appearance-none rounded-sm border border-border bg-background-primary px-3 py-2 text-paragraph text-text-primary outline-none focus:border-action-default-border-focus"
             >
               <option value="schedule">Scheduled</option>
               <option value="file_arrival">File arrival</option>
@@ -910,6 +910,7 @@ function ScheduledTasksMainView({
   }
 
   const triggerIcon = (t: ScheduledTask["triggerType"]) => "clockIcon";
+  const triggerLabel = (t: ScheduledTask["triggerType"]) => "Scheduled automation";
 
   function handleCreate(task: ScheduledTask) {
     setTasks((prev) => [...prev, task]);
@@ -925,7 +926,7 @@ function ScheduledTasksMainView({
           onCreate={handleCreate}
         />
       )}
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-md">
         <div className="mx-auto w-full max-w-[800px]">
         {/* Header */}
         <div className="sticky top-0 z-10 flex items-center gap-sm bg-background-primary pt-6 pb-4">
@@ -991,7 +992,7 @@ function ScheduledTasksMainView({
                         : "border-border bg-background-primary hover:border-action-default-border-hover",
                     )}
                   >
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-background-tertiary">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-background-tertiary" title={triggerLabel(task.triggerType)}>
                       <Icon name={triggerIcon(task.triggerType)} size={14} className="text-text-secondary" />
                     </div>
                     <div className="min-w-0 flex-1">
@@ -1376,7 +1377,7 @@ function CustomizationsMainView({
   onOpenAssistantInstructionsFile: () => void;
 }) {
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col px-md">
       <div className="mx-auto flex min-h-0 w-full max-w-[800px] min-w-0 flex-1 flex-col">
         {/* Tab bar */}
         <div className="flex shrink-0 items-center border-b border-border">
