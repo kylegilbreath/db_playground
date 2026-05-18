@@ -565,6 +565,7 @@ const SCHEDULED_TASKS: ScheduledTask[] = [
   { id: "t1", title: "Weekly dashboard refresh", schedule: "Every Mon 8:00 AM", prompt: "Re-run all dashboard queries and send a Slack summary to #data-ops every Monday morning", lastRun: "2d ago", status: "success", triggerType: "schedule", enabled: true },
   { id: "t2", title: "Ski resorts quality scan", schedule: "main.2026_northeast.ski_resorts", prompt: "Scan main.2026_northeast.ski_resorts for nulls, duplicates, and schema drift. Flag any columns with >5% null rates and report unexpected value distributions in resort_name, region, and vertical_drop.", lastRun: "14h ago", status: "success", triggerType: "table_update", enabled: true },
   { id: "t3", title: "Forecast model retrain", schedule: "main.default.forecast_model", prompt: "Kick off the feature pipeline and retrain the forecast model every Sunday night", lastRun: "4d ago", status: "failed", triggerType: "model_training", enabled: false },
+  { id: "t4", title: "Pipeline monitoring", schedule: "data_engineering/silver_transform", prompt: "Monitor the silver_transform pipeline for failures and anomalies. Alert when job duration exceeds 2x the rolling average or when error rate rises above 1%.", lastRun: "1h ago", status: "running", triggerType: "job_completion", enabled: true },
 ];
 
 const MOCK_JOBS = [
@@ -1395,6 +1396,12 @@ const TASK_RUN_HISTORY: Record<string, Array<{ date: string; status: "pending" |
     { date: "Sun, Apr 27 at 11:00 PM", status: "notified" },
     { date: "Sun, Apr 20 at 11:00 PM", status: "notified" },
   ],
+  t4: [
+    { date: "Sun, May 18 at 1:12 PM", status: "pending" },
+    { date: "Sun, May 18 at 9:00 AM", status: "notified" },
+    { date: "Sat, May 17 at 9:00 AM", status: "notified" },
+    { date: "Fri, May 16 at 9:03 AM", status: "notified" },
+  ],
 };
 
 function ScheduledTaskDetailView({
@@ -1445,9 +1452,15 @@ function ScheduledTaskDetailView({
   const runStatusColor = (s: "pending" | "notified" | "failed") =>
     s === "pending" ? "text-text-secondary" : s === "notified" ? "text-green-600" : "text-red-600";
 
-  const nextRun = task.schedule.startsWith("Every Mon") ? "Next run Tue, May 12 at 8:00 AM" : task.schedule.startsWith("Daily") ? "Next run Tue, May 12 at 6:00 AM" : "Next run Sun, May 18 at 11:00 PM";
+  const nextRun = task.triggerType === "job_completion"
+    ? `Next run on ${task.schedule} pipeline complete`
+    : task.schedule.startsWith("Every Mon")
+    ? "Next run Tue, May 12 at 8:00 AM"
+    : task.schedule.startsWith("Daily")
+    ? "Next run Tue, May 12 at 6:00 AM"
+    : "Next run Sun, May 18 at 11:00 PM";
 
-  const scheduleValue = (task.triggerType === "table_update" || task.triggerType === "model_training")
+  const scheduleValue = (task.triggerType === "table_update" || task.triggerType === "model_training" || task.triggerType === "job_completion")
     ? task.schedule
     : task.schedule.startsWith("Every Mon")
     ? "Weekly on Mondays at 9 AM (UTC-07:00) America/Los_Angeles"
@@ -1461,7 +1474,11 @@ function ScheduledTaskDetailView({
     ? "Refreshes all dashboard datasets and sends a Slack digest to the #data-ops channel."
     : task.title === "Ski resorts quality scan"
     ? "Scans main.2026_northeast.ski_resorts for nulls, duplicates, and schema drift."
-    : "Kicks off the feature pipeline and retrains the forecast model every Sunday night.";
+    : task.title === "Forecast model retrain"
+    ? "Kicks off the feature pipeline and retrains the forecast model every Sunday night."
+    : task.title === "Pipeline monitoring"
+    ? "Monitors the silver_transform pipeline for failures and anomalies. Alerts when job duration or error rate exceeds baseline thresholds."
+    : task.prompt;
 
   return (
     <>
