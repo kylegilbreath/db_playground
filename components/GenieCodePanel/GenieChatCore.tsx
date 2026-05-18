@@ -31,7 +31,7 @@ import { SKILL_CONTENTS } from "@/app/editor/page";
 // ---------------------------------------------------------------------------
 
 export type ThreadStatus = "running" | "attention" | "input" | "done" | "review";
-export type GenieThread = { id: string; label: string; status: ThreadStatus; time?: string; subtitle?: string; diff?: { added: number; removed: number; files: number } };
+export type GenieThread = { id: string; label: string; status: ThreadStatus; time?: string; subtitle?: string; diff?: { added: number; removed: number; files: number }; parentLabel?: string };
 
 export const SEED_THREADS: GenieThread[] = [
   { id: "thread-eda", label: "EDA on ski resort properties with a 6 month forecast", status: "done", time: "2h", subtitle: "Created Ski Resort EDA notebook, ran forecast model" },
@@ -207,6 +207,21 @@ export function useGenieChatState() {
     setThreads((prev) => prev.map((t) => t.id === id ? { ...t, label: newLabel.trim() } : t));
   }, []);
 
+  const [lockedThreadIds, setLockedThreadIds] = React.useState<Set<string>>(new Set());
+
+  const injectThread = React.useCallback((thread: GenieThread, initialSteps: ChatStep[] = []) => {
+    setThreads((prev) => {
+      if (prev.find((t) => t.id === thread.id)) return prev;
+      return [thread, ...prev];
+    });
+    threadStepsRef.current.set(thread.id, initialSteps);
+    threadRunStatusRef.current.set(thread.id, "done");
+    setLockedThreadIds((prev) => new Set([...prev, thread.id]));
+    setActiveThreadId(thread.id);
+    setSteps(initialSteps);
+    setRunStatus("done");
+  }, []);
+
   return {
     text,
     setText,
@@ -222,6 +237,8 @@ export function useGenieChatState() {
     handleSubmit,
     handleNewChat,
     handleRenameThread,
+    injectThread,
+    lockedThreadIds,
     hasAssets,
     timersRef,
   };
@@ -593,6 +610,10 @@ export type GenieChatBodyProps = {
   onFocusTitleInputReady?: (focusFn: () => void) => void;
   /** Called when the user clicks the "Open file" button in the header. */
   onOpenFile?: () => void;
+  /** Hide the three-dot more options menu (e.g. on new/empty chat). */
+  hideMoreOptions?: boolean;
+  /** Called when the user clicks the parent breadcrumb link in a locked run thread header. */
+  onNavigateToParent?: (threadId: string) => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -1200,6 +1221,8 @@ export function GenieChatBody({
   onReviewed,
   onFocusTitleInputReady,
   onOpenFile,
+  hideMoreOptions = false,
+  onNavigateToParent,
 }: GenieChatBodyProps) {
   const titleInputRef = React.useRef<HTMLInputElement>(null);
   const focusTitleInput = React.useCallback(() => {
@@ -1224,6 +1247,7 @@ export function GenieChatBody({
     handleSubmit,
     handleNewChat,
     handleRenameThread,
+    lockedThreadIds,
     hasAssets,
     timersRef: timers,
   } = state;
@@ -1289,7 +1313,9 @@ export function GenieChatBody({
               />
             </Tip>
           )}
-          {size === "full" && activeThreadId && activeThreadTitle ? (
+          {size === "full" && activeThreadId === null ? (
+            <span className="min-w-0 flex-1" />
+          ) : size === "full" && activeThreadId && activeThreadTitle && !state.lockedThreadIds.has(activeThreadId) ? (
             <input
               key={activeThreadId}
               ref={titleInputRef}
@@ -1298,9 +1324,28 @@ export function GenieChatBody({
               onBlur={(e) => handleRenameThread(activeThreadId, e.currentTarget.value)}
               onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
             />
+          ) : size === "full" && activeThreadId && state.lockedThreadIds.has(activeThreadId) ? (
+            <span className="flex min-w-0 flex-1 items-center gap-xs truncate">
+              {(() => {
+                const parentLabel = threads.find((t) => t.id === activeThreadId)?.parentLabel;
+                return parentLabel ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => onNavigateToParent?.(activeThreadId)}
+                      className="shrink-0 text-hint text-text-secondary hover:text-action-default-text-hover hover:underline"
+                    >
+                      {parentLabel}
+                    </button>
+                    <span className="shrink-0 text-hint text-text-secondary">/</span>
+                  </>
+                ) : null;
+              })()}
+              <span className="truncate text-paragraph font-medium text-text-primary">{activeThreadTitle ?? ""}</span>
+            </span>
           ) : (
             <span className="min-w-0 flex-1 truncate text-paragraph font-medium text-text-primary">
-              {size === "full" ? (activeThreadTitle ?? "Genie Code") : "Genie Code"}
+              {size === "full" ? (activeThreadTitle ?? "") : "Genie Code"}
             </span>
           )}
           <Tip label="Connected to Serverless compute">
@@ -1334,7 +1379,7 @@ export function GenieChatBody({
               />
             </Tip>
           )}
-          <div className="relative">
+          {!hideMoreOptions && <div className="relative">
             <IconButton
               aria-label="More options"
               icon={<Icon name="overflowIcon" size={14} />}
@@ -1351,7 +1396,7 @@ export function GenieChatBody({
                 onOpenSettings={() => setSettingsOpen(true)}
               />
             )}
-          </div>
+          </div>}
           {onOpenFile && !previewOpen && (
             <Tip label="Open file">
               <IconButton

@@ -20,7 +20,7 @@ import { AssistantInstructionsCard, RenderSkillDialogMarkdown } from "@/componen
 import { useGenieChatState, GenieChatBody, GenieChatThreadList, MoreOptionsMenu } from "@/components/GenieCodePanel/GenieChatCore";
 import { ASSISTANT_INSTRUCTIONS_FILE, ASSISTANT_INSTRUCTIONS_MARKDOWN } from "@/lib/assistant-instructions";
 import { ASSISTANT_DASHBOARD_REVIEW_ASSETS } from "@/components/AgentChat/data/assistantDashboardRun";
-import type { ReviewAsset } from "@/components/AgentChat";
+import type { ReviewAsset, ChatStep } from "@/components/AgentChat";
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -461,7 +461,7 @@ function ToolsMainView({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Header */}
-      <div className="flex shrink-0 items-center px-8 py-3">
+      <div className="flex shrink-0 items-center py-3">
         <span className="flex-1 text-title3 font-semibold text-text-primary">Skills &amp; instructions</span>
         <div className="flex w-fit rounded-sm border border-border bg-background-tertiary p-0.5">
           {(["user", "workspace"] as const).map((s) => (
@@ -482,7 +482,7 @@ function ToolsMainView({
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-8 py-6">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto py-6">
         {/* Skills section */}
         <div className="flex flex-col gap-xs">
           <div className="flex items-center pb-xs">
@@ -542,145 +542,807 @@ function ToolsMainView({
 // ---------------------------------------------------------------------------
 
 const SUGGESTED_TASKS = [
-  { icon: "refreshIcon", title: "Refresh weekly dashboard", description: "Re-run all dashboard queries and send a Slack summary every Monday morning" },
+  { icon: "dashboardIcon", title: "Refresh weekly dashboard", description: "Re-run all dashboard queries and send a Slack summary every Monday morning" },
   { icon: "searchIcon", title: "Monitor data quality", description: "Scan key tables for nulls, duplicates, and schema drift on a daily schedule" },
   { icon: "notebookIcon", title: "Generate EDA report", description: "Run exploratory analysis on new data arrivals and append findings to a shared notebook" },
   { icon: "alertIcon", title: "Alert on metric drops", description: "Check DAU and WAU thresholds each hour and notify the team if they fall below baseline" },
   { icon: "queryListViewIcon", title: "Archive stale queries", description: "Identify queries unused for 30+ days and move them to an archive schema" },
-  { icon: "calendarIcon", title: "Weekly model retraining", description: "Kick off the feature pipeline and retrain the forecast model every Sunday night" },
+  { icon: "modelsIcon", title: "Weekly model retraining", description: "Kick off the feature pipeline and retrain the forecast model every Sunday night" },
 ];
 
 type ScheduledTask = {
   id: string;
   title: string;
   schedule: string;
+  prompt: string;
   lastRun: string;
   status: "success" | "failed" | "running";
+  triggerType: "schedule";
+  enabled: boolean;
 };
 
 const SCHEDULED_TASKS: ScheduledTask[] = [
-  { id: "t1", title: "Weekly dashboard refresh", schedule: "Every Mon 8:00 AM", lastRun: "2d ago", status: "success" },
-  { id: "t2", title: "Data quality scan", schedule: "Daily 6:00 AM", lastRun: "14h ago", status: "success" },
-  { id: "t3", title: "Forecast model retrain", schedule: "Every Sun 11:00 PM", lastRun: "4d ago", status: "failed" },
+  { id: "t1", title: "Weekly dashboard refresh", schedule: "Every Mon 8:00 AM", prompt: "Re-run all dashboard queries and send a Slack summary to #data-ops every Monday morning", lastRun: "2d ago", status: "success", triggerType: "schedule", enabled: true },
+  { id: "t2", title: "Data quality scan", schedule: "Daily 6:00 AM", prompt: "Scan key tables for nulls, duplicates, and schema drift on a daily schedule", lastRun: "14h ago", status: "success", triggerType: "schedule", enabled: true },
+  { id: "t3", title: "Forecast model retrain", schedule: "Every Sun 11:00 PM", prompt: "Kick off the feature pipeline and retrain the forecast model every Sunday night", lastRun: "4d ago", status: "failed", triggerType: "schedule", enabled: false },
 ];
+
+const FREQUENCY_OPTIONS = ["Day", "Week", "Month"] as const;
+const DAY_OPTIONS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const;
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
+const MINUTE_OPTIONS = ["00", "15", "30", "45"];
+
+const TIMEZONE_OPTIONS = [
+  { label: "(UTC-12:00) International Date Line West", value: "Etc/GMT+12" },
+  { label: "(UTC-11:00) Coordinated Universal Time-11", value: "Etc/GMT+11" },
+  { label: "(UTC-10:00) Hawaii", value: "Pacific/Honolulu" },
+  { label: "(UTC-09:00) Alaska", value: "America/Anchorage" },
+  { label: "(UTC-08:00) Pacific Time (US & Canada)", value: "America/Los_Angeles" },
+  { label: "(UTC-07:00) Mountain Time (US & Canada)", value: "America/Denver" },
+  { label: "(UTC-07:00) Arizona", value: "America/Phoenix" },
+  { label: "(UTC-06:00) Central Time (US & Canada)", value: "America/Chicago" },
+  { label: "(UTC-06:00) Mexico City", value: "America/Mexico_City" },
+  { label: "(UTC-05:00) Eastern Time (US & Canada)", value: "America/New_York" },
+  { label: "(UTC-05:00) Bogota, Lima, Quito", value: "America/Bogota" },
+  { label: "(UTC-04:00) Atlantic Time (Canada)", value: "America/Halifax" },
+  { label: "(UTC-04:00) Caracas, La Paz", value: "America/Caracas" },
+  { label: "(UTC-03:00) Buenos Aires", value: "America/Argentina/Buenos_Aires" },
+  { label: "(UTC-03:00) Brasilia", value: "America/Sao_Paulo" },
+  { label: "(UTC-02:00) Mid-Atlantic", value: "Etc/GMT+2" },
+  { label: "(UTC-01:00) Azores", value: "Atlantic/Azores" },
+  { label: "(UTC+00:00) London, Dublin, Lisbon", value: "Europe/London" },
+  { label: "(UTC+00:00) Coordinated Universal Time", value: "UTC" },
+  { label: "(UTC+01:00) Amsterdam, Berlin, Paris, Rome", value: "Europe/Paris" },
+  { label: "(UTC+01:00) Madrid, Copenhagen, Warsaw", value: "Europe/Madrid" },
+  { label: "(UTC+02:00) Athens, Bucharest, Istanbul", value: "Europe/Athens" },
+  { label: "(UTC+02:00) Cairo", value: "Africa/Cairo" },
+  { label: "(UTC+02:00) Johannesburg", value: "Africa/Johannesburg" },
+  { label: "(UTC+03:00) Moscow, St. Petersburg", value: "Europe/Moscow" },
+  { label: "(UTC+03:00) Nairobi", value: "Africa/Nairobi" },
+  { label: "(UTC+03:30) Tehran", value: "Asia/Tehran" },
+  { label: "(UTC+04:00) Abu Dhabi, Muscat", value: "Asia/Dubai" },
+  { label: "(UTC+04:30) Kabul", value: "Asia/Kabul" },
+  { label: "(UTC+05:00) Islamabad, Karachi", value: "Asia/Karachi" },
+  { label: "(UTC+05:30) Chennai, Kolkata, Mumbai, New Delhi", value: "Asia/Kolkata" },
+  { label: "(UTC+05:45) Kathmandu", value: "Asia/Kathmandu" },
+  { label: "(UTC+06:00) Dhaka", value: "Asia/Dhaka" },
+  { label: "(UTC+06:30) Yangon (Rangoon)", value: "Asia/Rangoon" },
+  { label: "(UTC+07:00) Bangkok, Hanoi, Jakarta", value: "Asia/Bangkok" },
+  { label: "(UTC+08:00) Beijing, Chongqing, Hong Kong", value: "Asia/Shanghai" },
+  { label: "(UTC+08:00) Singapore", value: "Asia/Singapore" },
+  { label: "(UTC+08:00) Perth", value: "Australia/Perth" },
+  { label: "(UTC+09:00) Tokyo, Osaka, Sapporo", value: "Asia/Tokyo" },
+  { label: "(UTC+09:00) Seoul", value: "Asia/Seoul" },
+  { label: "(UTC+09:30) Adelaide", value: "Australia/Adelaide" },
+  { label: "(UTC+10:00) Sydney, Melbourne, Brisbane", value: "Australia/Sydney" },
+  { label: "(UTC+11:00) Solomon Islands, New Caledonia", value: "Pacific/Guadalcanal" },
+  { label: "(UTC+12:00) Auckland, Wellington", value: "Pacific/Auckland" },
+  { label: "(UTC+12:00) Fiji", value: "Pacific/Fiji" },
+];
+
+function CreateAutomationDialog({ onClose, onCreate, onSave, initialTask }: {
+  onClose: () => void;
+  onCreate?: (task: ScheduledTask) => void;
+  onSave?: (task: ScheduledTask) => void;
+  initialTask?: ScheduledTask;
+}) {
+  const isEdit = !!initialTask;
+  const [title, setTitle] = React.useState(initialTask?.title ?? "");
+  const [instructions, setInstructions] = React.useState(initialTask?.prompt ?? "");
+  const [triggerType, setTriggerType] = React.useState<"schedule" | "file_arrival" | "table_update" | "continuous" | "model_update">("schedule");
+  const [frequency, setFrequency] = React.useState<typeof FREQUENCY_OPTIONS[number]>("Week");
+  const [day, setDay] = React.useState<typeof DAY_OPTIONS[number]>("Monday");
+  const [hour, setHour] = React.useState("09");
+  const [minute, setMinute] = React.useState("00");
+  const [timezone, setTimezone] = React.useState("America/Denver");
+  const [tzPickerOpen, setTzPickerOpen] = React.useState(false);
+  const [tzSearch, setTzSearch] = React.useState("");
+  const tzRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!tzPickerOpen) return;
+    const handler = (e: MouseEvent) => { if (tzRef.current && !tzRef.current.contains(e.target as Node)) setTzPickerOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [tzPickerOpen]);
+
+  const selectedTz = TIMEZONE_OPTIONS.find((t) => t.value === timezone) ?? TIMEZONE_OPTIONS[6];
+  const filteredTz = TIMEZONE_OPTIONS.filter((t) => t.label.toLowerCase().includes(tzSearch.toLowerCase()));
+
+  const scheduleLabel = frequency === "Day"
+    ? `Daily ${hour}:${minute}`
+    : frequency === "Week"
+    ? `Every ${day.slice(0, 3)} ${hour}:${minute}`
+    : `Monthly ${hour}:${minute}`;
+
+  function handleSubmit() {
+    if (!title.trim()) return;
+    if (isEdit && onSave && initialTask) {
+      onSave({ ...initialTask, title: title.trim(), prompt: instructions, schedule: scheduleLabel });
+    } else if (!isEdit && onCreate) {
+      const newTask: ScheduledTask = {
+        id: `t${Date.now()}`,
+        title: title.trim(),
+        prompt: instructions,
+        schedule: scheduleLabel,
+        lastRun: "Never",
+        status: "success",
+        triggerType: "schedule",
+        enabled: true,
+      };
+      onCreate(newTask);
+    }
+  }
+
+  return ReactDOM.createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div
+        className="relative w-[560px] rounded-lg bg-background-primary shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Dialog header */}
+        <div className="flex items-center justify-between px-6 pt-6 pb-4">
+          <h2 className="text-title3 font-semibold text-text-primary">{isEdit ? "Edit automation" : "Create automation"}</h2>
+          <button type="button" onClick={onClose} className="text-text-secondary hover:text-text-primary">
+            <Icon name="closeSmallIcon" size={16} />
+          </button>
+        </div>
+
+        {/* Form */}
+        <div className="flex flex-col gap-md px-6 pb-6">
+          {/* Title */}
+          <div className="flex flex-col gap-xs">
+            <label className="text-paragraph font-medium text-text-primary">Title</label>
+            <input
+              autoFocus
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder=""
+              className="rounded-sm border border-border bg-background-primary px-3 py-2 text-paragraph text-text-primary outline-none placeholder:text-text-placeholder focus:border-action-default-border-focus"
+            />
+          </div>
+
+          {/* Prompt */}
+          <div className="flex flex-col gap-xs">
+            <label className="text-paragraph font-medium text-text-primary">Prompt</label>
+            <textarea
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+              rows={5}
+              placeholder="e.g. Re-run all dashboard queries and send a Slack summary to #data-ops every Monday morning"
+              className="resize-none rounded-sm border border-border bg-background-primary px-3 py-2 text-paragraph text-text-primary outline-none placeholder:text-text-placeholder focus:border-action-default-border-focus"
+            />
+          </div>
+
+
+          {/* Trigger */}
+          <div className="flex flex-col gap-sm">
+            <label className="text-paragraph font-medium text-text-primary">Trigger</label>
+            <select
+              value={triggerType}
+              onChange={(e) => setTriggerType(e.target.value as typeof triggerType)}
+              className="rounded-sm border border-border bg-background-primary px-2 py-1.5 text-paragraph text-text-primary outline-none focus:border-action-default-border-focus"
+            >
+              <option value="schedule">Scheduled</option>
+              <option value="file_arrival">File arrival</option>
+              <option value="table_update">Table update</option>
+              <option value="continuous">Continuous</option>
+              <option value="model_update">Model update</option>
+            </select>
+            {triggerType === "schedule" && (
+              <div className="rounded-sm border border-border bg-background-primary divide-y divide-border">
+                {/* Repeat row */}
+                <div className="flex items-center gap-sm px-3 py-2">
+                  <span className="w-16 shrink-0 text-hint text-text-secondary">Repeat</span>
+                  <select
+                    value={frequency}
+                    onChange={(e) => setFrequency(e.target.value as typeof FREQUENCY_OPTIONS[number])}
+                    className="flex-1 bg-transparent text-paragraph text-text-primary outline-none"
+                  >
+                    {FREQUENCY_OPTIONS.map((f) => <option key={f}>{f}</option>)}
+                  </select>
+                </div>
+                {/* Day row — only for weekly */}
+                {frequency === "Week" && (
+                  <div className="flex items-center gap-sm px-3 py-2">
+                    <span className="w-16 shrink-0 text-hint text-text-secondary">Day</span>
+                    <select
+                      value={day}
+                      onChange={(e) => setDay(e.target.value as typeof DAY_OPTIONS[number])}
+                      className="flex-1 bg-transparent text-paragraph text-text-primary outline-none"
+                    >
+                      {DAY_OPTIONS.map((d) => <option key={d}>{d}</option>)}
+                    </select>
+                  </div>
+                )}
+                {/* Time row */}
+                <div className="flex items-center gap-sm px-3 py-2">
+                  <span className="w-16 shrink-0 text-hint text-text-secondary">Time</span>
+                  <div className="flex items-center gap-xs">
+                    <select
+                      value={hour}
+                      onChange={(e) => setHour(e.target.value)}
+                      className="bg-transparent text-paragraph text-text-primary outline-none"
+                    >
+                      {HOUR_OPTIONS.map((h) => <option key={h}>{h}</option>)}
+                    </select>
+                    <span className="text-paragraph text-text-secondary">:</span>
+                    <select
+                      value={minute}
+                      onChange={(e) => setMinute(e.target.value)}
+                      className="bg-transparent text-paragraph text-text-primary outline-none"
+                    >
+                      {MINUTE_OPTIONS.map((m) => <option key={m}>{m}</option>)}
+                    </select>
+                  </div>
+                </div>
+                {/* Timezone row */}
+                <div className="relative" ref={tzRef}>
+                  <button
+                    type="button"
+                    onClick={() => { setTzPickerOpen((v) => !v); setTzSearch(""); }}
+                    className="flex w-full items-center gap-sm px-3 py-2 text-left hover:bg-background-secondary"
+                  >
+                    <span className="w-16 shrink-0 text-hint text-text-secondary">Timezone</span>
+                    <span className="flex-1 text-paragraph text-text-primary">{selectedTz.label}</span>
+                    <Icon name="chevronDownIcon" size={12} className="shrink-0 text-text-secondary" />
+                  </button>
+                  {tzPickerOpen && (
+                    <div className="absolute bottom-full left-0 right-0 z-50 mb-1 overflow-hidden rounded border border-border bg-background-primary shadow-[0px_4px_20px_0px_rgba(0,0,0,0.12)]">
+                      <div className="flex items-center gap-xs border-b border-border px-3 py-2">
+                        <Icon name="searchIcon" size={13} className="shrink-0 text-text-secondary" />
+                        <input
+                          autoFocus
+                          type="text"
+                          value={tzSearch}
+                          onChange={(e) => setTzSearch(e.target.value)}
+                          placeholder="Search timezones..."
+                          className="flex-1 bg-transparent text-paragraph text-text-primary outline-none placeholder:text-text-placeholder"
+                        />
+                      </div>
+                      <div className="max-h-[200px] overflow-y-auto">
+                        {filteredTz.length === 0 ? (
+                          <p className="px-3 py-3 text-paragraph text-text-secondary">No results</p>
+                        ) : filteredTz.map((tz) => (
+                          <button
+                            key={tz.value}
+                            type="button"
+                            onClick={() => { setTimezone(tz.value); setTzPickerOpen(false); }}
+                            className={cx("flex w-full items-center gap-sm px-3 py-2 text-left text-paragraph hover:bg-background-secondary", tz.value === timezone ? "bg-action-default-background-hover font-medium text-text-primary" : "text-text-primary")}
+                          >
+                            {tz.value === timezone && <Icon name="checkmarkIcon" size={12} className="shrink-0 text-action-tertiary-text-default" />}
+                            {tz.value !== timezone && <span className="w-3 shrink-0" />}
+                            {tz.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            {(triggerType === "file_arrival" || triggerType === "table_update" || triggerType === "model_update") && (
+              <div className="flex items-center justify-between rounded-sm border border-border bg-background-primary px-3 py-2 text-paragraph text-text-placeholder">
+                <span>{triggerType === "file_arrival" ? "Select a path or volume" : triggerType === "table_update" ? "Select a table" : "Select a model"}</span>
+                <Icon name="chevronDownIcon" size={14} className="text-text-secondary" />
+              </div>
+            )}
+            {triggerType === "continuous" && (
+              <p className="text-paragraph text-text-secondary">This automation will run continuously as a streaming job.</p>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center justify-end gap-sm pt-xs">
+            <DefaultButton size="default" onClick={onClose}>Cancel</DefaultButton>
+            <PrimaryButton size="default" onClick={handleSubmit} disabled={!title.trim()}>{isEdit ? "Save" : "Create"}</PrimaryButton>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
 
 function ScheduledTasksMainView({
   selectedTaskId,
   onTaskClick,
+  state,
+  onSetMainView,
+  onRegisterRunThread,
+  navigateToDetailTaskId,
 }: {
   selectedTaskId: string | null;
   onTaskClick: (id: string) => void;
+  state: ReturnType<typeof useGenieChatState>;
+  onSetMainView: (view: MainView) => void;
+  onRegisterRunThread?: (threadId: string, taskId: string) => void;
+  navigateToDetailTaskId?: string | null;
 }) {
+  const [tasks, setTasks] = React.useState<ScheduledTask[]>(SCHEDULED_TASKS);
   const [searchOpen, setSearchOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
   const searchInputRef = React.useRef<HTMLInputElement>(null);
+  const [detailTaskId, setDetailTaskId] = React.useState<string | null>(null);
+  const [createOpen, setCreateOpen] = React.useState(false);
+  const [openMenuId, setOpenMenuId] = React.useState<string | null>(null);
 
-  const statusColor = (s: ScheduledTask["status"]) =>
-    s === "success" ? "bg-green-500" : s === "failed" ? "bg-red-500" : "bg-yellow-500";
+  React.useEffect(() => {
+    if (!openMenuId) return;
+    const handler = (e: MouseEvent) => setOpenMenuId(null);
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [openMenuId]);
+
+  React.useEffect(() => {
+    if (navigateToDetailTaskId) {
+      setDetailTaskId(navigateToDetailTaskId);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigateToDetailTaskId]);
+
+  const detailTask = detailTaskId ? tasks.find((t) => t.id === detailTaskId) ?? null : null;
+
+  function handleToggleEnabled(id: string) {
+    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, enabled: !t.enabled } : t));
+  }
+
+  function handleSave(updated: ScheduledTask) {
+    setTasks((prev) => prev.map((t) => t.id === updated.id ? updated : t));
+  }
+
+  if (detailTask) {
+    return <ScheduledTaskDetailView
+      task={detailTask}
+      onBack={() => setDetailTaskId(null)}
+      onToggleEnabled={() => handleToggleEnabled(detailTask.id)}
+      onSave={handleSave}
+      onOpenRun={(threadId, label) => {
+        state.injectThread(
+          { id: threadId, label, status: "done", time: "now", subtitle: `Run of ${detailTask.title}`, parentLabel: detailTask.title },
+          buildRunSteps(detailTask),
+        );
+        onRegisterRunThread?.(threadId, detailTask.id);
+        onSetMainView("thread");
+      }}
+    />;
+  }
+
+  const triggerIcon = (t: ScheduledTask["triggerType"]) => "clockIcon";
+
+  function handleCreate(task: ScheduledTask) {
+    setTasks((prev) => [...prev, task]);
+    setCreateOpen(false);
+    setDetailTaskId(task.id);
+  }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-      {/* Header */}
-      <div className="shrink-0 flex items-center gap-sm px-8 pt-6 pb-4">
-        <h1 className="flex-1 text-title3 font-semibold text-text-primary">Scheduled tasks</h1>
-        {searchOpen ? (
-          <div className="flex items-center gap-xs rounded-md border border-action-default-border-focus bg-background-primary px-2 py-1" style={{ width: 200 }}>
-            <Icon name="searchIcon" size={14} className="shrink-0 text-text-secondary" />
-            <input
-              ref={searchInputRef}
-              autoFocus
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onBlur={() => { if (!searchQuery) { setSearchOpen(false); } }}
-              onKeyDown={(e) => { if (e.key === "Escape") { setSearchOpen(false); setSearchQuery(""); } }}
-              placeholder="Search tasks..."
-              className="w-full bg-transparent text-paragraph text-text-primary outline-none placeholder:text-text-secondary"
+    <>
+      {createOpen && (
+        <CreateAutomationDialog
+          onClose={() => setCreateOpen(false)}
+          onCreate={handleCreate}
+        />
+      )}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <div className="mx-auto w-full max-w-[800px]">
+        {/* Header */}
+        <div className="sticky top-0 z-10 flex items-center gap-sm bg-background-primary pt-6 pb-4">
+          <h1 className="flex-1 text-title3 font-semibold text-text-primary">Automations</h1>
+          {searchOpen ? (
+            <div className="flex items-center gap-xs rounded-md border border-action-default-border-focus bg-background-primary px-2 py-1" style={{ width: 200 }}>
+              <Icon name="searchIcon" size={14} className="shrink-0 text-text-secondary" />
+              <input
+                ref={searchInputRef}
+                autoFocus
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onBlur={() => { if (!searchQuery) { setSearchOpen(false); } }}
+                onKeyDown={(e) => { if (e.key === "Escape") { setSearchOpen(false); setSearchQuery(""); } }}
+                placeholder="Search tasks..."
+                className="w-full bg-transparent text-paragraph text-text-primary outline-none placeholder:text-text-secondary"
+              />
+              {searchQuery && (
+                <button type="button" onClick={() => setSearchQuery("")} className="shrink-0 text-text-secondary hover:text-text-primary">
+                  <Icon name="closeSmallIcon" size={14} />
+                </button>
+              )}
+            </div>
+          ) : (
+            <IconButton
+              aria-label="Search tasks"
+              icon={<Icon name="searchIcon" size={14} />}
+              size="small"
+              tone="neutral"
+              onClick={() => setSearchOpen(true)}
             />
-            {searchQuery && (
-              <button type="button" onClick={() => setSearchQuery("")} className="shrink-0 text-text-secondary hover:text-text-primary">
-                <Icon name="closeSmallIcon" size={14} />
-              </button>
+          )}
+          <PrimaryButton size="small" leadingIcon={<Icon name="plusIcon" size={12} />} onClick={() => setCreateOpen(true)}>New</PrimaryButton>
+        </div>
+
+        <div className="py-4">
+          <div>
+          {tasks.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+              <Icon name="clockIcon" size={32} className="text-text-placeholder" />
+              <p className="text-paragraph font-medium text-text-primary">No automations yet</p>
+              <p className="text-paragraph text-text-secondary">Run Genie Code tasks on a schedule or in response to events.</p>
+              <PrimaryButton size="default" onClick={() => setCreateOpen(true)}>Create automation</PrimaryButton>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {tasks.map((task) => {
+                const isSelected = selectedTaskId === task.id;
+                return (
+                  <div
+                    key={task.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setDetailTaskId(task.id)}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setDetailTaskId(task.id); }}
+                    className={cx(
+                      "flex w-full cursor-pointer items-center gap-sm rounded-md border px-4 py-3 text-left transition-colors",
+                      isSelected
+                        ? "border-action-default-border-focus bg-action-default-background-hover"
+                        : !task.enabled
+                        ? "border-border bg-background-secondary hover:border-action-default-border-hover"
+                        : "border-border bg-background-primary hover:border-action-default-border-hover",
+                    )}
+                  >
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-background-tertiary">
+                      <Icon name={triggerIcon(task.triggerType)} size={14} className="text-text-secondary" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-xs">
+                        <p className={cx("truncate text-paragraph font-medium", !task.enabled ? "text-text-secondary" : "text-text-primary")}>{task.title}</p>
+                        {!task.enabled && (
+                          <span className="shrink-0 rounded-sm bg-background-tertiary px-1.5 py-0.5 text-hint font-medium text-text-secondary">Paused</span>
+                        )}
+                      </div>
+                      <p className="text-hint text-text-secondary">{task.schedule}{task.lastRun !== "Never" ? ` · Last run ${task.lastRun}` : ""}</p>
+                    </div>
+                    <div className="relative" onMouseDown={(e) => e.stopPropagation()}>
+                      <IconButton
+                        aria-label="More"
+                        icon={<Icon name="overflowIcon" size={14} />}
+                        size="small"
+                        tone="neutral"
+                        onClick={(e) => { e.stopPropagation(); setOpenMenuId((prev) => (prev === task.id ? null : task.id)); }}
+                      />
+                      {openMenuId === task.id && (
+                        <div className="absolute right-0 top-7 z-50 min-w-[180px] overflow-hidden rounded border border-border bg-background-primary py-1 shadow-[0px_2px_16px_0px_rgba(0,0,0,0.08)]">
+                          {[
+                            { icon: "playIcon", label: "Run now", danger: false },
+                            { icon: "pencilIcon", label: "Edit automation", danger: false },
+                            { icon: "trashIcon", label: "Delete automation", danger: true },
+                          ].map(({ icon, label, danger }) => (
+                            <button
+                              key={label}
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); if (danger) { setTasks((prev) => prev.filter((t) => t.id !== task.id)); } setOpenMenuId(null); }}
+                              className={cx("flex w-full items-center gap-sm px-3 py-1.5 text-left text-paragraph hover:bg-background-secondary", danger ? "text-action-danger-default-text-default" : "text-text-primary")}
+                            >
+                              <Icon name={icon as Parameters<typeof Icon>[0]["name"]} size={14} className={danger ? "text-action-danger-default-text-default" : "text-text-secondary"} />
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          </div>
+        </div>
+
+        {/* Suggested */}
+        <div className="border-t border-border py-5">
+          <p className="mb-3 text-title4 font-semibold text-text-primary">Suggested</p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {SUGGESTED_TASKS.map((task) => (
+              <div
+                key={task.title}
+                className="flex items-start gap-sm rounded-md border border-border bg-background-primary p-3 transition-colors hover:border-action-default-border-hover"
+              >
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-background-secondary">
+                  <Icon name={task.icon as Parameters<typeof Icon>[0]["name"]} size={14} className="text-text-secondary" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-paragraph font-medium text-text-primary">{task.title}</p>
+                  <p className="mt-0.5 text-hint text-text-secondary">{task.description}</p>
+                </div>
+                <button
+                  type="button"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-text-secondary hover:bg-background-secondary hover:text-text-primary"
+                >
+                  <Icon name="plusIcon" size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+        </div>{/* max-w-[800px] */}
+      </div>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Scheduled task detail view
+// ---------------------------------------------------------------------------
+
+const TASK_MOCK_RESPONSES: Record<string, string> = {
+  t1: "I've re-run all 8 dashboard queries across the `sales`, `ops`, and `marketing` catalogs. All queries completed successfully. I sent a summary to **#data-ops** on Slack with row counts, any nulls detected, and a link back to the refreshed dashboards.",
+  t2: "Scan complete across 12 key tables. Found **3 issues**: `orders.customer_id` has 0.4% null rate (within threshold), `events` table has 142 duplicate event IDs (flagged), and `products` schema added a new `sku_v2` column not in the baseline. No critical drift detected. Report saved to `data_quality_2026-05-18.md`.",
+  t3: "Feature pipeline completed in 4m 32s. Retrained forecast model on the latest 90-day window — RMSE improved from 0.214 to 0.198. Model artifact saved to `models/forecast_v3_2026-05-11` and registered in MLflow. Ready for promotion to staging.",
+};
+
+function buildRunSteps(task: ScheduledTask): ChatStep[] {
+  const response = TASK_MOCK_RESPONSES[task.id] ?? "Run completed successfully.";
+  return [
+    { type: "user", id: `${task.id}-user`, text: task.prompt },
+    { type: "assistant-text", id: `${task.id}-response`, text: response },
+  ];
+}
+
+const TASK_RUN_HISTORY: Record<string, Array<{ date: string; status: "pending" | "notified" | "failed" }>> = {
+  t1: [
+    { date: "Mon, May 11 at 8:00 AM", status: "notified" },
+    { date: "Mon, May 4 at 8:00 AM", status: "notified" },
+    { date: "Mon, Apr 28 at 8:00 AM", status: "failed" },
+    { date: "Mon, Apr 21 at 8:00 AM", status: "notified" },
+  ],
+  t2: [
+    { date: "Mon, May 11 at 2:57 PM", status: "pending" },
+    { date: "Mon, May 11 at 9:02 AM", status: "notified" },
+    { date: "Sun, May 10 at 9:02 AM", status: "notified" },
+    { date: "Sat, May 9 at 9:01 AM", status: "notified" },
+  ],
+  t3: [
+    { date: "Sun, May 11 at 11:00 PM", status: "failed" },
+    { date: "Sun, May 4 at 11:00 PM", status: "notified" },
+    { date: "Sun, Apr 27 at 11:00 PM", status: "notified" },
+    { date: "Sun, Apr 20 at 11:00 PM", status: "notified" },
+  ],
+};
+
+function ScheduledTaskDetailView({
+  task,
+  onBack,
+  onToggleEnabled,
+  onSave,
+  onOpenRun,
+}: {
+  task: ScheduledTask;
+  onBack: () => void;
+  onToggleEnabled: () => void;
+  onSave: (updated: ScheduledTask) => void;
+  onOpenRun: (threadId: string, label: string) => void;
+}) {
+  const runs = TASK_RUN_HISTORY[task.id] ?? [];
+  const enabled = task.enabled;
+  const [overflowOpen, setOverflowOpen] = React.useState(false);
+  const [editOpen, setEditOpen] = React.useState(false);
+  const [configOpen, setConfigOpen] = React.useState(false);
+  const [scheduleOpen, setScheduleOpen] = React.useState(true);
+  const [instructionsOpen, setInstructionsOpen] = React.useState(true);
+  const [connectorsOpen, setConnectorsOpen] = React.useState(true);
+  const overflowRef = React.useRef<HTMLSpanElement>(null);
+  const overflowMenuRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (overflowMenuRef.current && !overflowMenuRef.current.contains(e.target as Node) && overflowRef.current && !overflowRef.current.contains(e.target as Node)) {
+        setOverflowOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const runStatusLabel = (s: "pending" | "notified" | "failed") =>
+    s === "pending" ? "Pending" : s === "notified" ? "Notified" : "Failed";
+
+  const runStatusIcon = (s: "pending" | "notified" | "failed") =>
+    s === "pending" ? "clockIcon" : s === "notified" ? "notificationIcon" : "dangerSmallIcon";
+
+  const runStatusColor = (s: "pending" | "notified" | "failed") =>
+    s === "pending" ? "text-text-secondary" : s === "notified" ? "text-green-600" : "text-red-600";
+
+  const nextRun = task.schedule.startsWith("Every Mon") ? "Next run Tue, May 12 at 8:00 AM" : task.schedule.startsWith("Daily") ? "Next run Tue, May 12 at 6:00 AM" : "Next run Sun, May 18 at 11:00 PM";
+
+  const scheduleValue = task.schedule.startsWith("Every Mon")
+    ? "Weekly on Mondays at 9 AM (UTC-07:00) America/Los_Angeles"
+    : task.schedule.startsWith("Daily")
+    ? "Daily at 6:00 AM (UTC-07:00) America/Los_Angeles"
+    : "Weekly on Sundays at 11:00 PM (UTC-07:00) America/Los_Angeles";
+
+  const instructions = task.prompt;
+
+  const description = task.title === "Weekly dashboard refresh"
+    ? "Refreshes all dashboard datasets and sends a Slack digest to the #data-ops channel."
+    : task.title === "Data quality scan"
+    ? "Scans key tables for nulls, duplicates, and schema drift on a daily schedule."
+    : "Kicks off the feature pipeline and retrains the forecast model every Sunday night.";
+
+  return (
+    <>
+    {editOpen && (
+      <CreateAutomationDialog
+        onClose={() => setEditOpen(false)}
+        initialTask={task}
+        onSave={(updated) => { onSave(updated); setEditOpen(false); }}
+      />
+    )}
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+      <div className="mx-auto w-full max-w-[800px] px-6 py-6">
+        {/* Breadcrumb */}
+        <div className="mb-4 flex items-center gap-xs text-hint">
+          <button type="button" onClick={onBack} className="text-action-tertiary-text-default hover:underline">
+            Automations
+          </button>
+          <Icon name="chevronRightIcon" size={12} className="text-text-secondary" />
+        </div>
+
+        {/* Title row */}
+        <div className="mb-1 flex items-center gap-sm">
+          <h1 className="flex-1 text-title3 font-semibold text-text-primary">{task.title}</h1>
+          <div className="relative">
+            <span ref={overflowRef} className="inline-flex">
+              <IconButton
+                aria-label="More options"
+                icon={<Icon name="overflowIcon" size={14} />}
+                size="small"
+                tone="neutral"
+                onClick={() => setOverflowOpen((v) => !v)}
+              />
+            </span>
+            {overflowOpen && (
+              <div
+                ref={overflowMenuRef}
+                className="absolute right-0 top-8 z-50 min-w-[160px] overflow-hidden rounded border border-border bg-background-primary py-1 shadow-[0px_2px_16px_0px_rgba(0,0,0,0.08)]"
+              >
+                {[
+                  { icon: "pencilIcon", label: "Edit", danger: false },
+                  { icon: "trashIcon", label: "Delete", danger: true },
+                ].map(({ icon, label, danger }) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => { setOverflowOpen(false); if (label === "Edit") setEditOpen(true); }}
+                    className={cx("flex w-full items-center gap-sm px-2 py-1 text-left text-paragraph hover:bg-background-secondary", danger ? "text-action-danger-default-text-default" : "text-text-primary")}
+                  >
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center">
+                      <Icon name={icon as Parameters<typeof Icon>[0]["name"]} size={16} className={danger ? "text-action-danger-default-text-default" : "text-text-secondary"} />
+                    </span>
+                    <span>{label}</span>
+                  </button>
+                ))}
+              </div>
             )}
           </div>
-        ) : (
-          <IconButton
-            aria-label="Search tasks"
-            icon={<Icon name="searchIcon" size={14} />}
-            size="small"
-            tone="neutral"
-            onClick={() => setSearchOpen(true)}
-          />
-        )}
-        <PrimaryButton size="small" leadingIcon={<Icon name="plusIcon" size={12} />}>New</PrimaryButton>
-      </div>
+          <PrimaryButton size="small" leadingIcon={<Icon name="playIcon" size={12} />}>Run now</PrimaryButton>
+        </div>
 
-      <div className="flex-1 px-8 py-4">
-        {SCHEDULED_TASKS.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-            <Icon name="clockIcon" size={32} className="text-text-placeholder" />
-            <p className="text-paragraph font-medium text-text-primary">No scheduled tasks yet</p>
-            <p className="text-paragraph text-text-secondary">Run Genie Code tasks on a schedule or in response to events.</p>
-            <PrimaryButton size="default">Create task</PrimaryButton>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {SCHEDULED_TASKS.map((task) => {
-              const isSelected = selectedTaskId === task.id;
-              return (
-                <div
-                  key={task.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => onTaskClick(task.id)}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onTaskClick(task.id); }}
-                  className={cx(
-                    "flex w-full cursor-pointer items-center gap-sm rounded-md border px-4 py-3 text-left transition-colors",
-                    isSelected
-                      ? "border-action-default-border-focus bg-action-default-background-hover"
-                      : "border-border bg-background-primary hover:border-action-default-border-hover",
-                  )}
-                >
-                  <span className={cx("h-2 w-2 shrink-0 rounded-full", statusColor(task.status))} />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-paragraph font-medium text-text-primary">{task.title}</p>
-                    <p className="text-hint text-text-secondary">{task.schedule} · Last run {task.lastRun}</p>
-                  </div>
-                  <IconButton aria-label="More" icon={<Icon name="overflowIcon" size={14} />} size="small" tone="neutral" onClick={(e) => e.stopPropagation()} />
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+        {/* Status + next run */}
+        <div className="mb-3 flex items-center gap-sm">
+          <span className={cx("flex items-center gap-xs text-hint font-medium", enabled ? "text-green-600" : "text-text-secondary")}>
+            {enabled && <span className="h-1.5 w-1.5 rounded-full bg-green-500" />}
+            {enabled ? "Active" : "Paused"}
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={enabled}
+            onClick={() => onToggleEnabled()}
+            className={cx(
+              "relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full transition-colors",
+              enabled ? "bg-action-primary-background-default" : "bg-border-accessible",
+            )}
+          >
+            <span className={cx("absolute top-0.5 h-3 w-3 rounded-full bg-white shadow-sm transition-transform", enabled ? "translate-x-3.5" : "translate-x-0.5")} />
+          </button>
+          <span className="text-hint text-text-secondary">· {nextRun}</span>
+        </div>
 
-      {/* Suggested */}
-      <div className="shrink-0 border-t border-border px-8 py-5">
-        <p className="mb-3 text-title4 font-semibold text-text-primary">Suggested</p>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {SUGGESTED_TASKS.map((task) => (
-            <div
-              key={task.title}
-              className="flex items-start gap-sm rounded-md border border-border bg-background-primary p-3 transition-colors hover:border-action-default-border-hover"
-            >
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-background-secondary">
-                <Icon name={task.icon as Parameters<typeof Icon>[0]["name"]} size={14} className="text-text-secondary" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-paragraph font-medium text-text-primary">{task.title}</p>
-                <p className="mt-0.5 text-hint text-text-secondary">{task.description}</p>
-              </div>
+        {/* Description */}
+        <p className="mb-6 text-paragraph text-text-secondary">{description}</p>
+
+        {/* Configuration — collapsible card with subsections */}
+        <div className="mb-3 rounded-md border border-border bg-background-primary">
+          <button
+            type="button"
+            onClick={() => setConfigOpen((v) => !v)}
+            className="flex w-full items-center px-4 py-3 text-left hover:bg-background-secondary rounded-t-md transition-colors"
+          >
+            <span className="flex-1 text-paragraph font-semibold text-text-primary">Configuration</span>
+            {configOpen && (
               <button
                 type="button"
-                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-text-secondary hover:bg-background-secondary hover:text-text-primary"
+                onClick={(e) => { e.stopPropagation(); setEditOpen(true); }}
+                className="mr-2 flex items-center gap-xs text-hint text-action-tertiary-text-default hover:underline"
               >
-                <Icon name="plusIcon" size={14} />
+                <Icon name="pencilIcon" size={13} />
+                <span>Edit</span>
               </button>
+            )}
+            <Icon name={configOpen ? "chevronDownIcon" : "chevronRightIcon"} size={16} className="shrink-0 text-text-secondary" />
+          </button>
+          {configOpen && (
+            <div className="border-t border-border">
+              {/* Schedule subsection */}
+              <div className="border-b border-border">
+                <button
+                  type="button"
+                  onClick={() => setScheduleOpen((v) => !v)}
+                  className="flex w-full items-center gap-sm px-4 py-2.5 text-left"
+                >
+                  <Icon name={scheduleOpen ? "chevronDownIcon" : "chevronRightIcon"} size={12} className="shrink-0 text-text-secondary" />
+                  <span className="flex-1 text-paragraph text-text-primary">Trigger</span>
+                </button>
+                {scheduleOpen && (
+                  <div className="px-4 pb-3 pt-0.5">
+                    <p className="text-paragraph text-text-secondary">{scheduleValue}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Instructions subsection */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setInstructionsOpen((v) => !v)}
+                  className="flex w-full items-center gap-sm px-4 py-2.5 text-left"
+                >
+                  <Icon name={instructionsOpen ? "chevronDownIcon" : "chevronRightIcon"} size={12} className="shrink-0 text-text-secondary" />
+                  <span className="flex-1 text-paragraph text-text-primary">Prompt</span>
+                </button>
+                {instructionsOpen && (
+                  <div className="px-4 pb-3 pt-0.5">
+                    <p className="text-paragraph text-text-secondary">{instructions}</p>
+                  </div>
+                )}
+              </div>
+
             </div>
-          ))}
+          )}
+        </div>
+
+        {/* Run History — always expanded, no card wrapper */}
+        <div className="mb-3 mt-lg">
+          <p className="mb-2 text-paragraph font-semibold text-text-primary">Run History</p>
+          {runs.length === 0 ? (
+            <div className="flex items-center justify-center gap-xs rounded-md border border-dashed border-border px-4 py-4">
+              <span className="text-paragraph text-text-secondary">No runs yet.</span>
+              <button type="button" className="text-paragraph text-action-tertiary-text-default hover:underline">Run now</button>
+            </div>
+          ) : (
+            <div className="rounded-md border border-border bg-background-primary divide-y divide-border">
+              {runs.map((run, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => onOpenRun(`run-${task.id}-${i}`, run.date)}
+                  className="flex w-full items-center px-4 py-2.5 text-left hover:bg-background-secondary transition-colors"
+                >
+                  <span className="flex-1 text-paragraph text-text-primary">{run.date}</span>
+                  <span className={cx("flex items-center gap-xs text-hint font-medium", runStatusColor(run.status))}>
+                    <Icon name={runStatusIcon(run.status)} size={13} />
+                    {runStatusLabel(run.status)}
+                  </span>
+                  <Icon name="chevronRightIcon" size={12} className="ml-sm shrink-0 text-text-secondary" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
+    </>
   );
 }
 
@@ -714,10 +1376,10 @@ function CustomizationsMainView({
   onOpenAssistantInstructionsFile: () => void;
 }) {
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col px-mid">
-      <div className="mx-auto flex min-h-0 w-full max-w-6xl min-w-0 flex-1 flex-col">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="mx-auto flex min-h-0 w-full max-w-[800px] min-w-0 flex-1 flex-col">
         {/* Tab bar */}
-        <div className="flex shrink-0 items-center border-b border-border px-8">
+        <div className="flex shrink-0 items-center border-b border-border">
           {([["skills", "Skills & instructions"], ["connections", "MCP servers"]] as const).map(([tab, label]) => (
             <button
               key={tab}
@@ -745,6 +1407,7 @@ function CustomizationsMainView({
           />
         ) : (
           <ConnectionsMainView
+            layout="drawer"
             selectedServerId={selectedServerId}
             onServerClick={onServerClick}
             onConfigureMcpTools={onConfigureMcpTools}
@@ -788,6 +1451,21 @@ function ChatLeftNav({
   const [searchQuery, setSearchQuery] = React.useState("");
   const searchInputRef = React.useRef<HTMLInputElement>(null);
   const isDragging = React.useRef(false);
+  const [navMenuOpen, setNavMenuOpen] = React.useState(false);
+  const [incognito, setIncognito] = React.useState(false);
+  const navMenuRef = React.useRef<HTMLDivElement>(null);
+  const navMenuBtnRef = React.useRef<HTMLSpanElement>(null);
+
+  React.useEffect(() => {
+    if (!navMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (navMenuRef.current && !navMenuRef.current.contains(e.target as Node) && navMenuBtnRef.current && !navMenuBtnRef.current.contains(e.target as Node)) {
+        setNavMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [navMenuOpen]);
   const startX = React.useRef(0);
   const startWidth = React.useRef(DEFAULT_NAV_WIDTH);
 
@@ -845,14 +1523,14 @@ function ChatLeftNav({
             onClick={() => { onSetMainView(activeMainView === "customizations" ? "thread" : "customizations"); setCollapsed(false); }}
           />
         </Tooltip>
-        <Tooltip label="Scheduled tasks" align="left">
+        <Tooltip label="Automations" align="left">
           <IconButton
-            aria-label="Scheduled tasks"
+            aria-label="Automations"
             icon={<Icon name="clockIcon" size={14} />}
             size="small"
             tone="neutral"
             className={activeMainView === "scheduled" ? "!bg-background-tertiary" : ""}
-            onClick={() => { onSetMainView(activeMainView === "scheduled" ? "thread" : "scheduled"); setCollapsed(false); }}
+            onClick={() => { onSetMainView("scheduled"); setCollapsed(false); }}
           />
         </Tooltip>
       </div>
@@ -864,7 +1542,7 @@ function ChatLeftNav({
       {/* Header */}
       <div className="flex h-10 w-full min-w-0 shrink-0 items-center gap-xs px-3">
         <span className="min-w-0 flex-1 truncate text-paragraph font-semibold text-text-primary">Genie Code</span>
-        <div className="shrink-0">
+        <div className="relative flex shrink-0 items-center gap-xs">
           <Tooltip label="Close sidebar" align="right">
             <IconButton
               aria-label="Collapse thread panel"
@@ -874,6 +1552,52 @@ function ChatLeftNav({
               onClick={() => setCollapsed(true)}
             />
           </Tooltip>
+          <div className="relative">
+            <span ref={navMenuBtnRef} className="inline-flex">
+              <IconButton
+                aria-label="More options"
+                icon={<Icon name="overflowIcon" size={16} />}
+                size="small"
+                tone="neutral"
+                onClick={() => setNavMenuOpen((v) => !v)}
+              />
+            </span>
+            {navMenuOpen && (
+              <div
+                ref={navMenuRef}
+                className="absolute left-0 top-8 z-50 min-w-[220px] overflow-hidden rounded border border-border bg-background-primary py-1 shadow-[0px_2px_16px_0px_rgba(0,0,0,0.08)]"
+              >
+                {[
+                  { icon: "gearOutlinedIcon", label: "Settings" },
+                  { icon: "questionMarkOutlinedIcon", label: "Help" },
+                  { icon: "speechBubbleIcon", label: "Send feedback to Databricks" },
+                ].map(({ icon, label }) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => setNavMenuOpen(false)}
+                    className="flex w-full items-center gap-sm px-3 py-2 text-left text-paragraph text-text-primary hover:bg-background-secondary"
+                  >
+                    <Icon name={icon as Parameters<typeof Icon>[0]["name"]} size={16} className="shrink-0 text-text-secondary" />
+                    {label}
+                  </button>
+                ))}
+                <div className="mx-3 my-1 border-t border-border" />
+                <div className="flex items-center gap-sm px-3 py-2">
+                  <span className="flex-1 text-paragraph text-text-primary">Incognito</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={incognito}
+                    onClick={() => setIncognito((v) => !v)}
+                    className={cx("relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full transition-colors", incognito ? "bg-action-primary-background-default" : "bg-border-accessible")}
+                  >
+                    <span className={cx("absolute top-0.5 h-3 w-3 rounded-full bg-white shadow-sm transition-transform", incognito ? "translate-x-3.5" : "translate-x-0.5")} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -901,14 +1625,14 @@ function ChatLeftNav({
           </button>
           <button
             type="button"
-            onClick={() => onSetMainView(activeMainView === "scheduled" ? "thread" : "scheduled")}
+            onClick={() => onSetMainView("scheduled")}
             className={cx(
               "flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-paragraph hover:bg-background-secondary",
               activeMainView === "scheduled" ? "bg-action-default-background-hover font-medium text-text-primary" : "text-text-primary",
             )}
           >
             <Icon name="clockIcon" size={14} className="shrink-0 text-text-secondary" />
-            Scheduled tasks
+            Automations
           </button>
           {searchActive ? (
             <div className="mt-xs flex w-full items-center gap-2 rounded-md border border-[#1A6FCC] bg-background-secondary px-2 py-2">
@@ -2718,6 +3442,10 @@ export default function ChatPage() {
   const [toolsScope, setToolsScope] = React.useState<"user" | "workspace">("user");
   const [selectedMcpServerId, setSelectedMcpServerId] = React.useState<string | null>(null);
   const [selectedTaskId, setSelectedTaskId] = React.useState<string | null>(null);
+  const [scheduledViewKey, setScheduledViewKey] = React.useState(0);
+  // Maps run thread IDs to their parent task IDs for breadcrumb navigation
+  const runThreadTaskIdRef = React.useRef<Map<string, string>>(new Map());
+  const [scheduledDetailTaskId, setScheduledDetailTaskId] = React.useState<string | null>(null);
 
   const handleSkillSave = React.useCallback((file: string, newContent: string) => {
     SKILL_FILE_CONTENT[file] = newContent;
@@ -2731,7 +3459,10 @@ export default function ChatPage() {
   }, []);
 
   const handleSetMainView = React.useCallback((view: MainView) => {
-    setMainView(view);
+    setMainView((prev) => {
+      if (view === "scheduled" && prev === "scheduled") setScheduledViewKey((k) => k + 1);
+      return view;
+    });
     if (view !== "customizations") {
       setSelectedMcpServerId(null);
       setSelectedSkillFile(null);
@@ -2819,23 +3550,36 @@ export default function ChatPage() {
           />
         ) : mainView === "scheduled" ? (
           <ScheduledTasksMainView
+            key={scheduledViewKey}
             selectedTaskId={selectedTaskId}
             onTaskClick={(id) => {
               setSelectedTaskId((prev) => (prev === id ? null : id));
               if (containerRef.current) setInitialPreviewWidth(Math.round(containerRef.current.offsetWidth * 0.45));
             }}
+            state={state}
+            onSetMainView={handleSetMainView}
+            onRegisterRunThread={(threadId, taskId) => { runThreadTaskIdRef.current.set(threadId, taskId); }}
+            navigateToDetailTaskId={scheduledDetailTaskId}
           />
         ) : (
           <GenieChatBody
             state={state}
             size="full"
             hideThreadToggle
+            hideMoreOptions={state.activeThreadId === null}
             previewOpen={previewOpen}
             onAssetClick={handleAssetClick}
             onFullScreen={() => { sessionStorage.setItem("openGeniePanel", "1"); router.back(); }}
             reviewed={isReviewed}
             onReviewed={handleReviewed}
             onFocusTitleInputReady={handleFocusTitleInputReady}
+            onNavigateToParent={(threadId) => {
+              const taskId = runThreadTaskIdRef.current.get(threadId);
+              if (taskId) {
+                setScheduledDetailTaskId(taskId);
+                handleSetMainView("scheduled");
+              }
+            }}
           />
         )}
 
