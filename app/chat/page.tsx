@@ -542,12 +542,12 @@ function ToolsMainView({
 // ---------------------------------------------------------------------------
 
 const SUGGESTED_TASKS = [
-  { icon: "dashboardIcon", title: "Refresh weekly dashboard", description: "Re-run all dashboard queries and send a Slack summary every Monday morning" },
-  { icon: "searchIcon", title: "Monitor data quality", description: "Scan key tables for nulls, duplicates, and schema drift on a daily schedule" },
-  { icon: "notebookIcon", title: "Generate EDA report", description: "Run exploratory analysis on new data arrivals and append findings to a shared notebook" },
-  { icon: "alertIcon", title: "Alert on metric drops", description: "Check DAU and WAU thresholds each hour and notify the team if they fall below baseline" },
-  { icon: "queryListViewIcon", title: "Archive stale queries", description: "Identify queries unused for 30+ days and move them to an archive schema" },
-  { icon: "modelsIcon", title: "Weekly model retraining", description: "Kick off the feature pipeline and retrain the forecast model every Sunday night" },
+  { icon: "clockIcon", title: "Refresh weekly dashboard", description: "Re-run all dashboard queries and send a Slack summary every Monday morning", triggerType: "schedule" },
+  { icon: "tableIcon", title: "Monitor data quality", description: "Scan key tables for nulls, duplicates, and schema drift on a daily schedule", triggerType: "table_update" },
+  { icon: "fileIcon", title: "Generate EDA report", description: "Run exploratory analysis on new data arrivals and append findings to a shared notebook", triggerType: "file_arrival" },
+  { icon: "modelsIcon", title: "Weekly model retraining", description: "Kick off the feature pipeline and retrain the forecast model every Sunday night", triggerType: "model_training" },
+  { icon: "WorkflowsIcon", title: "Quality check on pipeline", description: "Monitor your pipelines and analyze when issues arise", triggerType: "job_completion" },
+  { icon: "alertIcon", title: "Alert on metric drops", description: "Check DAU and WAU thresholds each hour and notify the team if they fall below baseline", triggerType: "schedule" },
 ];
 
 type ScheduledTask = {
@@ -557,14 +557,29 @@ type ScheduledTask = {
   prompt: string;
   lastRun: string;
   status: "success" | "failed" | "running";
-  triggerType: "schedule";
+  triggerType: "schedule" | "file_arrival" | "table_update" | "continuous" | "model_update" | "job_completion" | "model_training";
   enabled: boolean;
 };
 
 const SCHEDULED_TASKS: ScheduledTask[] = [
   { id: "t1", title: "Weekly dashboard refresh", schedule: "Every Mon 8:00 AM", prompt: "Re-run all dashboard queries and send a Slack summary to #data-ops every Monday morning", lastRun: "2d ago", status: "success", triggerType: "schedule", enabled: true },
-  { id: "t2", title: "Data quality scan", schedule: "Daily 6:00 AM", prompt: "Scan key tables for nulls, duplicates, and schema drift on a daily schedule", lastRun: "14h ago", status: "success", triggerType: "schedule", enabled: true },
-  { id: "t3", title: "Forecast model retrain", schedule: "Every Sun 11:00 PM", prompt: "Kick off the feature pipeline and retrain the forecast model every Sunday night", lastRun: "4d ago", status: "failed", triggerType: "schedule", enabled: false },
+  { id: "t2", title: "Ski resorts quality scan", schedule: "main.2026_northeast.ski_resorts", prompt: "Scan main.2026_northeast.ski_resorts for nulls, duplicates, and schema drift. Flag any columns with >5% null rates and report unexpected value distributions in resort_name, region, and vertical_drop.", lastRun: "14h ago", status: "success", triggerType: "table_update", enabled: true },
+  { id: "t3", title: "Forecast model retrain", schedule: "main.default.forecast_model", prompt: "Kick off the feature pipeline and retrain the forecast model every Sunday night", lastRun: "4d ago", status: "failed", triggerType: "model_training", enabled: false },
+];
+
+const MOCK_JOBS = [
+  "data_engineering/bronze_ingestion",
+  "data_engineering/silver_transform",
+  "data_engineering/gold_aggregation",
+  "ml_pipelines/feature_pipeline",
+  "ml_pipelines/model_training",
+  "ml_pipelines/model_evaluation",
+  "analytics/weekly_dashboard_refresh",
+  "analytics/data_quality_scan",
+  "analytics/forecast_retrain",
+  "ops/table_maintenance",
+  "ops/cost_attribution_rollup",
+  "ops/usage_reporting",
 ];
 
 const FREQUENCY_OPTIONS = ["Day", "Week", "Month"] as const;
@@ -620,16 +635,17 @@ const TIMEZONE_OPTIONS = [
   { label: "(UTC+12:00) Fiji", value: "Pacific/Fiji" },
 ];
 
-function CreateAutomationDialog({ onClose, onCreate, onSave, initialTask }: {
+function CreateAutomationDialog({ onClose, onCreate, onSave, initialTask, suggestion }: {
   onClose: () => void;
   onCreate?: (task: ScheduledTask) => void;
   onSave?: (task: ScheduledTask) => void;
   initialTask?: ScheduledTask;
+  suggestion?: { title: string; triggerType: string } | null;
 }) {
   const isEdit = !!initialTask;
-  const [title, setTitle] = React.useState(initialTask?.title ?? "");
+  const [title, setTitle] = React.useState(initialTask?.title ?? suggestion?.title ?? "");
   const [instructions, setInstructions] = React.useState(initialTask?.prompt ?? "");
-  const [triggerType, setTriggerType] = React.useState<"schedule" | "file_arrival" | "table_update" | "continuous" | "model_update">("schedule");
+  const [triggerType, setTriggerType] = React.useState<"schedule" | "file_arrival" | "table_update" | "continuous" | "model_update" | "model_training" | "job_completion">((initialTask?.triggerType ?? suggestion?.triggerType as any) ?? "schedule");
   const [frequency, setFrequency] = React.useState<typeof FREQUENCY_OPTIONS[number]>("Week");
   const [day, setDay] = React.useState<typeof DAY_OPTIONS[number]>("Monday");
   const [hour, setHour] = React.useState("09");
@@ -637,6 +653,19 @@ function CreateAutomationDialog({ onClose, onCreate, onSave, initialTask }: {
   const [timezone, setTimezone] = React.useState("America/Denver");
   const [tzPickerOpen, setTzPickerOpen] = React.useState(false);
   const [tzSearch, setTzSearch] = React.useState("");
+  const [tables, setTables] = React.useState<string[]>(initialTask?.triggerType === "table_update" ? initialTask.schedule.split(", ") : [""]);
+  const [tableCondition, setTableCondition] = React.useState<"all" | "any">("all");
+  const [modelName, setModelName] = React.useState(initialTask?.triggerType === "model_training" ? initialTask.schedule : "");
+  const [modelEvent, setModelEvent] = React.useState<"version_ready" | "alias_set">("version_ready");
+  const [jobs, setJobs] = React.useState<string[]>([""]);
+  const [jobSearchOpen, setJobSearchOpen] = React.useState<number | null>(null);
+  const [jobSearch, setJobSearch] = React.useState("");
+  const jobSearchRef = React.useRef<HTMLDivElement>(null);
+  const [notifEmail, setNotifEmail] = React.useState("");
+  const [notifEnabled, setNotifEnabled] = React.useState(false);
+  const [notifOnStart, setNotifOnStart] = React.useState(false);
+  const [notifOnSuccess, setNotifOnSuccess] = React.useState(false);
+  const [notifOnFailure, setNotifOnFailure] = React.useState(true);
   const tzRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -645,6 +674,13 @@ function CreateAutomationDialog({ onClose, onCreate, onSave, initialTask }: {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [tzPickerOpen]);
+
+  React.useEffect(() => {
+    if (jobSearchOpen === null) return;
+    const handler = (e: MouseEvent) => { if (jobSearchRef.current && !jobSearchRef.current.contains(e.target as Node)) setJobSearchOpen(null); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [jobSearchOpen]);
 
   const selectedTz = TIMEZONE_OPTIONS.find((t) => t.value === timezone) ?? TIMEZONE_OPTIONS[6];
   const filteredTz = TIMEZONE_OPTIONS.filter((t) => t.label.toLowerCase().includes(tzSearch.toLowerCase()));
@@ -719,72 +755,80 @@ function CreateAutomationDialog({ onClose, onCreate, onSave, initialTask }: {
           {/* Trigger */}
           <div className="flex flex-col gap-sm">
             <label className="text-paragraph font-medium text-text-primary">Trigger</label>
-            <select
-              value={triggerType}
-              onChange={(e) => setTriggerType(e.target.value as typeof triggerType)}
-              className="h-9 w-full appearance-none rounded-sm border border-border bg-background-primary px-3 py-2 text-paragraph text-text-primary outline-none focus:border-action-default-border-focus"
-            >
-              <option value="schedule">Scheduled</option>
-              <option value="file_arrival">File arrival</option>
-              <option value="table_update">Table update</option>
-              <option value="continuous">Continuous</option>
-              <option value="model_update">Model update</option>
-            </select>
+            <div className="relative">
+              <select
+                value={triggerType}
+                onChange={(e) => setTriggerType(e.target.value as typeof triggerType)}
+                className="h-9 w-full appearance-none rounded-sm border border-border bg-background-primary px-3 py-2 pr-8 text-paragraph text-text-primary outline-none focus:border-action-default-border-focus"
+              >
+                <option value="schedule">Scheduled</option>
+                <option value="file_arrival">File arrival</option>
+                <option value="table_update">Table update</option>
+                <option value="continuous">Continuous</option>
+                <option value="model_update">Model update</option>
+              <option value="model_training">Model training</option>
+              <option value="job_completion">Job / pipeline completion</option>
+              </select>
+              <Icon name="chevronDownIcon" size={12} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary" />
+            </div>
             {triggerType === "schedule" && (
-              <div className="rounded-sm border border-border bg-background-primary divide-y divide-border">
-                {/* Repeat row */}
-                <div className="flex items-center gap-sm px-3 py-2">
-                  <span className="w-16 shrink-0 text-hint text-text-secondary">Repeat</span>
-                  <select
-                    value={frequency}
-                    onChange={(e) => setFrequency(e.target.value as typeof FREQUENCY_OPTIONS[number])}
-                    className="flex-1 bg-transparent text-paragraph text-text-primary outline-none"
-                  >
-                    {FREQUENCY_OPTIONS.map((f) => <option key={f}>{f}</option>)}
-                  </select>
-                </div>
-                {/* Day row — only for weekly */}
-                {frequency === "Week" && (
-                  <div className="flex items-center gap-sm px-3 py-2">
-                    <span className="w-16 shrink-0 text-hint text-text-secondary">Day</span>
+              <div className="flex flex-col gap-sm">
+                {/* Line 1: Every [frequency] [day?] at [HH] : [MM] */}
+                <div className="flex items-center gap-sm">
+                  <span className="shrink-0 text-paragraph text-text-secondary">Every</span>
+                  <div className="relative">
                     <select
-                      value={day}
-                      onChange={(e) => setDay(e.target.value as typeof DAY_OPTIONS[number])}
-                      className="flex-1 bg-transparent text-paragraph text-text-primary outline-none"
+                      value={frequency}
+                      onChange={(e) => setFrequency(e.target.value as typeof FREQUENCY_OPTIONS[number])}
+                      className="appearance-none rounded-sm border border-border bg-background-primary py-2 pl-3 pr-7 text-paragraph text-text-primary outline-none focus:border-action-default-border-focus"
                     >
-                      {DAY_OPTIONS.map((d) => <option key={d}>{d}</option>)}
+                      {FREQUENCY_OPTIONS.map((f) => <option key={f}>{f}</option>)}
                     </select>
+                    <Icon name="chevronDownIcon" size={12} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-text-secondary" />
                   </div>
-                )}
-                {/* Time row */}
-                <div className="flex items-center gap-sm px-3 py-2">
-                  <span className="w-16 shrink-0 text-hint text-text-secondary">Time</span>
-                  <div className="flex items-center gap-xs">
+                  {frequency === "Week" && (
+                    <div className="relative">
+                      <select
+                        value={day}
+                        onChange={(e) => setDay(e.target.value as typeof DAY_OPTIONS[number])}
+                        className="appearance-none rounded-sm border border-border bg-background-primary py-2 pl-3 pr-7 text-paragraph text-text-primary outline-none focus:border-action-default-border-focus"
+                      >
+                        {DAY_OPTIONS.map((d) => <option key={d}>{d}</option>)}
+                      </select>
+                      <Icon name="chevronDownIcon" size={12} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-text-secondary" />
+                    </div>
+                  )}
+                  <span className="shrink-0 text-paragraph text-text-secondary">at</span>
+                  <div className="relative">
                     <select
                       value={hour}
                       onChange={(e) => setHour(e.target.value)}
-                      className="bg-transparent text-paragraph text-text-primary outline-none"
+                      className="appearance-none rounded-sm border border-border bg-background-primary py-2 pl-3 pr-7 text-paragraph text-text-primary outline-none focus:border-action-default-border-focus"
                     >
                       {HOUR_OPTIONS.map((h) => <option key={h}>{h}</option>)}
                     </select>
-                    <span className="text-paragraph text-text-secondary">:</span>
+                    <Icon name="chevronDownIcon" size={12} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-text-secondary" />
+                  </div>
+                  <span className="shrink-0 text-paragraph text-text-secondary">:</span>
+                  <div className="relative">
                     <select
                       value={minute}
                       onChange={(e) => setMinute(e.target.value)}
-                      className="bg-transparent text-paragraph text-text-primary outline-none"
+                      className="appearance-none rounded-sm border border-border bg-background-primary py-2 pl-3 pr-7 text-paragraph text-text-primary outline-none focus:border-action-default-border-focus"
                     >
                       {MINUTE_OPTIONS.map((m) => <option key={m}>{m}</option>)}
                     </select>
+                    <Icon name="chevronDownIcon" size={12} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-text-secondary" />
                   </div>
                 </div>
-                {/* Timezone row */}
+                {/* Line 2: Timezone selector */}
                 <div className="relative" ref={tzRef}>
                   <button
                     type="button"
                     onClick={() => { setTzPickerOpen((v) => !v); setTzSearch(""); }}
-                    className="flex w-full items-center gap-sm px-3 py-2 text-left hover:bg-background-secondary"
+                    className="flex w-full items-center gap-sm rounded-sm border border-border bg-background-primary px-3 py-2 text-left hover:border-action-default-border-hover"
                   >
-                    <span className="w-16 shrink-0 text-hint text-text-secondary">Timezone</span>
+                    <span className="shrink-0 text-hint text-text-secondary">Timezone</span>
                     <span className="flex-1 text-paragraph text-text-primary">{selectedTz.label}</span>
                     <Icon name="chevronDownIcon" size={12} className="shrink-0 text-text-secondary" />
                   </button>
@@ -822,15 +866,239 @@ function CreateAutomationDialog({ onClose, onCreate, onSave, initialTask }: {
                 </div>
               </div>
             )}
-            {(triggerType === "file_arrival" || triggerType === "table_update" || triggerType === "model_update") && (
-              <div className="flex items-center justify-between rounded-sm border border-border bg-background-primary px-3 py-2 text-paragraph text-text-placeholder">
-                <span>{triggerType === "file_arrival" ? "Select a path or volume" : triggerType === "table_update" ? "Select a table" : "Select a model"}</span>
-                <Icon name="chevronDownIcon" size={14} className="text-text-secondary" />
+            {triggerType === "file_arrival" && (
+              <div className="flex flex-col gap-md">
+                <p className="text-paragraph text-text-secondary">File arrival triggers monitor cloud storage paths for new files. These paths are either Unity Catalog volumes or external locations managed through Unity Catalog.</p>
+                {/* Storage location */}
+                <div className="flex flex-col gap-xs">
+                  <div className="flex items-center gap-xs">
+                    <label className="text-paragraph font-medium text-text-primary">Storage location</label>
+                    <Icon name="infoIcon" size={12} className="text-text-secondary" />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="e.g. '/Volumes/mycatalog/myschema/myvolume/path_within_volume/' or 's3://bucket/path/'"
+                    className="rounded-sm border border-border bg-background-primary px-3 py-2 text-paragraph text-text-primary outline-none placeholder:text-text-placeholder focus:border-action-default-border-focus"
+                  />
+                </div>
+              </div>
+            )}
+            {triggerType === "table_update" && (
+              <div className="flex flex-col gap-md">
+                {/* Tables */}
+                <div className="flex flex-col gap-sm">
+                  <label className="text-paragraph font-medium text-text-primary">Tables</label>
+                  <div className="flex flex-col gap-sm">
+                    {tables.map((table, i) => (
+                      <div key={i} className="flex items-center gap-sm">
+                        <input
+                          type="text"
+                          value={table}
+                          onChange={(e) => setTables((prev) => prev.map((t, idx) => idx === i ? e.target.value : t))}
+                          placeholder={'Table name (e.g. "mycatalog.myschema.mytable")'}
+                          className="flex-1 rounded-sm border border-border bg-background-primary px-3 py-2 text-paragraph text-text-primary outline-none placeholder:text-text-placeholder focus:border-action-default-border-focus"
+                        />
+                        {tables.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setTables((prev) => prev.filter((_, idx) => idx !== i))}
+                            className="shrink-0 text-text-secondary hover:text-action-danger-default-text-default"
+                          >
+                            <Icon name="trashIcon" size={16} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex">
+                    <DefaultButton size="default" leadingIcon={<Icon name="plusIcon" size={12} />} onClick={() => setTables((prev) => [...prev, ""])}>
+                      Add table
+                    </DefaultButton>
+                  </div>
+                </div>
+                {/* Trigger when — only shown when multiple tables */}
+                {tables.length > 1 && (
+                  <div className="flex flex-col gap-sm">
+                    <label className="text-paragraph font-medium text-text-primary">Trigger when</label>
+                    {(["all", "any"] as const).map((val) => (
+                      <button key={val} type="button" onClick={() => setTableCondition(val)} className="flex items-center gap-sm text-left">
+                        <span className={cx(
+                          "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2",
+                          tableCondition === val ? "border-blue-600 bg-blue-600" : "border-border bg-background-primary",
+                        )}>
+                          {tableCondition === val && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+                        </span>
+                        <span className="text-paragraph text-text-primary">{val === "all" ? "All tables are updated" : "Any table is updated"}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {(triggerType === "model_update" || triggerType === "model_training") && (
+              <div className="flex flex-col gap-md">
+                {/* Model input */}
+                <div className="flex flex-col gap-xs">
+                  <label className="text-paragraph font-medium text-text-primary">Model</label>
+                  <input
+                    type="text"
+                    value={modelName}
+                    onChange={(e) => setModelName(e.target.value)}
+                    placeholder='Enter model name (e.g. "main.default.model")'
+                    className="rounded-sm border border-border bg-background-primary px-3 py-2 text-paragraph text-text-primary outline-none placeholder:text-text-placeholder focus:border-action-default-border-focus"
+                  />
+                </div>
+                {/* Events */}
+                <div className="flex flex-col gap-sm">
+                  <label className="text-paragraph font-medium text-text-primary">Events</label>
+                  {(["version_ready", "alias_set"] as const).map((val) => (
+                    <button key={val} type="button" onClick={() => setModelEvent(val)} className="flex items-start gap-sm text-left">
+                      <span className={cx(
+                        "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2",
+                        modelEvent === val ? "border-blue-600 bg-blue-600" : "border-border bg-background-primary",
+                      )}>
+                        {modelEvent === val && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+                      </span>
+                      <div>
+                        <p className="text-paragraph text-text-primary">{val === "version_ready" ? "Model version is ready" : "Model alias is set"}</p>
+                        <p className="text-hint text-text-secondary">{val === "version_ready" ? "Triggers when a model version becomes ready" : "Triggers when specified aliases are set on a model version"}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {triggerType === "job_completion" && (
+              <div className="flex flex-col gap-sm">
+                <label className="text-paragraph font-medium text-text-primary">Jobs / pipelines</label>
+                <div className="flex flex-col gap-sm">
+                  {jobs.map((job, i) => (
+                    <div key={i} className="flex items-center gap-sm">
+                      <div className="relative flex-1" ref={jobSearchOpen === i ? jobSearchRef : undefined}>
+                        <input
+                          type="text"
+                          value={job}
+                          onChange={(e) => {
+                            setJobs((prev) => prev.map((j, idx) => idx === i ? e.target.value : j));
+                            setJobSearch(e.target.value);
+                            setJobSearchOpen(i);
+                          }}
+                          onFocus={() => { setJobSearchOpen(i); setJobSearch(job); }}
+                          placeholder="Search jobs or pipelines..."
+                          className="w-full rounded-sm border border-border bg-background-primary px-3 py-2 text-paragraph text-text-primary outline-none placeholder:text-text-placeholder focus:border-action-default-border-focus"
+                        />
+                        {jobSearchOpen === i && (
+                          <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded border border-border bg-background-primary shadow-[0px_4px_20px_0px_rgba(0,0,0,0.12)]">
+                            <div className="flex items-center gap-xs border-b border-border px-3 py-2">
+                              <Icon name="searchIcon" size={13} className="shrink-0 text-text-secondary" />
+                              <input
+                                autoFocus
+                                type="text"
+                                value={jobSearch}
+                                onChange={(e) => setJobSearch(e.target.value)}
+                                placeholder="Search..."
+                                className="flex-1 bg-transparent text-paragraph text-text-primary outline-none placeholder:text-text-placeholder"
+                              />
+                            </div>
+                            <div className="max-h-[200px] overflow-y-auto">
+                              {MOCK_JOBS.filter((j) => j.toLowerCase().includes(jobSearch.toLowerCase())).length === 0 ? (
+                                <p className="px-3 py-3 text-paragraph text-text-secondary">No results</p>
+                              ) : MOCK_JOBS.filter((j) => j.toLowerCase().includes(jobSearch.toLowerCase())).map((j) => (
+                                <button
+                                  key={j}
+                                  type="button"
+                                  onClick={() => {
+                                    setJobs((prev) => prev.map((_, idx) => idx === i ? j : _));
+                                    setJobSearchOpen(null);
+                                  }}
+                                  className={cx("flex w-full items-center gap-sm px-3 py-2 text-left text-paragraph hover:bg-background-secondary", job === j ? "bg-action-default-background-hover font-medium text-text-primary" : "text-text-primary")}
+                                >
+                                  {job === j && <Icon name="checkmarkIcon" size={12} className="shrink-0 text-action-tertiary-text-default" />}
+                                  {job !== j && <span className="w-3 shrink-0" />}
+                                  {j}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      {jobs.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => setJobs((prev) => prev.filter((_, idx) => idx !== i))}
+                          className="shrink-0 text-text-secondary hover:text-action-danger-default-text-default"
+                        >
+                          <Icon name="trashIcon" size={16} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
             {triggerType === "continuous" && (
               <p className="text-paragraph text-text-secondary">This automation will run continuously as a streaming job.</p>
             )}
+          </div>
+
+          {/* Notifications */}
+          <div className="flex flex-col gap-sm">
+            <div className="flex items-center justify-between">
+              <label className="text-paragraph font-medium text-text-primary">Notifications</label>
+              <div className="flex rounded-sm border border-border bg-background-secondary p-0.5">
+                {(["Disabled", "Enabled"] as const).map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => setNotifEnabled(opt === "Enabled")}
+                    className={cx(
+                      "rounded-xs px-2 py-0.5 text-hint transition-colors",
+                      (opt === "Enabled") === notifEnabled
+                        ? "bg-background-primary font-medium text-text-primary shadow-sm"
+                        : "text-text-secondary hover:text-text-primary",
+                    )}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {notifEnabled && <div className="overflow-hidden rounded-sm border border-border">
+              {/* Header row */}
+              <div className="grid grid-cols-[1fr_56px_56px_88px] items-center border-b border-border px-3 py-2">
+                <span className="text-hint font-medium text-text-secondary">Destination</span>
+                <span className="text-center text-hint font-medium text-text-secondary">Started</span>
+                <span className="text-center text-hint font-medium text-text-secondary">Finished</span>
+                <span className="text-center text-hint font-medium text-text-secondary">Needs attention</span>
+              </div>
+              {/* Email row */}
+              <div className="grid grid-cols-[1fr_56px_56px_88px] items-center px-3 py-2">
+                <div className="flex items-center gap-sm rounded-sm border border-border bg-background-primary px-2 py-1.5 focus-within:border-action-default-border-focus">
+                  <Icon name="MailIcon" size={13} className="shrink-0 text-text-secondary" />
+                  <input
+                    type="email"
+                    value={notifEmail}
+                    onChange={(e) => setNotifEmail(e.target.value)}
+                    placeholder="Type email here"
+                    className="min-w-0 flex-1 bg-transparent text-hint text-text-primary outline-none placeholder:text-text-placeholder"
+                  />
+                </div>
+                {([
+                  [notifOnStart, setNotifOnStart],
+                  [notifOnSuccess, setNotifOnSuccess],
+                  [notifOnFailure, setNotifOnFailure],
+                ] as [boolean, (v: boolean) => void][]).map(([checked, setter], i) => (
+                  <div key={i} className="flex justify-center">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => setter(!checked)}
+                      className="h-4 w-4 cursor-pointer accent-blue-600"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>}
           </div>
 
           {/* Actions */}
@@ -866,6 +1134,7 @@ function ScheduledTasksMainView({
   const searchInputRef = React.useRef<HTMLInputElement>(null);
   const [detailTaskId, setDetailTaskId] = React.useState<string | null>(null);
   const [createOpen, setCreateOpen] = React.useState(false);
+  const [createSuggestion, setCreateSuggestion] = React.useState<{ title: string; triggerType: string } | null>(null);
   const [openMenuId, setOpenMenuId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -909,8 +1178,25 @@ function ScheduledTasksMainView({
     />;
   }
 
-  const triggerIcon = (t: ScheduledTask["triggerType"]) => "clockIcon";
-  const triggerLabel = (t: ScheduledTask["triggerType"]) => "Scheduled automation";
+  const triggerIcon = (t: ScheduledTask["triggerType"]) => {
+    if (t === "schedule") return "clockIcon";
+    if (t === "file_arrival") return "fileIcon";
+    if (t === "table_update") return "tableIcon";
+    if (t === "continuous") return "refreshIcon";
+    if (t === "model_update" || t === "model_training") return "modelsIcon";
+    if (t === "job_completion") return "WorkflowsIcon";
+    return "clockIcon";
+  };
+  const triggerLabel = (t: ScheduledTask["triggerType"]) => {
+    if (t === "schedule") return "Scheduled automation";
+    if (t === "file_arrival") return "File arrival";
+    if (t === "table_update") return "Table update";
+    if (t === "continuous") return "Continuous";
+    if (t === "model_update") return "Model update";
+    if (t === "model_training") return "Model training";
+    if (t === "job_completion") return "Job / pipeline completion";
+    return "Scheduled automation";
+  };
 
   function handleCreate(task: ScheduledTask) {
     setTasks((prev) => [...prev, task]);
@@ -922,8 +1208,9 @@ function ScheduledTasksMainView({
     <>
       {createOpen && (
         <CreateAutomationDialog
-          onClose={() => setCreateOpen(false)}
+          onClose={() => { setCreateOpen(false); setCreateSuggestion(null); }}
           onCreate={handleCreate}
+          suggestion={createSuggestion}
         />
       )}
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-md">
@@ -1045,9 +1332,11 @@ function ScheduledTasksMainView({
           <p className="mb-3 text-title4 font-semibold text-text-primary">Suggested</p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {SUGGESTED_TASKS.map((task) => (
-              <div
+              <button
                 key={task.title}
-                className="flex items-start gap-sm rounded-md border border-border bg-background-primary p-3 transition-colors hover:border-action-default-border-hover"
+                type="button"
+                onClick={() => { setCreateSuggestion({ title: task.title, triggerType: task.triggerType }); setCreateOpen(true); }}
+                className="flex items-start gap-sm rounded-md border border-border bg-background-primary p-3 text-left transition-colors hover:border-action-default-border-hover"
               >
                 <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-background-secondary">
                   <Icon name={task.icon as Parameters<typeof Icon>[0]["name"]} size={14} className="text-text-secondary" />
@@ -1056,13 +1345,10 @@ function ScheduledTasksMainView({
                   <p className="text-paragraph font-medium text-text-primary">{task.title}</p>
                   <p className="mt-0.5 text-hint text-text-secondary">{task.description}</p>
                 </div>
-                <button
-                  type="button"
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-text-secondary hover:bg-background-secondary hover:text-text-primary"
-                >
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-text-secondary hover:bg-background-secondary hover:text-text-primary">
                   <Icon name="plusIcon" size={14} />
-                </button>
-              </div>
+                </span>
+              </button>
             ))}
           </div>
         </div>
@@ -1124,7 +1410,7 @@ function ScheduledTaskDetailView({
   onSave: (updated: ScheduledTask) => void;
   onOpenRun: (threadId: string, label: string) => void;
 }) {
-  const runs = TASK_RUN_HISTORY[task.id] ?? [];
+  const [runs, setRuns] = React.useState(TASK_RUN_HISTORY[task.id] ?? []);
   const enabled = task.enabled;
   const [overflowOpen, setOverflowOpen] = React.useState(false);
   const [editOpen, setEditOpen] = React.useState(false);
@@ -1146,7 +1432,7 @@ function ScheduledTaskDetailView({
   }, []);
 
   const runStatusLabel = (s: "pending" | "notified" | "failed") =>
-    s === "pending" ? "Pending" : s === "notified" ? "Notified" : "Failed";
+    s === "pending" ? "In progress" : s === "notified" ? "Notified" : "Failed";
 
   const runStatusIcon = (s: "pending" | "notified" | "failed") =>
     s === "pending" ? "clockIcon" : s === "notified" ? "notificationIcon" : "dangerSmallIcon";
@@ -1156,7 +1442,9 @@ function ScheduledTaskDetailView({
 
   const nextRun = task.schedule.startsWith("Every Mon") ? "Next run Tue, May 12 at 8:00 AM" : task.schedule.startsWith("Daily") ? "Next run Tue, May 12 at 6:00 AM" : "Next run Sun, May 18 at 11:00 PM";
 
-  const scheduleValue = task.schedule.startsWith("Every Mon")
+  const scheduleValue = (task.triggerType === "table_update" || task.triggerType === "model_training")
+    ? task.schedule
+    : task.schedule.startsWith("Every Mon")
     ? "Weekly on Mondays at 9 AM (UTC-07:00) America/Los_Angeles"
     : task.schedule.startsWith("Daily")
     ? "Daily at 6:00 AM (UTC-07:00) America/Los_Angeles"
@@ -1166,8 +1454,8 @@ function ScheduledTaskDetailView({
 
   const description = task.title === "Weekly dashboard refresh"
     ? "Refreshes all dashboard datasets and sends a Slack digest to the #data-ops channel."
-    : task.title === "Data quality scan"
-    ? "Scans key tables for nulls, duplicates, and schema drift on a daily schedule."
+    : task.title === "Ski resorts quality scan"
+    ? "Scans main.2026_northeast.ski_resorts for nulls, duplicates, and schema drift."
     : "Kicks off the feature pipeline and retrains the forecast model every Sunday night.";
 
   return (
@@ -1226,7 +1514,11 @@ function ScheduledTaskDetailView({
               </div>
             )}
           </div>
-          <PrimaryButton size="small" leadingIcon={<Icon name="playIcon" size={12} />}>Run now</PrimaryButton>
+          <PrimaryButton size="small" leadingIcon={<Icon name="playIcon" size={12} />} onClick={() => {
+            const now = new Date();
+            const label = now.toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+            setRuns((prev) => [{ date: label, status: "pending" }, ...prev]);
+          }}>Run now</PrimaryButton>
         </div>
 
         {/* Status + next run */}
@@ -1258,32 +1550,32 @@ function ScheduledTaskDetailView({
           <button
             type="button"
             onClick={() => setConfigOpen((v) => !v)}
-            className="flex w-full items-center px-4 py-3 text-left hover:bg-background-secondary rounded-t-md transition-colors"
+            className="flex h-11 w-full items-center px-4 text-left hover:bg-background-secondary rounded-t-md transition-colors"
           >
             <span className="flex-1 text-paragraph font-semibold text-text-primary">Configuration</span>
             {configOpen && (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); setEditOpen(true); }}
-                className="mr-2 flex items-center gap-xs text-hint text-action-tertiary-text-default hover:underline"
+              <DefaultButton
+                size="small"
+                leadingIcon={<Icon name="pencilIcon" size={12} />}
+                onClick={(e: React.MouseEvent) => { e.stopPropagation(); setEditOpen(true); }}
+                className="mr-2"
               >
-                <Icon name="pencilIcon" size={13} />
-                <span>Edit</span>
-              </button>
+                Edit
+              </DefaultButton>
             )}
             <Icon name={configOpen ? "chevronDownIcon" : "chevronRightIcon"} size={16} className="shrink-0 text-text-secondary" />
           </button>
           {configOpen && (
-            <div className="border-t border-border">
+            <div>
               {/* Schedule subsection */}
-              <div className="border-b border-border">
+              <div>
                 <button
                   type="button"
                   onClick={() => setScheduleOpen((v) => !v)}
                   className="flex w-full items-center gap-sm px-4 py-2.5 text-left"
                 >
                   <Icon name={scheduleOpen ? "chevronDownIcon" : "chevronRightIcon"} size={12} className="shrink-0 text-text-secondary" />
-                  <span className="flex-1 text-paragraph text-text-primary">Trigger</span>
+                  <span className="flex-1 text-paragraph text-text-primary">{task.triggerType === "table_update" ? "Tables" : task.triggerType === "model_training" ? "Model" : "Trigger"}</span>
                 </button>
                 {scheduleOpen && (
                   <div className="px-4 pb-3 pt-0.5">
@@ -1331,11 +1623,12 @@ function ScheduledTaskDetailView({
                   className="flex w-full items-center px-4 py-2.5 text-left hover:bg-background-secondary transition-colors"
                 >
                   <span className="flex-1 text-paragraph text-text-primary">{run.date}</span>
-                  <span className={cx("flex items-center gap-xs text-hint font-medium", runStatusColor(run.status))}>
-                    <Icon name={runStatusIcon(run.status)} size={13} />
-                    {runStatusLabel(run.status)}
-                  </span>
-                  <Icon name="chevronRightIcon" size={12} className="ml-sm shrink-0 text-text-secondary" />
+                  {run.status === "pending" && (
+                    <span className="flex items-center gap-xs text-hint font-medium text-text-secondary">
+                      <span className="h-3 w-3 animate-spin rounded-full border-2 border-border border-t-text-secondary" />
+                      In progress
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
@@ -3459,7 +3752,7 @@ export default function ChatPage() {
     setSkills((prev) => prev.map((s) => s.primaryFile === file ? { ...s, name, description } : s));
   }, []);
 
-  const handleSetMainView = React.useCallback((view: MainView) => {
+  const handleSetMainView = React.useCallback((view: MainView, clearDetail = true) => {
     setMainView((prev) => {
       if (view === "scheduled" && prev === "scheduled") setScheduledViewKey((k) => k + 1);
       return view;
@@ -3470,6 +3763,9 @@ export default function ChatPage() {
     }
     if (view !== "scheduled") {
       setSelectedTaskId(null);
+    }
+    if (view === "scheduled" && clearDetail) {
+      setScheduledDetailTaskId(null);
     }
     if (view === "customizations" || view === "scheduled") {
       setPreviewOpen(false);
@@ -3578,7 +3874,7 @@ export default function ChatPage() {
               const taskId = runThreadTaskIdRef.current.get(threadId);
               if (taskId) {
                 setScheduledDetailTaskId(taskId);
-                handleSetMainView("scheduled");
+                handleSetMainView("scheduled", false);
               }
             }}
           />
