@@ -1166,9 +1166,6 @@ export function MoreOptionsMenu({
           key={label}
           type="button"
           onClick={() => {
-            if (label === "Settings") {
-              onOpenSettings?.();
-            }
             onClose();
           }}
           className="flex w-full items-center gap-sm px-2 py-1 text-left text-paragraph text-text-primary hover:bg-background-secondary"
