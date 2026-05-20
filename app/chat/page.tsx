@@ -543,11 +543,11 @@ function ToolsMainView({
 
 const SUGGESTED_TASKS = [
   { icon: "clockIcon", title: "Refresh weekly dashboard", description: "Re-run all dashboard queries and send a Slack summary every Monday morning", triggerType: "schedule" },
-  { icon: "tableIcon", title: "Monitor data quality", description: "Scan key tables for nulls, duplicates, and schema drift on a daily schedule", triggerType: "table_update" },
-  { icon: "fileIcon", title: "Generate EDA report", description: "Run exploratory analysis on new data arrivals and append findings to a shared notebook", triggerType: "file_arrival" },
-  { icon: "modelsIcon", title: "Weekly model retraining", description: "Kick off the feature pipeline and retrain the forecast model every Sunday night", triggerType: "model_training" },
-  { icon: "WorkflowsIcon", title: "Quality check on pipeline", description: "Monitor your pipelines and analyze when issues arise", triggerType: "job_completion" },
-  { icon: "alertIcon", title: "Alert on metric drops", description: "Check DAU and WAU thresholds each hour and notify the team if they fall below baseline", triggerType: "schedule" },
+  { icon: "lightningIcon", title: "Monitor data quality", description: "Scan key tables for nulls, duplicates, and schema drift on a daily schedule", triggerType: "table_update" },
+  { icon: "lightningIcon", title: "Generate EDA report", description: "Run exploratory analysis on new data arrivals and append findings to a shared notebook", triggerType: "file_arrival" },
+  { icon: "lightningIcon", title: "Weekly model retraining", description: "Kick off the feature pipeline and retrain the forecast model every Sunday night", triggerType: "model_training" },
+  { icon: "lightningIcon", title: "Quality check on pipeline", description: "Monitor your pipelines and analyze when issues arise", triggerType: "job_completion" },
+  { icon: "clockIcon", title: "Alert on metric drops", description: "Check DAU and WAU thresholds each hour and notify the team if they fall below baseline", triggerType: "schedule" },
 ];
 
 type ScheduledTask = {
@@ -566,6 +566,9 @@ const SCHEDULED_TASKS: ScheduledTask[] = [
   { id: "t2", title: "Ski resorts quality scan", schedule: "main.2026_northeast.ski_resorts", prompt: "Scan main.2026_northeast.ski_resorts for nulls, duplicates, and schema drift. Flag any columns with >5% null rates and report unexpected value distributions in resort_name, region, and vertical_drop.", lastRun: "14h ago", status: "success", triggerType: "table_update", enabled: true },
   { id: "t3", title: "Forecast model retrain", schedule: "main.default.forecast_model", prompt: "Kick off the feature pipeline and retrain the forecast model every Sunday night", lastRun: "4d ago", status: "failed", triggerType: "model_training", enabled: false },
   { id: "t4", title: "Pipeline monitoring", schedule: "data_engineering/silver_transform", prompt: "Monitor the silver_transform pipeline for failures and anomalies. Alert when job duration exceeds 2x the rolling average or when error rate rises above 1%.", lastRun: "1h ago", status: "running", triggerType: "job_completion", enabled: true },
+  { id: "t5", title: "Daily sales summary", schedule: "Every day 7:00 AM", prompt: "Pull yesterday's sales data, compute totals by region and product category, and post a summary to #sales-ops", lastRun: "7h ago", status: "success", triggerType: "schedule", enabled: true },
+  { id: "t6", title: "End-of-week KPI report", schedule: "Every Fri 5:00 PM", prompt: "Aggregate the week's key metrics — DAU, revenue, pipeline health — and generate a Friday wrap-up report for leadership", lastRun: "5d ago", status: "success", triggerType: "schedule", enabled: true },
+  { id: "t7", title: "Nightly data freshness check", schedule: "Every day 2:00 AM", prompt: "Verify all critical tables were updated within their expected refresh windows. Flag any tables that are stale by more than 2 hours.", lastRun: "5h ago", status: "failed", triggerType: "schedule", enabled: false },
 ];
 
 const MOCK_JOBS = [
@@ -1042,70 +1045,60 @@ function CreateAutomationDialog({ onClose, onCreate, onSave, initialTask, sugges
             )}
           </div>
 
-          {/* Notifications */}
-          <div className="flex flex-col gap-sm">
-            <div className="flex items-center justify-between">
-              <label className="text-paragraph font-medium text-text-primary">Notifications</label>
-              <div className="flex rounded-sm border border-border bg-background-secondary p-0.5">
-                {(["Disabled", "Enabled"] as const).map((opt) => (
-                  <button
-                    key={opt}
-                    type="button"
-                    onClick={() => setNotifEnabled(opt === "Enabled")}
-                    className={cx(
-                      "rounded-xs px-2 py-0.5 text-hint transition-colors",
-                      (opt === "Enabled") === notifEnabled
-                        ? "bg-background-primary font-medium text-text-primary shadow-sm"
-                        : "text-text-secondary hover:text-text-primary",
-                    )}
-                  >
-                    {opt}
-                  </button>
-                ))}
-              </div>
+          {/* Notification detail table — shown when enabled */}
+          {notifEnabled && <div className="overflow-hidden rounded-sm border border-border">
+            {/* Header row */}
+            <div className="grid grid-cols-[1fr_56px_56px_88px] items-center border-b border-border px-3 py-2">
+              <span className="text-hint font-medium text-text-secondary">Destination</span>
+              <span className="text-center text-hint font-medium text-text-secondary">Started</span>
+              <span className="text-center text-hint font-medium text-text-secondary">Finished</span>
+              <span className="text-center text-hint font-medium text-text-secondary">Needs attention</span>
             </div>
-            {notifEnabled && <div className="overflow-hidden rounded-sm border border-border">
-              {/* Header row */}
-              <div className="grid grid-cols-[1fr_56px_56px_88px] items-center border-b border-border px-3 py-2">
-                <span className="text-hint font-medium text-text-secondary">Destination</span>
-                <span className="text-center text-hint font-medium text-text-secondary">Started</span>
-                <span className="text-center text-hint font-medium text-text-secondary">Finished</span>
-                <span className="text-center text-hint font-medium text-text-secondary">Needs attention</span>
+            {/* Email row */}
+            <div className="grid grid-cols-[1fr_56px_56px_88px] items-center px-3 py-2">
+              <div className="flex items-center gap-sm rounded-sm border border-border bg-background-primary px-2 py-1.5 focus-within:border-action-default-border-focus">
+                <Icon name="MailIcon" size={13} className="shrink-0 text-text-secondary" />
+                <input
+                  type="email"
+                  value={notifEmail}
+                  onChange={(e) => setNotifEmail(e.target.value)}
+                  placeholder="Type email here"
+                  className="min-w-0 flex-1 bg-transparent text-hint text-text-primary outline-none placeholder:text-text-placeholder"
+                />
               </div>
-              {/* Email row */}
-              <div className="grid grid-cols-[1fr_56px_56px_88px] items-center px-3 py-2">
-                <div className="flex items-center gap-sm rounded-sm border border-border bg-background-primary px-2 py-1.5 focus-within:border-action-default-border-focus">
-                  <Icon name="MailIcon" size={13} className="shrink-0 text-text-secondary" />
+              {([
+                [notifOnStart, setNotifOnStart],
+                [notifOnSuccess, setNotifOnSuccess],
+                [notifOnFailure, setNotifOnFailure],
+              ] as [boolean, (v: boolean) => void][]).map(([checked, setter], i) => (
+                <div key={i} className="flex justify-center">
                   <input
-                    type="email"
-                    value={notifEmail}
-                    onChange={(e) => setNotifEmail(e.target.value)}
-                    placeholder="Type email here"
-                    className="min-w-0 flex-1 bg-transparent text-hint text-text-primary outline-none placeholder:text-text-placeholder"
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => setter(!checked)}
+                    className="h-4 w-4 cursor-pointer accent-blue-600"
                   />
                 </div>
-                {([
-                  [notifOnStart, setNotifOnStart],
-                  [notifOnSuccess, setNotifOnSuccess],
-                  [notifOnFailure, setNotifOnFailure],
-                ] as [boolean, (v: boolean) => void][]).map(([checked, setter], i) => (
-                  <div key={i} className="flex justify-center">
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => setter(!checked)}
-                      className="h-4 w-4 cursor-pointer accent-blue-600"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>}
-          </div>
+              ))}
+            </div>
+          </div>}
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-sm pt-xs">
-            <DefaultButton size="default" onClick={onClose}>Cancel</DefaultButton>
-            <PrimaryButton size="default" onClick={handleSubmit} disabled={!title.trim()}>{isEdit ? "Save" : "Create"}</PrimaryButton>
+          <div className="flex items-center justify-between gap-sm pt-xs">
+            {/* Notification checkbox */}
+            <label className="flex cursor-pointer items-center gap-xs text-paragraph text-text-secondary">
+              <input
+                type="checkbox"
+                checked={notifEnabled}
+                onChange={() => setNotifEnabled((v) => !v)}
+                className="h-4 w-4 cursor-pointer accent-blue-600"
+              />
+              Notify
+            </label>
+            <div className="flex items-center gap-sm">
+              <DefaultButton size="default" onClick={onClose}>Cancel</DefaultButton>
+              <PrimaryButton size="default" onClick={handleSubmit} disabled={!title.trim()}>{isEdit ? "Save" : "Create"}</PrimaryButton>
+            </div>
           </div>
         </div>
       </div>
@@ -1129,6 +1122,7 @@ function ScheduledTasksMainView({
   onRegisterRunThread?: (threadId: string, taskId: string) => void;
   navigateToDetailTaskId?: string | null;
 }) {
+  const router = useRouter();
   const [tasks, setTasks] = React.useState<ScheduledTask[]>(SCHEDULED_TASKS);
   const [searchOpen, setSearchOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -1137,6 +1131,11 @@ function ScheduledTasksMainView({
   const [createOpen, setCreateOpen] = React.useState(false);
   const [createSuggestion, setCreateSuggestion] = React.useState<{ title: string; triggerType: string } | null>(null);
   const [openMenuId, setOpenMenuId] = React.useState<string | null>(null);
+  const [filterOpen, setFilterOpen] = React.useState(false);
+  const [activeFilters, setActiveFilters] = React.useState<("time-based" | "event-based")[]>([]);
+  const filterRef = React.useRef<HTMLDivElement>(null);
+  const [splitMenuOpen, setSplitMenuOpen] = React.useState(false);
+  const splitMenuRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     if (!openMenuId) return;
@@ -1144,6 +1143,28 @@ function ScheduledTasksMainView({
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [openMenuId]);
+
+  React.useEffect(() => {
+    if (!filterOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+        setFilterOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [filterOpen]);
+
+  React.useEffect(() => {
+    if (!splitMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (splitMenuRef.current && !splitMenuRef.current.contains(e.target as Node)) {
+        setSplitMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [splitMenuOpen]);
 
   React.useEffect(() => {
     if (navigateToDetailTaskId) {
@@ -1181,28 +1202,35 @@ function ScheduledTasksMainView({
 
   const triggerIcon = (t: ScheduledTask["triggerType"]) => {
     if (t === "schedule") return "clockIcon";
-    if (t === "file_arrival") return "fileIcon";
-    if (t === "table_update") return "tableIcon";
-    if (t === "continuous") return "refreshIcon";
-    if (t === "model_update" || t === "model_training") return "modelsIcon";
-    if (t === "job_completion") return "WorkflowsIcon";
-    return "clockIcon";
+    return "lightningIcon";
   };
   const triggerLabel = (t: ScheduledTask["triggerType"]) => {
-    if (t === "schedule") return "Scheduled automation";
-    if (t === "file_arrival") return "File arrival";
-    if (t === "table_update") return "Table update";
-    if (t === "continuous") return "Continuous";
-    if (t === "model_update") return "Model update";
-    if (t === "model_training") return "Model training";
-    if (t === "job_completion") return "Job / pipeline completion";
-    return "Scheduled automation";
+    if (t === "schedule") return "Time-based";
+    return "Event-based";
   };
 
   function handleCreate(task: ScheduledTask) {
     setTasks((prev) => [...prev, task]);
     setCreateOpen(false);
     setDetailTaskId(task.id);
+  }
+
+  const FILTER_OPTIONS: { value: "time-based" | "event-based"; label: string }[] = [
+    { value: "time-based", label: "Time-based" },
+    { value: "event-based", label: "Event-based" },
+  ];
+
+  const filteredTasks = tasks.filter((t) => {
+    const matchesSearch = !searchQuery || t.title.toLowerCase().includes(searchQuery.toLowerCase());
+    const category = t.triggerType === "schedule" ? "time-based" : "event-based";
+    const matchesFilter = activeFilters.length === 0 || activeFilters.includes(category);
+    return matchesSearch && matchesFilter;
+  });
+
+  function toggleFilter(type: "time-based" | "event-based") {
+    setActiveFilters((prev) =>
+      prev.includes(type) ? prev.filter((f) => f !== type) : [...prev, type]
+    );
   }
 
   return (
@@ -1245,24 +1273,160 @@ function ScheduledTasksMainView({
               icon={<Icon name="searchIcon" size={14} />}
               size="small"
               tone="neutral"
+              className="text-text-secondary"
               onClick={() => setSearchOpen(true)}
             />
           )}
-          <PrimaryButton size="small" leadingIcon={<Icon name="plusIcon" size={12} />} onClick={() => setCreateOpen(true)}>New</PrimaryButton>
+          {/* Filter button */}
+          <div className="relative" ref={filterRef}>
+            <button
+              type="button"
+              aria-label="Filter by type"
+              onClick={() => setFilterOpen((v) => !v)}
+              className={cx(
+                "relative flex h-7 items-center gap-xs rounded px-2 text-hint font-medium transition-colors",
+                activeFilters.length > 0
+                  ? "bg-blue-100 text-action-tertiary-text-default hover:bg-blue-200"
+                  : "text-text-secondary hover:bg-action-default-background-hover hover:text-text-primary",
+              )}
+            >
+              <Icon name="filterIcon" size={14} />
+              {activeFilters.length > 0 && (
+                <span className="text-action-tertiary-text-default">{activeFilters.length}</span>
+              )}
+            </button>
+            {filterOpen && (
+              <div className="absolute right-0 top-8 z-50 min-w-[188px] overflow-hidden rounded border border-border bg-background-primary py-1 shadow-[0px_2px_16px_0px_rgba(0,0,0,0.08)]">
+                <p className="px-3 py-1.5 text-hint font-semibold text-text-secondary uppercase tracking-wide">Filter by type</p>
+                {FILTER_OPTIONS.map(({ value, label }) => {
+                  const active = activeFilters.includes(value);
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => toggleFilter(value)}
+                      className="flex w-full items-center gap-sm px-3 py-1.5 text-left text-paragraph text-text-primary hover:bg-background-secondary"
+                    >
+                      <span className={cx(
+                        "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border transition-colors",
+                        active ? "border-action-primary-background-default bg-action-primary-background-default" : "border-border",
+                      )}>
+                        {active && <Icon name="checkIcon" size={10} className="text-white" />}
+                      </span>
+                      {label}
+                    </button>
+                  );
+                })}
+                {activeFilters.length > 0 && (
+                  <>
+                    <div className="my-1 border-t border-border" />
+                    <button
+                      type="button"
+                      onClick={() => setActiveFilters([])}
+                      className="flex w-full items-center gap-sm px-3 py-1.5 text-left text-paragraph text-action-tertiary-text-default hover:bg-background-secondary"
+                    >
+                      Clear filters
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+          {/* Split button: Create (dialog) + chevron (Create in chat) */}
+          <div className="relative flex" ref={splitMenuRef}>
+            <button
+              type="button"
+              onClick={() => setCreateOpen(true)}
+              className="flex h-7 items-center gap-xs rounded-l px-3 text-hint font-medium text-action-primary-text-default bg-action-primary-background-default hover:bg-action-primary-background-hover transition-colors"
+            >
+              <Icon name="plusIcon" size={12} />
+              Create
+            </button>
+            <button
+              type="button"
+              aria-label="More create options"
+              onClick={() => setSplitMenuOpen((v) => !v)}
+              className="flex h-7 w-6 items-center justify-center rounded-r border-l border-action-primary-background-hover bg-action-primary-background-default text-action-primary-text-default hover:bg-action-primary-background-hover transition-colors"
+            >
+              <Icon name="chevronDownIcon" size={12} />
+            </button>
+            {splitMenuOpen && (
+              <div className="absolute right-0 top-8 z-50 min-w-[160px] overflow-hidden rounded border border-border bg-background-primary py-1 shadow-[0px_2px_16px_0px_rgba(0,0,0,0.08)]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSplitMenuOpen(false);
+                    const threadId = `create-automation-${Date.now()}`;
+                    state.injectThread(
+                      { id: threadId, label: "Create a new automation", status: "done", time: "now", subtitle: "New automation" },
+                      [
+                        { type: "user", id: `${threadId}-user`, text: "Create a new automation" },
+                        { type: "assistant-text", id: `${threadId}-response`, text: "", nodes: (
+                          <>
+                            <p>I can help you set up a new automation. Automations can run in two ways:</p>
+                            <div className="flex flex-col gap-xs">
+                              <p className="font-medium text-text-primary">Time-based</p>
+                              <p className="text-text-secondary">Runs on a schedule you define. For example:</p>
+                              <ul className="ml-4 flex list-disc flex-col gap-xs text-text-secondary">
+                                <li>Every Monday at 9:00 AM</li>
+                                <li>Daily at 6:00 AM</li>
+                                <li>Every Friday at 5:00 PM</li>
+                              </ul>
+                            </div>
+                            <div className="flex flex-col gap-xs">
+                              <p className="font-medium text-text-primary">Event-based</p>
+                              <p className="text-text-secondary">Triggered when something happens in your workspace:</p>
+                              <ul className="ml-4 flex list-disc flex-col gap-xs text-text-secondary">
+                                <li><span className="font-medium text-text-primary">Table update</span> — runs when a specific Unity Catalog table is updated</li>
+                                <li><span className="font-medium text-text-primary">File arrival</span> — runs when a new file lands in a volume or external location</li>
+                                <li><span className="font-medium text-text-primary">Job / pipeline completion</span> — runs after a Databricks job or pipeline finishes</li>
+                                <li><span className="font-medium text-text-primary">Model training</span> — runs when a model training job completes</li>
+                              </ul>
+                            </div>
+                            <p>To get started, tell me:</p>
+                            <ol className="ml-4 flex list-decimal flex-col gap-xs">
+                              <li><span className="font-medium">Name</span> — what should this automation be called?</li>
+                              <li><span className="font-medium">What it should do</span> — what question or task should it run each time?</li>
+                              <li><span className="font-medium">How to trigger it</span> — time-based schedule, or one of the events above?</li>
+                            </ol>
+                          </>
+                        )},
+                      ]
+                    );
+                    onSetMainView("thread");
+                  }}
+                  className="flex w-full items-center gap-sm px-3 py-1.5 text-left text-paragraph text-text-primary hover:bg-background-secondary"
+                >
+                  <Icon name="newThreadIcon" size={14} className="text-text-secondary" />
+                  Create in chat
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="py-4">
           <div>
-          {tasks.length === 0 ? (
+          {filteredTasks.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
               <Icon name="clockIcon" size={32} className="text-text-placeholder" />
-              <p className="text-paragraph font-medium text-text-primary">No automations yet</p>
-              <p className="text-paragraph text-text-secondary">Run Genie Code tasks on a schedule or in response to events.</p>
-              <PrimaryButton size="default" onClick={() => setCreateOpen(true)}>Create automation</PrimaryButton>
+              {tasks.length === 0 ? (
+                <>
+                  <p className="text-paragraph font-medium text-text-primary">No automations yet</p>
+                  <p className="text-paragraph text-text-secondary">Run Genie Code tasks on a schedule or in response to events.</p>
+                  <PrimaryButton size="default" onClick={() => setCreateOpen(true)}>Create automation</PrimaryButton>
+                </>
+              ) : (
+                <>
+                  <p className="text-paragraph font-medium text-text-primary">No matching automations</p>
+                  <p className="text-paragraph text-text-secondary">Try adjusting your filters or search query.</p>
+                  <DefaultButton size="default" onClick={() => { setActiveFilters([]); setSearchQuery(""); }}>Clear filters</DefaultButton>
+                </>
+              )}
             </div>
           ) : (
             <div className="flex flex-col gap-2">
-              {tasks.map((task) => {
+              {filteredTasks.map((task) => {
                 const isSelected = selectedTaskId === task.id;
                 return (
                   <div
@@ -1304,13 +1468,18 @@ function ScheduledTasksMainView({
                         <div className="absolute right-0 top-7 z-50 min-w-[180px] overflow-hidden rounded border border-border bg-background-primary py-1 shadow-[0px_2px_16px_0px_rgba(0,0,0,0.08)]">
                           {[
                             { icon: "playIcon", label: "Run now", danger: false },
-                            { icon: "pencilIcon", label: "Edit automation", danger: false },
+                            { icon: "pencilIcon", label: task.triggerType !== "schedule" ? "Edit in job" : "Edit automation", danger: false },
                             { icon: "trashIcon", label: "Delete automation", danger: true },
                           ].map(({ icon, label, danger }) => (
                             <button
                               key={label}
                               type="button"
-                              onClick={(e) => { e.stopPropagation(); if (danger) { setTasks((prev) => prev.filter((t) => t.id !== task.id)); } setOpenMenuId(null); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenMenuId(null);
+                                if (danger) { setTasks((prev) => prev.filter((t) => t.id !== task.id)); }
+                                else if (label === "Edit in job") { router.push(`/workflows/${task.id}`); }
+                              }}
                               className={cx("flex w-full items-center gap-sm px-3 py-1.5 text-left text-paragraph hover:bg-background-secondary", danger ? "text-action-danger-default-text-default" : "text-text-primary")}
                             >
                               <Icon name={icon as Parameters<typeof Icon>[0]["name"]} size={14} className={danger ? "text-action-danger-default-text-default" : "text-text-secondary"} />
@@ -1336,7 +1505,86 @@ function ScheduledTasksMainView({
               <button
                 key={task.title}
                 type="button"
-                onClick={() => { setCreateSuggestion({ title: task.title, triggerType: task.triggerType }); setCreateOpen(true); }}
+                onClick={() => {
+                  if (task.triggerType === "schedule") {
+                    setCreateSuggestion({ title: task.title, triggerType: task.triggerType });
+                    setCreateOpen(true);
+                  } else {
+                    const threadId = `suggest-${task.triggerType}-${Date.now()}`;
+                    const chatNodes: Record<string, { userText: string; nodes: React.ReactNode }> = {
+                      table_update: {
+                        userText: `Set up a "${task.title}" automation`,
+                        nodes: (
+                          <>
+                            <p>I can set up a <span className="font-medium">Monitor data quality</span> automation that runs whenever a table is updated. This is an event-based automation triggered by a table update.</p>
+                            <p>To configure it, I need a couple of details:</p>
+                            <ol className="ml-4 flex list-decimal flex-col gap-xs">
+                              <li><span className="font-medium">Which table?</span> — provide the full Unity Catalog path (e.g., <span className="font-mono text-hint">main.default.my_table</span>)</li>
+                              <li><span className="font-medium">What to check</span> — should I look for nulls, duplicates, schema drift, or all of the above?</li>
+                              <li><span className="font-medium">Where to send results</span> — Slack channel, email, or just save a report?</li>
+                            </ol>
+                            <p>Which table would you like to monitor?</p>
+                          </>
+                        ),
+                      },
+                      file_arrival: {
+                        userText: `Set up a "${task.title}" automation`,
+                        nodes: (
+                          <>
+                            <p>I can set up a <span className="font-medium">Generate EDA report</span> automation that runs whenever a new file arrives in a volume or external location. This is an event-based automation triggered by file arrival.</p>
+                            <p>To configure it, I need a few details:</p>
+                            <ol className="ml-4 flex list-decimal flex-col gap-xs">
+                              <li><span className="font-medium">Which path to watch?</span> — provide the Unity Catalog volume or external location path (e.g., <span className="font-mono text-hint">/Volumes/main/default/landing/</span>)</li>
+                              <li><span className="font-medium">File type</span> — CSV, Parquet, JSON, or any?</li>
+                              <li><span className="font-medium">Where to save the report</span> — which notebook or folder should the EDA output go to?</li>
+                            </ol>
+                            <p>Which path should I watch for new files?</p>
+                          </>
+                        ),
+                      },
+                      model_training: {
+                        userText: `Set up a "${task.title}" automation`,
+                        nodes: (
+                          <>
+                            <p>I can set up a <span className="font-medium">Weekly model retraining</span> automation that triggers after a model training job completes. This is an event-based automation triggered by model training.</p>
+                            <p>To configure it, I need a few details:</p>
+                            <ol className="ml-4 flex list-decimal flex-col gap-xs">
+                              <li><span className="font-medium">Which model?</span> — provide the model name or Unity Catalog path (e.g., <span className="font-mono text-hint">main.default.forecast_model</span>)</li>
+                              <li><span className="font-medium">What to run after training</span> — evaluate against a holdout set, promote to staging, or run a comparison report?</li>
+                              <li><span className="font-medium">Where to send results</span> — Slack, email, or MLflow?</li>
+                            </ol>
+                            <p>Which model should trigger this automation?</p>
+                          </>
+                        ),
+                      },
+                      job_completion: {
+                        userText: `Set up a "${task.title}" automation`,
+                        nodes: (
+                          <>
+                            <p>I can set up a <span className="font-medium">Quality check on pipeline</span> automation that runs whenever a job or pipeline finishes. This is an event-based automation triggered by job or pipeline completion.</p>
+                            <p>To configure it, I need a few details:</p>
+                            <ol className="ml-4 flex list-decimal flex-col gap-xs">
+                              <li><span className="font-medium">Which job or pipeline?</span> — provide the job name or pipeline path (e.g., <span className="font-mono text-hint">data_engineering/silver_transform</span>)</li>
+                              <li><span className="font-medium">What to check</span> — row counts, error rates, duration anomalies, or all?</li>
+                              <li><span className="font-medium">Alert threshold</span> — should I notify only on failure, or also on slow runs?</li>
+                            </ol>
+                            <p>Which job or pipeline should trigger this check?</p>
+                          </>
+                        ),
+                      },
+                    };
+                    const entry = chatNodes[task.triggerType];
+                    if (!entry) return;
+                    state.injectThread(
+                      { id: threadId, label: entry.userText, status: "done", time: "now", subtitle: task.title },
+                      [
+                        { type: "user", id: `${threadId}-user`, text: entry.userText },
+                        { type: "assistant-text", id: `${threadId}-response`, text: "", nodes: entry.nodes },
+                      ]
+                    );
+                    onSetMainView("thread");
+                  }
+                }}
                 className="flex items-start gap-sm rounded-md border border-border bg-background-primary p-3 text-left transition-colors hover:border-action-default-border-hover"
               >
                 <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-background-secondary">
@@ -1417,6 +1665,8 @@ function ScheduledTaskDetailView({
   onSave: (updated: ScheduledTask) => void;
   onOpenRun: (threadId: string, label: string) => void;
 }) {
+  const router = useRouter();
+  const isEventBased = task.triggerType !== "schedule";
   const [runs, setRuns] = React.useState(TASK_RUN_HISTORY[task.id] ?? []);
   const handleRunNow = () => {
     const now = new Date();
@@ -1518,13 +1768,17 @@ function ScheduledTaskDetailView({
                 className="absolute right-0 top-8 z-50 min-w-[160px] overflow-hidden rounded border border-border bg-background-primary py-1 shadow-[0px_2px_16px_0px_rgba(0,0,0,0.08)]"
               >
                 {[
-                  { icon: "pencilIcon", label: "Edit", danger: false },
+                  { icon: "pencilIcon", label: isEventBased ? "Edit in job" : "Edit", danger: false },
                   { icon: "trashIcon", label: "Delete", danger: true },
                 ].map(({ icon, label, danger }) => (
                   <button
                     key={label}
                     type="button"
-                    onClick={() => { setOverflowOpen(false); if (label === "Edit") setEditOpen(true); }}
+                    onClick={() => {
+                      setOverflowOpen(false);
+                      if (label === "Edit") setEditOpen(true);
+                      else if (label === "Edit in job") router.push(`/workflows/${task.id}`);
+                    }}
                     className={cx("flex w-full items-center gap-sm px-2 py-1 text-left text-paragraph hover:bg-background-secondary", danger ? "text-action-danger-default-text-default" : "text-text-primary")}
                   >
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center">
@@ -1575,10 +1829,17 @@ function ScheduledTaskDetailView({
               <DefaultButton
                 size="small"
                 leadingIcon={<Icon name="pencilIcon" size={12} />}
-                onClick={(e: React.MouseEvent) => { e.stopPropagation(); setEditOpen(true); }}
+                onClick={(e: React.MouseEvent) => {
+                  e.stopPropagation();
+                  if (isEventBased) {
+                    router.push(`/workflows/${task.id}`);
+                  } else {
+                    setEditOpen(true);
+                  }
+                }}
                 className="mr-2"
               >
-                Edit
+                {isEventBased ? "Edit in job" : "Edit"}
               </DefaultButton>
             )}
             <Icon name={configOpen ? "chevronDownIcon" : "chevronRightIcon"} size={16} className="shrink-0 text-text-secondary" />
@@ -1838,7 +2099,7 @@ function ChatLeftNav({
         <Tooltip label="Automations" align="left">
           <IconButton
             aria-label="Automations"
-            icon={<Icon name="clockIcon" size={14} />}
+            icon={<Icon name="lightningIcon" size={14} />}
             size="small"
             tone="neutral"
             className={activeMainView === "scheduled" ? "!bg-background-tertiary" : ""}
@@ -1929,7 +2190,7 @@ function ChatLeftNav({
               activeMainView === "scheduled" ? "bg-action-default-background-hover font-medium text-text-primary" : "text-text-primary",
             )}
           >
-            <Icon name="clockIcon" size={14} className="shrink-0 text-text-secondary" />
+            <Icon name="lightningIcon" size={14} className="shrink-0 text-text-secondary" />
             Automations
           </button>
           {searchActive ? (

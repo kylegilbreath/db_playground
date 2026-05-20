@@ -270,6 +270,9 @@ function AppChromeInner({ className, children }: AppChromeProps) {
       if (next === "workspace") {
         router.push("/workspace");
       }
+      if (next === "workflows") {
+        router.push("/workflows");
+      }
       if (next === "insights") {
         router.push(isOne || isExpanded || isNoTopbar || isM2 ? `${basePrefix}/insights` : "/one/insights");
       }

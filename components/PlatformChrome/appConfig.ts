@@ -54,7 +54,7 @@ const LAKEHOUSE_CONFIG: AppConfig = {
         { id: "discover", label: "Discover", iconName: "discoverIcon" },
         { id: "workspace", label: "Workspace", iconName: "workspacesIcon" },
         { id: "catalog", label: "Catalog", iconName: "catalogIcon", disabled: true },
-        { id: "workflows", label: "Workflows", iconName: "WorkflowsIcon", disabled: true },
+        { id: "workflows", label: "Jobs & Pipelines", iconName: "WorkflowsIcon" },
         { id: "compute", label: "Compute", iconName: "cloudIcon", disabled: true },
       ],
     },

@@ -1,3 +1,5 @@
+import type * as React from "react";
+
 export type AssetKind = "notebook" | "file" | "model" | "table" | "dashboard";
 
 export interface Asset {
@@ -26,6 +28,7 @@ export interface AssistantTextMessage {
   type: "assistant-text";
   id: string;
   text: string;
+  nodes?: React.ReactNode;
 }
 
 export interface ThinkingMessage {
