@@ -2004,6 +2004,7 @@ function ChatLeftNav({
   onCollapsedChange,
   reviewedThreadIds = new Set(),
   onRenameActiveThread,
+  onRenameThread,
   activeMainView,
   onSetMainView,
 }: {
@@ -2015,6 +2016,7 @@ function ChatLeftNav({
   onCollapsedChange: (v: boolean) => void;
   reviewedThreadIds?: Set<string>;
   onRenameActiveThread?: () => void;
+  onRenameThread?: (id: string, newLabel: string) => void;
   activeMainView: MainView;
   onSetMainView: (view: MainView) => void;
 }) {
@@ -2244,6 +2246,7 @@ function ChatLeftNav({
             onSelect={(id) => { onSelect(id); onSetMainView("thread"); setSearchQuery(""); setSearchActive(false); }}
             reviewedThreadIds={reviewedThreadIds}
             onRenameActiveThread={onRenameActiveThread}
+            onRenameThread={onRenameThread}
           />
         </div>
       </div>
@@ -4088,6 +4091,7 @@ export default function ChatPage() {
           onCollapsedChange={setNavCollapsed}
           reviewedThreadIds={reviewedThreadIds}
           onRenameActiveThread={() => setTimeout(() => focusTitleInputRef.current?.(), 50)}
+          onRenameThread={state.handleRenameThread}
           activeMainView={mainView}
           onSetMainView={handleSetMainView}
         />
