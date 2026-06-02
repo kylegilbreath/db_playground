@@ -329,12 +329,9 @@ function ThreadStatusIcon({ status }: { status: ThreadStatus }) {
 function groupThreads(threads: GenieThread[], pinnedIds: Set<string>): Array<{ label: string; threads: GenieThread[] }> {
   const pinned = threads.filter((t) => pinnedIds.has(t.id));
   const unpinned = threads.filter((t) => !pinnedIds.has(t.id));
-  const today = unpinned.slice(0, 3);
-  const previous = unpinned.slice(3);
   const groups: Array<{ label: string; threads: GenieThread[] }> = [];
   if (pinned.length > 0) groups.push({ label: "Pinned", threads: pinned });
-  groups.push({ label: "Today", threads: today });
-  if (previous.length > 0) groups.push({ label: "Previous 7 days", threads: previous });
+  if (unpinned.length > 0) groups.push({ label: "Recents", threads: unpinned });
   return groups;
 }
 
