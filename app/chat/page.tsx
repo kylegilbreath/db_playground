@@ -58,7 +58,7 @@ const WORKSPACE_FILES_CHAT: { name: string; icon: string; kind: import("@/compon
 ];
 
 type SidePanel = "threads";
-type MainView = "thread" | "customizations" | "scheduled";
+type MainView = "thread" | "customizations" | "scheduled" | "inbox";
 type CustomizationsTab = "skills" | "connections";
 
 function Tooltip({ label, children, align = "center" }: { label: string; children: React.ReactNode; align?: "center" | "left" | "right" }) {
@@ -1136,6 +1136,7 @@ function ScheduledTasksMainView({
   const filterRef = React.useRef<HTMLDivElement>(null);
   const [splitMenuOpen, setSplitMenuOpen] = React.useState(false);
   const splitMenuRef = React.useRef<HTMLDivElement>(null);
+  const [suggestedCollapsed, setSuggestedCollapsed] = React.useState(false);
 
   React.useEffect(() => {
     if (!openMenuId) return;
@@ -1192,7 +1193,7 @@ function ScheduledTasksMainView({
       onOpenRun={(threadId, label) => {
         state.injectThread(
           { id: threadId, label, status: "done", time: "now", subtitle: `Run of ${detailTask.title}`, parentLabel: detailTask.title },
-          buildRunSteps(detailTask),
+          buildRunSteps(detailTask, label),
         );
         onRegisterRunThread?.(threadId, detailTask.id);
         onSetMainView("thread");
@@ -1499,8 +1500,15 @@ function ScheduledTasksMainView({
 
         {/* Suggested */}
         <div className="border-t border-border py-5">
-          <p className="mb-3 text-title4 font-semibold text-text-primary">Suggested</p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => setSuggestedCollapsed(!suggestedCollapsed)}
+            className="mb-3 flex w-full items-center justify-between text-title4 font-semibold text-text-primary hover:text-text-secondary"
+          >
+            <span>Suggested</span>
+            <Icon name={suggestedCollapsed ? "chevronRightIcon" : "chevronDownIcon"} size={14} />
+          </button>
+          {!suggestedCollapsed && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {SUGGESTED_TASKS.map((task) => (
               <button
                 key={task.title}
@@ -1599,7 +1607,7 @@ function ScheduledTasksMainView({
                 </span>
               </button>
             ))}
-          </div>
+          </div>}
         </div>
         </div>{/* max-w-[800px] */}
       </div>
@@ -1617,38 +1625,340 @@ const TASK_MOCK_RESPONSES: Record<string, string> = {
   t3: "Feature pipeline completed in 4m 32s. Retrained forecast model on the latest 90-day window — RMSE improved from 0.214 to 0.198. Model artifact saved to `models/forecast_v3_2026-05-11` and registered in MLflow. Ready for promotion to staging.",
 };
 
-function buildRunSteps(task: ScheduledTask): ChatStep[] {
+// ---------------------------------------------------------------------------
+// Inbox
+// ---------------------------------------------------------------------------
+
+type InboxSource = "automation" | "manual" | "zeroops";
+type InboxStatus = "needs-review" | "in-progress" | "done";
+
+type InboxThread = {
+  id: string;
+  title: string;
+  source: InboxSource;
+  sourceName: string;
+  taskId?: string; // for automation threads — which ScheduledTask created this
+  status: InboxStatus;
+  updatedAt: string;
+  read: boolean;
+};
+
+const INBOX_THREADS: InboxThread[] = [
+  { id: "ib-1", title: "Assistant Usage Dashboard: Analyze Last 90 Days", source: "manual", sourceName: "Manual", status: "needs-review", updatedAt: "Jun 2, 9:14 AM", read: false },
+  { id: "ib-2", title: "Weekly dashboard refresh — Jun 1, 10:03 AM", source: "automation", sourceName: "Weekly dashboard refresh", taskId: "t1", status: "done", updatedAt: "Jun 1, 10:09 AM", read: false },
+  { id: "ib-3", title: "Customer 360 failing: upstream table dropped", source: "zeroops", sourceName: "ZeroOps Autopilot", status: "needs-review", updatedAt: "Jun 1, 8:42 AM", read: false },
+  { id: "ib-4", title: "EDA on ski resort properties with a 6 month forecast", source: "manual", sourceName: "Manual", status: "done", updatedAt: "Jun 1, 7:00 AM", read: true },
+  { id: "ib-5", title: "Ski resorts quality scan — Jun 1, 9:02 AM", source: "automation", sourceName: "Ski resorts quality scan", taskId: "t2", status: "done", updatedAt: "Jun 1, 9:08 AM", read: true },
+  { id: "ib-6", title: "Sales dashboard data arriving late", source: "zeroops", sourceName: "ZeroOps Autopilot", status: "in-progress", updatedAt: "May 31, 4:30 PM", read: false },
+  { id: "ib-7", title: "Cluster resorts into groups based on price, size, and snowfall", source: "manual", sourceName: "Manual", status: "done", updatedAt: "May 31, 2:15 PM", read: true },
+  { id: "ib-8", title: "Pipeline monitoring — Jun 1, 9:00 AM", source: "automation", sourceName: "Pipeline monitoring", taskId: "t4", status: "needs-review", updatedAt: "Jun 1, 9:05 AM", read: false },
+  { id: "ib-9", title: "etl_marketing_events freshness SLA at risk", source: "zeroops", sourceName: "ZeroOps Autopilot", status: "needs-review", updatedAt: "May 31, 11:20 AM", read: true },
+  { id: "ib-10", title: "Build a revenue attribution model comparing paid vs. organic acquisition channels across Q1 and Q2", source: "manual", sourceName: "Manual", status: "done", updatedAt: "May 29, 3:00 PM", read: true },
+  { id: "ib-11", title: "Weekly dashboard refresh — May 25, 10:02 AM", source: "automation", sourceName: "Weekly dashboard refresh", taskId: "t1", status: "done", updatedAt: "May 25, 10:08 AM", read: true },
+  { id: "ib-12", title: "DBR 14 → 17 update available for 4 jobs", source: "zeroops", sourceName: "ZeroOps Autopilot", status: "needs-review", updatedAt: "May 25, 9:00 AM", read: true },
+];
+
+const SOURCE_LABELS: Record<InboxSource, string> = {
+  automation: "Automation",
+  manual: "Manual",
+  zeroops: "ZeroOps",
+};
+
+const SOURCE_COLORS: Record<InboxSource, string> = {
+  automation: "bg-blue-100 text-blue-700",
+  manual: "bg-neutral-100 text-text-secondary",
+  zeroops: "bg-purple-100 text-purple-700",
+};
+
+const STATUS_CONFIG: Record<InboxStatus, { label: string; dot: string; text: string }> = {
+  "needs-review": { label: "Needs review", dot: "bg-yellow-400", text: "text-yellow-700" },
+  "in-progress": { label: "In progress", dot: "bg-blue-400", text: "text-blue-700" },
+  "done": { label: "Done", dot: "bg-green-500", text: "text-green-700" },
+};
+
+const INBOX_THREAD_STEPS: Record<string, ChatStep[]> = {
+  "ib-1": [
+    { type: "user", id: "ib-1-u", text: "Assistant Usage Dashboard: Analyze Last 90 Days" },
+    { type: "assistant-text", id: "ib-1-a", text: "I've analyzed the last 90 days of assistant usage. Key findings: 847 total sessions, up 34% vs prior period. Top use cases: data exploration (41%), SQL generation (28%), debugging (18%). Average session length: 6.2 minutes. 2 files are ready for your review." },
+  ],
+  "ib-2": [
+    { type: "user", id: "ib-2-u", text: "Weekly dashboard refresh — Jun 1, 10:03 AM" },
+    { type: "assistant-text", id: "ib-2-a", text: "I've re-run all 8 dashboard queries across the sales, ops, and marketing catalogs. All queries completed successfully. Summary sent to #data-ops on Slack." },
+  ],
+  "ib-3": [
+    { type: "user", id: "ib-3-u", text: "Customer 360 failing: upstream table dropped" },
+    { type: "assistant-text", id: "ib-3-a", text: "Detected that `main.prod.customer_events` was dropped at 8:38 AM. This is blocking 3 downstream jobs including Customer 360. I've identified the likely cause and have a suggested fix ready for your review." },
+  ],
+  "ib-6": [
+    { type: "user", id: "ib-6-u", text: "Sales dashboard data arriving late" },
+    { type: "assistant-text", id: "ib-6-a", text: "The sales dashboard ingestion pipeline has been running 40–60 minutes behind SLA for the past 3 days. Root cause appears to be increased volume in the source system. I'm currently investigating options to parallelize the ingestion." },
+  ],
+  "ib-8": [
+    { type: "user", id: "ib-8-u", text: "Pipeline monitoring — Jun 1, 9:00 AM" },
+    { type: "assistant-text", id: "ib-8-a", text: "silver_transform job duration spiked to 3.4× the rolling average this morning. Error rate is within threshold (0.3%) but job took 47 minutes vs the usual 14. Recommend reviewing the new partition logic added in yesterday's deploy." },
+  ],
+  "ib-9": [
+    { type: "user", id: "ib-9-u", text: "etl_marketing_events freshness SLA at risk" },
+    { type: "assistant-text", id: "ib-9-a", text: "etl_marketing_events last updated 23h 14m ago — 46 minutes from breaching the 24h SLA. The upstream source connector has been intermittently failing since yesterday. No action needed yet but flagging for awareness." },
+  ],
+  "ib-12": [
+    { type: "user", id: "ib-12-u", text: "DBR 14 → 17 update available for 4 jobs" },
+    { type: "assistant-text", id: "ib-12-a", text: "4 jobs are still running on Databricks Runtime 14 which reaches end-of-support in 30 days. I've identified the jobs and checked compatibility — no breaking changes expected. Ready to schedule the upgrades when you approve." },
+  ],
+};
+
+const SEED_THREAD_ID_MAP: Record<string, string> = {
+  "ib-1": "thread-dashboard",
+  "ib-4": "thread-eda",
+  "ib-7": "thread-input",
+  "ib-10": "thread-long",
+};
+
+const INBOX_PARENT_LABELS: Record<InboxSource, string | null> = {
+  automation: "Automations",
+  zeroops: "ZeroOps",
+  manual: null,
+};
+
+function InboxMainView({
+  state,
+  threads,
+  setThreads,
+  onOpenThread,
+}: {
+  state: ReturnType<typeof useGenieChatState>;
+  threads: InboxThread[];
+  setThreads: React.Dispatch<React.SetStateAction<InboxThread[]>>;
+  onOpenThread: (source: InboxSource, taskId?: string) => void;
+}) {
+  const [search, setSearch] = React.useState("");
+  const [filterSource, setFilterSource] = React.useState<InboxSource | "all">("all");
+  const [filterStatus, setFilterStatus] = React.useState<InboxStatus | "all">("all");
+  const [filterUnread, setFilterUnread] = React.useState(false);
+
+  const unreadCount = threads.filter((t) => !t.read).length;
+
+  const filtered = threads.filter((t) => {
+    if (search && !t.title.toLowerCase().includes(search.toLowerCase()) && !t.sourceName.toLowerCase().includes(search.toLowerCase())) return false;
+    if (filterSource !== "all" && t.source !== filterSource) return false;
+    if (filterStatus !== "all" && t.status !== filterStatus) return false;
+    if (filterUnread && t.read) return false;
+    return true;
+  });
+
+  function openThread(thread: InboxThread) {
+    setThreads((prev) => prev.map((t) => t.id === thread.id ? { ...t, read: true } : t));
+    // Automation threads: breadcrumb is the specific automation name; others use generic label
+    const parentLabel = thread.source === "automation"
+      ? thread.sourceName
+      : thread.source === "zeroops"
+      ? "ZeroOps"
+      : null;
+    const seedId = SEED_THREAD_ID_MAP[thread.id];
+    if (seedId) {
+      state.handleSelectThread(seedId);
+    } else {
+      const steps = INBOX_THREAD_STEPS[thread.id] ?? [
+        { type: "user" as const, id: `${thread.id}-u`, text: thread.title },
+        { type: "assistant-text" as const, id: `${thread.id}-a`, text: "Thread content." },
+      ];
+      state.injectThread(
+        { id: thread.id, label: thread.title, status: "done", time: "now", subtitle: thread.sourceName, parentLabel: parentLabel ?? undefined },
+        steps,
+      );
+    }
+    onOpenThread(thread.source, thread.taskId);
+  }
+
+  function markAllRead() {
+    setThreads((prev) => prev.map((t) => ({ ...t, read: true })));
+  }
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+      <div className="mx-auto w-full max-w-[900px] px-6 py-6">
+        {/* Header */}
+        <div className="mb-5 flex items-center gap-sm">
+          <h1 className="flex-1 text-title3 font-semibold text-text-primary">Inbox</h1>
+          {unreadCount > 0 && (
+            <button
+              type="button"
+              onClick={markAllRead}
+              className="text-hint text-action-tertiary-text-default hover:underline"
+            >
+              Mark all as read
+            </button>
+          )}
+        </div>
+
+        {/* Filter bar */}
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          {/* Search */}
+          <div className="flex items-center gap-xs rounded border border-border bg-background-primary px-2 py-1.5" style={{ width: 220 }}>
+            <Icon name="searchIcon" size={14} className="shrink-0 text-text-secondary" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search chats..."
+              className="min-w-0 flex-1 bg-transparent text-hint text-text-primary outline-none placeholder:text-text-placeholder"
+            />
+            {search && (
+              <button type="button" onClick={() => setSearch("")} className="shrink-0 text-text-secondary hover:text-text-primary">
+                <Icon name="closeSmallIcon" size={12} />
+              </button>
+            )}
+          </div>
+
+          {/* Unread toggle */}
+          <button
+            type="button"
+            onClick={() => setFilterUnread((v) => !v)}
+            className={cx(
+              "flex h-7 items-center gap-xs rounded border px-3 text-hint font-medium transition-colors",
+              filterUnread
+                ? "border-blue-300 bg-blue-50 text-action-tertiary-text-default"
+                : "border-border text-text-secondary hover:border-action-default-border-hover hover:text-text-primary",
+            )}
+          >
+            Unread
+            {unreadCount > 0 && (
+              <span className={cx("rounded-full px-1.5 py-0.5 text-hint font-medium", filterUnread ? "bg-blue-100 text-action-tertiary-text-default" : "bg-background-secondary text-text-secondary")}>
+                {unreadCount}
+              </span>
+            )}
+          </button>
+
+          {/* Source filter */}
+          <div className="flex rounded border border-border">
+            {([["all", "All"], ["manual", "Manual"], ["automation", "Automation"], ["zeroops", "ZeroOps"]] as const).map(([val, label], i) => (
+              <button
+                key={val}
+                type="button"
+                onClick={() => setFilterSource(val)}
+                className={cx(
+                  "px-3 py-1.5 text-hint transition-colors",
+                  i > 0 && "border-l border-border",
+                  filterSource === val
+                    ? "bg-action-default-background-hover font-medium text-action-tertiary-text-default"
+                    : "text-text-secondary hover:bg-background-secondary hover:text-text-primary",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Status filter */}
+          <div className="flex rounded border border-border">
+            {([["all", "All"], ["needs-review", "Needs review"], ["in-progress", "In progress"], ["done", "Done"]] as const).map(([val, label], i) => (
+              <button
+                key={val}
+                type="button"
+                onClick={() => setFilterStatus(val)}
+                className={cx(
+                  "px-3 py-1.5 text-hint transition-colors",
+                  i > 0 && "border-l border-border",
+                  filterStatus === val
+                    ? "bg-action-default-background-hover font-medium text-action-tertiary-text-default"
+                    : "text-text-secondary hover:bg-background-secondary hover:text-text-primary",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Chat count */}
+        <p className="mb-2 text-hint text-text-secondary">{filtered.length} chat{filtered.length !== 1 ? "s" : ""}</p>
+
+        {/* Chat list */}
+        {filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
+            <Icon name="inboxTrayIcon" size={32} className="text-text-placeholder" />
+            <p className="text-paragraph font-medium text-text-primary">No chats</p>
+            <p className="text-paragraph text-text-secondary">Try adjusting your filters.</p>
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-md border border-border bg-background-primary">
+            {/* Header row */}
+            <div className="grid grid-cols-[minmax(0,3fr)_120px_140px_120px] items-center border-b border-border bg-background-secondary px-4 py-2">
+              <span className="text-hint font-medium text-text-secondary">Chat</span>
+              <span className="text-hint font-medium text-text-secondary">Source</span>
+              <span className="text-hint font-medium text-text-secondary">Status</span>
+              <span className="text-hint font-medium text-text-secondary">Updated</span>
+            </div>
+            {filtered.map((thread) => {
+              const sc = STATUS_CONFIG[thread.status];
+              return (
+                <button
+                  key={thread.id}
+                  type="button"
+                  onClick={() => openThread(thread)}
+                  className="grid w-full grid-cols-[minmax(0,3fr)_120px_140px_120px] items-center border-b border-border px-4 py-3 text-left last:border-b-0 hover:bg-background-secondary transition-colors"
+                >
+                  {/* Thread title */}
+                  <div className="flex min-w-0 items-center gap-sm pr-4">
+                    <span className={cx("h-1.5 w-1.5 shrink-0 rounded-full transition-opacity", thread.read ? "opacity-0" : "bg-blue-500 opacity-100")} />
+                    <span className={cx("min-w-0 truncate text-paragraph", thread.read ? "text-text-primary" : "font-semibold text-text-primary")}>
+                      {thread.title}
+                    </span>
+                  </div>
+                  {/* Source */}
+                  <span className={cx("inline-flex w-fit items-center rounded px-2 py-0.5 text-hint font-medium", SOURCE_COLORS[thread.source])}>
+                    {SOURCE_LABELS[thread.source]}
+                  </span>
+                  {/* Status */}
+                  <div className="flex items-center gap-xs">
+                    <span className={cx("h-1.5 w-1.5 shrink-0 rounded-full", sc.dot)} />
+                    <span className={cx("text-hint", sc.text)}>{sc.label}</span>
+                  </div>
+                  {/* Updated */}
+                  <span className="text-hint text-text-secondary">{thread.updatedAt}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function buildRunSteps(task: ScheduledTask, threadLabel?: string): ChatStep[] {
   const response = TASK_MOCK_RESPONSES[task.id] ?? "Run completed successfully.";
   return [
-    { type: "user", id: `${task.id}-user`, text: task.prompt },
+    { type: "user", id: `${task.id}-user`, text: threadLabel ?? task.prompt },
     { type: "assistant-text", id: `${task.id}-response`, text: response },
   ];
 }
 
-const TASK_RUN_HISTORY: Record<string, Array<{ date: string; status: "pending" | "notified" | "failed" }>> = {
+const TASK_RUN_HISTORY: Record<string, Array<{ threadId: string | null; startedAt: string | null; status: "pending" | "completed" | "failed" }>> = {
   t1: [
-    { date: "Mon, May 11 at 8:00 AM", status: "notified" },
-    { date: "Mon, May 4 at 8:00 AM", status: "notified" },
-    { date: "Mon, Apr 28 at 8:00 AM", status: "failed" },
-    { date: "Mon, Apr 21 at 8:00 AM", status: "notified" },
+    { threadId: null, startedAt: null, status: "pending" },
+    { threadId: "run-t1-1", startedAt: "Jun 1, 10:03 AM", status: "completed" },
+    { threadId: "run-t1-2", startedAt: "May 31, 10:01 AM", status: "completed" },
+    { threadId: "run-t1-3", startedAt: "May 26, 9:58 AM", status: "failed" },
+    { threadId: "run-t1-4", startedAt: "May 19, 10:02 AM", status: "completed" },
   ],
   t2: [
-    { date: "Mon, May 11 at 2:57 PM", status: "pending" },
-    { date: "Mon, May 11 at 9:02 AM", status: "notified" },
-    { date: "Sun, May 10 at 9:02 AM", status: "notified" },
-    { date: "Sat, May 9 at 9:01 AM", status: "notified" },
+    { threadId: null, startedAt: null, status: "pending" },
+    { threadId: "run-t2-1", startedAt: "Jun 1, 9:02 AM", status: "completed" },
+    { threadId: "run-t2-2", startedAt: "May 31, 9:02 AM", status: "completed" },
+    { threadId: "run-t2-3", startedAt: "May 30, 9:01 AM", status: "completed" },
   ],
   t3: [
-    { date: "Sun, May 11 at 11:00 PM", status: "failed" },
-    { date: "Sun, May 4 at 11:00 PM", status: "notified" },
-    { date: "Sun, Apr 27 at 11:00 PM", status: "notified" },
-    { date: "Sun, Apr 20 at 11:00 PM", status: "notified" },
+    { threadId: "run-t3-0", startedAt: "May 25, 11:00 PM", status: "failed" },
+    { threadId: "run-t3-1", startedAt: "May 18, 11:00 PM", status: "completed" },
+    { threadId: "run-t3-2", startedAt: "May 11, 11:00 PM", status: "completed" },
+    { threadId: "run-t3-3", startedAt: "May 4, 11:00 PM", status: "completed" },
   ],
   t4: [
-    { date: "Sun, May 18 at 1:12 PM", status: "pending" },
-    { date: "Sun, May 18 at 9:00 AM", status: "notified" },
-    { date: "Sat, May 17 at 9:00 AM", status: "notified" },
-    { date: "Fri, May 16 at 9:03 AM", status: "notified" },
+    { threadId: null, startedAt: null, status: "pending" },
+    { threadId: "run-t4-1", startedAt: "Jun 1, 9:00 AM", status: "completed" },
+    { threadId: "run-t4-2", startedAt: "May 31, 9:00 AM", status: "completed" },
+    { threadId: "run-t4-3", startedAt: "May 30, 9:03 AM", status: "completed" },
   ],
 };
 
@@ -1669,9 +1979,17 @@ function ScheduledTaskDetailView({
   const isEventBased = task.triggerType !== "schedule";
   const [runs, setRuns] = React.useState(TASK_RUN_HISTORY[task.id] ?? []);
   const handleRunNow = () => {
-    const now = new Date();
-    const label = now.toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-    setRuns((prev) => [{ date: label, status: "pending" as const }, ...prev]);
+    const newThreadId = `run-${task.id}-${Date.now()}`;
+    const startedAt = new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+    setRuns((prev) => [{ threadId: null, startedAt, status: "pending" as const }, ...prev]);
+    setTimeout(() => {
+      setRuns((prev) => prev.map((r, i) =>
+        i === 0 && r.status === "pending"
+          ? { threadId: newThreadId, startedAt, status: "completed" as const }
+          : r
+      ));
+      onOpenRun(newThreadId, `${task.title} — ${startedAt}`);
+    }, 10000);
   };
   const enabled = task.enabled;
   const [overflowOpen, setOverflowOpen] = React.useState(false);
@@ -1693,14 +2011,6 @@ function ScheduledTaskDetailView({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const runStatusLabel = (s: "pending" | "notified" | "failed") =>
-    s === "pending" ? "In progress" : s === "notified" ? "Notified" : "Failed";
-
-  const runStatusIcon = (s: "pending" | "notified" | "failed") =>
-    s === "pending" ? "clockIcon" : s === "notified" ? "notificationIcon" : "dangerSmallIcon";
-
-  const runStatusColor = (s: "pending" | "notified" | "failed") =>
-    s === "pending" ? "text-text-secondary" : s === "notified" ? "text-green-600" : "text-red-600";
 
   const nextRun = task.triggerType === "job_completion"
     ? `Next run on ${task.schedule} pipeline complete`
@@ -1884,31 +2194,68 @@ function ScheduledTaskDetailView({
           )}
         </div>
 
-        {/* Run History — always expanded, no card wrapper */}
+        {/* Run History */}
         <div className="mb-3 mt-lg">
-          <p className="mb-2 text-paragraph font-semibold text-text-primary">Run History</p>
+          <p className="mb-2 text-paragraph font-semibold text-text-primary">Run history</p>
           {runs.length === 0 ? (
             <div className="flex items-center justify-center gap-xs rounded-md border border-dashed border-border px-4 py-4">
               <span className="text-paragraph text-text-secondary">No runs yet.</span>
               <button type="button" onClick={handleRunNow} className="text-paragraph text-action-tertiary-text-default hover:underline">Run now</button>
             </div>
           ) : (
-            <div className="rounded-md border border-border bg-background-primary divide-y divide-border">
+            <div className="overflow-hidden rounded-md border border-border bg-background-primary">
+              {/* Table header */}
+              <div className="grid grid-cols-[2fr_1fr_120px] border-b border-border bg-background-secondary px-4 py-2">
+                <span className="text-hint font-medium text-text-secondary">Chat</span>
+                <span className="text-hint font-medium text-text-secondary">Started</span>
+                <span className="text-hint font-medium text-text-secondary">Status</span>
+              </div>
+              {/* Rows */}
               {runs.map((run, i) => (
-                <button
+                <div
                   key={i}
-                  type="button"
-                  onClick={() => onOpenRun(`run-${task.id}-${i}`, run.date)}
-                  className="flex w-full items-center px-4 py-2.5 text-left hover:bg-background-secondary transition-colors"
+                  className="grid grid-cols-[2fr_1fr_120px] items-center border-b border-border px-4 py-2.5 last:border-b-0 hover:bg-background-secondary transition-colors"
                 >
-                  <span className="flex-1 text-paragraph text-text-primary">{run.date}</span>
-                  {run.status === "pending" && (
-                    <span className="flex items-center gap-xs text-hint font-medium text-text-secondary">
-                      <span className="h-3 w-3 animate-spin rounded-full border-2 border-border border-t-text-secondary" />
-                      In progress
-                    </span>
-                  )}
-                </button>
+                  {/* Conversation link */}
+                  <div className="min-w-0 pr-4">
+                    {run.threadId ? (
+                      <button
+                        type="button"
+                        onClick={() => onOpenRun(run.threadId!, `${task.title} — ${run.startedAt}`)}
+                        className="w-full truncate text-left text-paragraph text-action-tertiary-text-default hover:underline"
+                      >
+                        {task.title} — {run.startedAt}
+                      </button>
+                    ) : (
+                      <span className="text-paragraph text-text-secondary">—</span>
+                    )}
+                  </div>
+                  {/* Started at */}
+                  <span className="text-paragraph text-text-primary">
+                    {run.startedAt ?? "—"}
+                  </span>
+                  {/* Status */}
+                  <div className="flex items-center gap-xs">
+                    {run.status === "pending" && (
+                      <>
+                        <span className="h-3 w-3 animate-spin rounded-full border-2 border-border border-t-text-secondary" />
+                        <span className="text-paragraph text-text-secondary">Queued</span>
+                      </>
+                    )}
+                    {run.status === "completed" && (
+                      <>
+                        <span className="h-2 w-2 rounded-full bg-green-500" />
+                        <span className="text-paragraph text-text-primary">Completed</span>
+                      </>
+                    )}
+                    {run.status === "failed" && (
+                      <>
+                        <span className="h-2 w-2 rounded-full bg-red-500" />
+                        <span className="text-paragraph text-red-600">Failed</span>
+                      </>
+                    )}
+                  </div>
+                </div>
               ))}
             </div>
           )}
@@ -2007,6 +2354,7 @@ function ChatLeftNav({
   onRenameThread,
   activeMainView,
   onSetMainView,
+  inboxUnreadCount = 0,
 }: {
   threads: ReturnType<typeof useGenieChatState>["threads"];
   activeThreadId: string | null;
@@ -2019,6 +2367,7 @@ function ChatLeftNav({
   onRenameThread?: (id: string, newLabel: string) => void;
   activeMainView: MainView;
   onSetMainView: (view: MainView) => void;
+  inboxUnreadCount?: number;
 }) {
   const setCollapsed = onCollapsedChange;
   const [width, setWidth] = React.useState(DEFAULT_NAV_WIDTH);
@@ -2108,6 +2457,23 @@ function ChatLeftNav({
             onClick={() => { onSetMainView("scheduled"); setCollapsed(false); }}
           />
         </Tooltip>
+        <Tooltip label="Inbox" align="left">
+          <div className="relative">
+            <IconButton
+              aria-label="Inbox"
+              icon={<Icon name="inboxTrayIcon" size={14} />}
+              size="small"
+              tone="neutral"
+              className={activeMainView === "inbox" ? "!bg-background-tertiary" : ""}
+              onClick={() => { onSetMainView("inbox"); setCollapsed(false); }}
+            />
+            {inboxUnreadCount > 0 && (
+              <span className="pointer-events-none absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-semibold text-white">
+                {inboxUnreadCount}
+              </span>
+            )}
+          </div>
+        </Tooltip>
       </div>
     );
   }
@@ -2194,6 +2560,22 @@ function ChatLeftNav({
           >
             <Icon name="lightningIcon" size={14} className="shrink-0 text-text-secondary" />
             Automations
+          </button>
+          <button
+            type="button"
+            onClick={() => onSetMainView("inbox")}
+            className={cx(
+              "flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-paragraph hover:bg-background-secondary",
+              activeMainView === "inbox" ? "bg-action-default-background-hover font-medium text-text-primary" : "text-text-primary",
+            )}
+          >
+            <Icon name="inboxTrayIcon" size={14} className="shrink-0 text-text-secondary" />
+            <span className="flex-1">Inbox</span>
+            {inboxUnreadCount > 0 && (
+              <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-semibold text-white">
+                {inboxUnreadCount}
+              </span>
+            )}
           </button>
           {searchActive ? (
             <div className="mt-xs flex w-full items-center gap-2 rounded-md border border-[#1A6FCC] bg-background-secondary px-2 py-2">
@@ -3997,6 +4379,8 @@ export default function ChatPage() {
   const handleFocusTitleInputReady = React.useCallback((fn: () => void) => { focusTitleInputRef.current = fn; }, []);
 
   const [mainView, setMainView] = React.useState<MainView>("thread");
+  const [inboxThreads, setInboxThreads] = React.useState<InboxThread[]>(INBOX_THREADS);
+  const inboxUnreadCount = inboxThreads.filter((t) => !t.read).length;
   const [customizationsTab, setCustomizationsTab] = React.useState<CustomizationsTab>("skills");
   const [selectedSkillFile, setSelectedSkillFile] = React.useState<string | null>(null);
   const [skillDialogFile, setSkillDialogFile] = React.useState<string | null>(null);
@@ -4007,6 +4391,8 @@ export default function ChatPage() {
   const [scheduledViewKey, setScheduledViewKey] = React.useState(0);
   // Maps run thread IDs to their parent task IDs for breadcrumb navigation
   const runThreadTaskIdRef = React.useRef<Map<string, string>>(new Map());
+  // Stores the taskId from the last inbox automation thread opened, for breadcrumb back-nav
+  const inboxPendingTaskIdRef = React.useRef<string | null>(null);
   const [scheduledDetailTaskId, setScheduledDetailTaskId] = React.useState<string | null>(null);
 
   const handleSkillSave = React.useCallback((file: string, newContent: string) => {
@@ -4094,6 +4480,7 @@ export default function ChatPage() {
           onRenameThread={state.handleRenameThread}
           activeMainView={mainView}
           onSetMainView={handleSetMainView}
+          inboxUnreadCount={inboxUnreadCount}
         />
 
         {mainView === "customizations" ? (
@@ -4113,6 +4500,18 @@ export default function ChatPage() {
             onServerClick={(id) => setSelectedMcpServerId((prev) => (prev === id ? null : id))}
             onConfigureMcpTools={(id) => setSelectedMcpServerId(id)}
             onOpenAssistantInstructionsFile={handleOpenAssistantInstructionsInEditor}
+          />
+        ) : mainView === "inbox" ? (
+          <InboxMainView
+            state={state}
+            threads={inboxThreads}
+            setThreads={setInboxThreads}
+            onOpenThread={(source, taskId) => {
+              handleSetMainView("thread");
+              if (source === "automation" && taskId) {
+                inboxPendingTaskIdRef.current = taskId;
+              }
+            }}
           />
         ) : mainView === "scheduled" ? (
           <ScheduledTasksMainView
@@ -4144,13 +4543,30 @@ export default function ChatPage() {
               if (taskId) {
                 setScheduledDetailTaskId(taskId);
                 handleSetMainView("scheduled", false);
+                return;
+              }
+              const thread = state.threads.find((t) => t.id === threadId);
+              if (!thread) return;
+              if (thread.parentLabel === "ZeroOps") {
+                router.push("/workflows?tab=zeroops");
+                return;
+              }
+              // Automation threads: parentLabel is the automation name — find its taskId
+              const inboxThread = inboxThreads.find((t) => t.id === threadId);
+              const pendingTaskId = inboxThread?.taskId ?? inboxPendingTaskIdRef.current;
+              if (pendingTaskId) {
+                inboxPendingTaskIdRef.current = null;
+                setScheduledDetailTaskId(pendingTaskId);
+                handleSetMainView("scheduled", false);
+              } else {
+                handleSetMainView("scheduled");
               }
             }}
           />
         )}
 
         {/* Right rail — shown when preview panel is closed */}
-        {mainView !== "customizations" && mainView !== "scheduled" && !previewOpen && (
+        {mainView !== "customizations" && mainView !== "scheduled" && mainView !== "inbox" && !previewOpen && (
           <div className="flex h-full w-9 shrink-0 flex-col items-center border-l border-border py-2 gap-sm">
             <Tooltip label="Open preview panel" align="right">
               <IconButton
