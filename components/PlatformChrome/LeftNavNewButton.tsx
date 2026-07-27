@@ -22,8 +22,8 @@ export function LeftNavNewButton({
     <button
       {...rest}
       className={cx(
-        "inline-flex w-full items-center justify-start gap-sm overflow-clip rounded-md px-mid py-sm shadow-[var(--elevation-shadow-md)]",
-        "bg-background-primary hover:bg-background-tertiary active:bg-background-tertiary",
+        "inline-flex w-full items-center justify-start gap-sm overflow-clip rounded-md border border-red-200 px-mid py-sm shadow-[var(--elevation-shadow-md)]",
+        "bg-red-100 hover:bg-red-200 active:bg-red-200",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-action-default-border-focus",
         "disabled:cursor-not-allowed disabled:opacity-60",
         className,
@@ -31,7 +31,7 @@ export function LeftNavNewButton({
       disabled={disabled}
       type="button"
     >
-      <Icon name="plusIcon" size={16} className="text-text-primary" />
+      <Icon name="plusIcon" size={16} className="text-red-600" />
       <span className="text-paragraph font-semibold leading-5 text-text-primary">
         New
       </span>

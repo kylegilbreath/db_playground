@@ -79,8 +79,12 @@ function AppChromeInner({ className, children }: AppChromeProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  // Routes that render the full Genie Code chat experience (the inbox and its
+  // prototype variants). They share the same chrome treatment.
+  const isGenieCodeChat = pathname === "/chat" || pathname === "/geniecode-onboarding";
+
   React.useEffect(() => {
-    if (pathname === "/chat") {
+    if (isGenieCodeChat) {
       setGenieCodeOpen(false);
     } else if (sessionStorage.getItem("openGeniePanel") === "1") {
       sessionStorage.removeItem("openGeniePanel");
@@ -283,12 +287,19 @@ function AppChromeInner({ className, children }: AppChromeProps) {
   const isEditorRoute = pathname === "/editor";
   const isDatabricksOneRoute = appConfig.id !== "lakehouse";
 
+  const [topNavHidden, setTopNavHidden] = React.useState(false);
+  // Don't let a hidden top nav leak to non-chat routes.
+  React.useEffect(() => {
+    if (!isGenieCodeChat && topNavHidden) setTopNavHidden(false);
+  }, [isGenieCodeChat, topNavHidden]);
   const genieCodeContextValue = React.useMemo(() => ({
     isOpen: genieCodeOpen,
     toggle: () => setGenieCodeOpen((v) => !v),
     open: () => setGenieCodeOpen(true),
     close: () => setGenieCodeOpen(false),
-  }), [genieCodeOpen]);
+    topNavHidden,
+    toggleTopNav: () => setTopNavHidden((v) => !v),
+  }), [genieCodeOpen, topNavHidden]);
 
   const isStackedNav = appConfig.navVariant === "stacked";
   const showLeftNav = (!collapsed || isStackedNav || isNoTopbar || isM2) && !((isNoTopbar || isM2) && isSmallScreen);
@@ -309,7 +320,7 @@ function AppChromeInner({ className, children }: AppChromeProps) {
       >
         {showBlob ? <BlobGradient topAligned={showBlob && pathname !== basePrefix} /> : null}
 
-        {appConfig.hideTopNav ? null : <TopNav
+        {appConfig.hideTopNav || topNavHidden ? null : <TopNav
           className={isExpanded ? "!bg-[var(--one-leftnav-bg)]" : undefined}
           collapsed={collapsed}
           transparentBackground={appConfig.transparentTopNav}
@@ -319,7 +330,7 @@ function AppChromeInner({ className, children }: AppChromeProps) {
           }}
           useMenuIcon={isNarrowNav}
           hideSidebarToggle={hideSidebarToggle}
-          hideGenieCodeButton={pathname === "/chat" || isDatabricksOneRoute}
+          hideGenieCodeButton={isGenieCodeChat || isDatabricksOneRoute}
           genieCodeActive={genieCodeOpen}
           onGenieCodeClick={() => setGenieCodeOpen((v) => !v)}
           sidebarHoverCard={
@@ -505,19 +516,13 @@ function AppChromeInner({ className, children }: AppChromeProps) {
 
 
           {appConfig.contentStyle === "full-bleed" ? (
-            isExpanded ? (
-              <div className="relative min-w-0 flex-1">
-                <div className="app-scroll h-full overflow-y-auto overflow-x-hidden">{children}</div>
-              </div>
-            ) : (
-              <div className="relative min-w-0 flex-1">
-                <div className="app-scroll h-full overflow-y-auto overflow-x-hidden">{children}</div>
-              </div>
-            )
+            <div className="relative min-w-0 flex-1">
+              <div className="app-scroll h-full overflow-y-auto overflow-x-hidden bg-background-primary">{children}</div>
+            </div>
           ) : (
             <div className="min-w-0 flex-1 p-sm">
-              <div className="h-full overflow-hidden rounded-md shadow-[var(--elevation-shadow-md)]">
-                <div className={cx("h-full bg-background-primary", pathname === "/chat" ? "overflow-hidden" : "app-scroll overflow-y-auto")}>
+              <div className={cx("h-full overflow-hidden rounded-md shadow-[var(--elevation-shadow-md)]", isGenieCodeChat && "border border-border")}>
+                <div className={cx("h-full bg-background-primary", isGenieCodeChat ? "overflow-hidden" : "app-scroll overflow-y-auto")}>
                   {children}
                 </div>
               </div>

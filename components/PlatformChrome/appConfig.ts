@@ -48,7 +48,6 @@ const LAKEHOUSE_CONFIG: AppConfig = {
     {
       id: "top",
       items: [
-        { id: "home", label: "Home", iconName: "homeIcon", selectedIconName: "HomeFilledIcon" },
         { id: "chat", label: "Genie Code", iconName: "genieIcon" },
         { id: "editor", label: "Editor", iconName: "QueryEditorIcon" },
         { id: "discover", label: "Discover", iconName: "discoverIcon" },
