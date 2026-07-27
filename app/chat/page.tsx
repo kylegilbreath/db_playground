@@ -4,6 +4,7 @@ import * as React from "react";
 import ReactDOM from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DefaultButton } from "@/components/DefaultButton";
+import { DropdownMenu, type DropdownMenuItem } from "@/components/DropdownMenu";
 import {
   ConnectionsMainView,
   MCP_SERVERS,
@@ -18,6 +19,7 @@ import { TextInput } from "@/components/TextInput";
 
 import { AssistantInstructionsCard, RenderSkillDialogMarkdown } from "@/components/AssistantInstructions/AssistantInstructionsCard";
 import { useGenieChatState, GenieChatBody, GenieChatThreadList, MoreOptionsMenu } from "@/components/GenieCodePanel/GenieChatCore";
+import { useGenieCode } from "@/components/GenieCodePanel/GenieCodeContext";
 import { ASSISTANT_INSTRUCTIONS_FILE, ASSISTANT_INSTRUCTIONS_MARKDOWN } from "@/lib/assistant-instructions";
 import { ASSISTANT_DASHBOARD_REVIEW_ASSETS } from "@/components/AgentChat/data/assistantDashboardRun";
 import type { ReviewAsset, ChatStep } from "@/components/AgentChat";
@@ -28,6 +30,31 @@ import type { ReviewAsset, ChatStep } from "@/components/AgentChat";
 
 function cx(...parts: Array<string | undefined | false>) {
   return parts.filter(Boolean).join(" ");
+}
+
+// Assets created via the rail's "New" menu get this id prefix so their preview
+// renders empty (a blank canvas) instead of the canned sample content.
+const NEW_ASSET_PREFIX = "new-asset-";
+function isNewAsset(asset: { id: string }) {
+  return asset.id.startsWith(NEW_ASSET_PREFIX);
+}
+
+// Special soft-tab id for the changes/diff view. Opened on demand from the
+// review drawer's diff button; never shown by default.
+const DIFF_TAB_ID = "__diff__";
+
+// Shared "New asset" menu — used by the right-rail + button and the preview
+// empty state's New button so both stay in sync.
+function newAssetMenuItems(
+  onCreate: (kind: ReviewAsset["kind"], name: string) => void,
+): DropdownMenuItem[] {
+  return [
+    { id: "query", label: "Query", leadingIcon: <Icon name="queryListViewIcon" size={16} className="text-text-secondary" />, onSelect: () => onCreate("file", "Untitled query") },
+    { id: "notebook", label: "Notebook", leadingIcon: <Icon name="notebookIcon" size={16} className="text-text-secondary" />, onSelect: () => onCreate("notebook", "Untitled notebook") },
+    { id: "file", label: "File", leadingIcon: <Icon name="fileIcon" size={16} className="text-text-secondary" />, onSelect: () => onCreate("file", "Untitled file") },
+    { id: "data-prep", label: "Visual data prep", leadingIcon: <Icon name="catalogShapesIcon" size={16} className="text-text-secondary" />, onSelect: () => onCreate("notebook", "Untitled data prep") },
+    { id: "alert", label: "Alert", leadingIcon: <Icon name="notificationIcon" size={16} className="text-text-secondary" />, onSelect: () => onCreate("file", "Untitled alert") },
+  ];
 }
 
 const DEFAULT_NAV_WIDTH = 320;
@@ -61,7 +88,7 @@ type SidePanel = "threads";
 type MainView = "thread" | "customizations" | "scheduled" | "inbox";
 type CustomizationsTab = "skills" | "connections";
 
-function Tooltip({ label, children, align = "center" }: { label: string; children: React.ReactNode; align?: "center" | "left" | "right" }) {
+function Tooltip({ label, children, align = "center", side = "bottom" }: { label: string; children: React.ReactNode; align?: "center" | "left" | "right"; side?: "top" | "bottom" }) {
   const posClass =
     align === "left" ? "left-0" :
     align === "right" ? "right-0" :
@@ -70,11 +97,13 @@ function Tooltip({ label, children, align = "center" }: { label: string; childre
     align === "left" ? "left-2" :
     align === "right" ? "right-2" :
     "left-1/2 -translate-x-1/2";
+  const sideClass = side === "top" ? "bottom-full mb-1.5" : "top-full mt-1.5";
+  const caretSideClass = side === "top" ? "top-full border-t-[#161616] border-b-transparent" : "bottom-full border-b-[#161616]";
   return (
     <div className="group relative inline-flex items-center">
       {children}
-      <div className={`pointer-events-none absolute top-full z-50 mt-1.5 whitespace-nowrap rounded bg-[#161616] px-2 py-1 text-hint text-white opacity-0 transition-opacity group-hover:opacity-100 ${posClass}`}>
-        <span className={`absolute bottom-full border-4 border-transparent border-b-[#161616] ${caretClass}`} />
+      <div className={`pointer-events-none absolute z-50 whitespace-nowrap rounded bg-[#161616] px-2 py-1 text-hint text-white opacity-0 transition-opacity group-hover:opacity-100 ${sideClass} ${posClass}`}>
+        <span className={`absolute border-4 border-transparent ${caretSideClass} ${caretClass}`} />
         {label}
       </div>
     </div>
@@ -1247,7 +1276,7 @@ function ScheduledTasksMainView({
         <div className="mx-auto w-full max-w-[800px]">
         {/* Header */}
         <div className="sticky top-0 z-10 flex items-center gap-sm bg-background-primary pt-6 pb-4">
-          <h1 className="flex-1 text-title3 font-semibold text-text-primary">Automations</h1>
+          <h1 className="flex-1 text-title3 font-semibold text-text-primary">Schedules</h1>
           {searchOpen ? (
             <div className="flex items-center gap-xs rounded-md border border-action-default-border-focus bg-background-primary px-2 py-1" style={{ width: 200 }}>
               <Icon name="searchIcon" size={14} className="shrink-0 text-text-secondary" />
@@ -1632,6 +1661,8 @@ const TASK_MOCK_RESPONSES: Record<string, string> = {
 type InboxSource = "automation" | "manual" | "zeroops";
 type InboxStatus = "needs-review" | "in-progress" | "done";
 
+type InboxTrigger = "Detection" | "Schedule" | "Manual";
+
 type InboxThread = {
   id: string;
   title: string;
@@ -1640,22 +1671,26 @@ type InboxThread = {
   taskId?: string; // for automation threads — which ScheduledTask created this
   status: InboxStatus;
   updatedAt: string;
+  hoursAgo: number; // relative age, used by the activity timeline
   read: boolean;
+  why?: string; // one-line "why this matters" subtitle on the card
+  trigger?: InboxTrigger; // what produced this thread
+  asset?: string; // related table / job / pipeline
 };
 
 const INBOX_THREADS: InboxThread[] = [
-  { id: "ib-1", title: "Assistant Usage Dashboard: Analyze Last 90 Days", source: "manual", sourceName: "Manual", status: "needs-review", updatedAt: "Jun 2, 9:14 AM", read: false },
-  { id: "ib-2", title: "Weekly dashboard refresh — Jun 1, 10:03 AM", source: "automation", sourceName: "Weekly dashboard refresh", taskId: "t1", status: "done", updatedAt: "Jun 1, 10:09 AM", read: false },
-  { id: "ib-3", title: "Customer 360 failing: upstream table dropped", source: "zeroops", sourceName: "ZeroOps Autopilot", status: "needs-review", updatedAt: "Jun 1, 8:42 AM", read: false },
-  { id: "ib-4", title: "EDA on ski resort properties with a 6 month forecast", source: "manual", sourceName: "Manual", status: "done", updatedAt: "Jun 1, 7:00 AM", read: true },
-  { id: "ib-5", title: "Ski resorts quality scan — Jun 1, 9:02 AM", source: "automation", sourceName: "Ski resorts quality scan", taskId: "t2", status: "done", updatedAt: "Jun 1, 9:08 AM", read: true },
-  { id: "ib-6", title: "Sales dashboard data arriving late", source: "zeroops", sourceName: "ZeroOps Autopilot", status: "in-progress", updatedAt: "May 31, 4:30 PM", read: false },
-  { id: "ib-7", title: "Cluster resorts into groups based on price, size, and snowfall", source: "manual", sourceName: "Manual", status: "done", updatedAt: "May 31, 2:15 PM", read: true },
-  { id: "ib-8", title: "Pipeline monitoring — Jun 1, 9:00 AM", source: "automation", sourceName: "Pipeline monitoring", taskId: "t4", status: "needs-review", updatedAt: "Jun 1, 9:05 AM", read: false },
-  { id: "ib-9", title: "etl_marketing_events freshness SLA at risk", source: "zeroops", sourceName: "ZeroOps Autopilot", status: "needs-review", updatedAt: "May 31, 11:20 AM", read: true },
-  { id: "ib-10", title: "Build a revenue attribution model comparing paid vs. organic acquisition channels across Q1 and Q2", source: "manual", sourceName: "Manual", status: "done", updatedAt: "May 29, 3:00 PM", read: true },
-  { id: "ib-11", title: "Weekly dashboard refresh — May 25, 10:02 AM", source: "automation", sourceName: "Weekly dashboard refresh", taskId: "t1", status: "done", updatedAt: "May 25, 10:08 AM", read: true },
-  { id: "ib-12", title: "DBR 14 → 17 update available for 4 jobs", source: "zeroops", sourceName: "ZeroOps Autopilot", status: "needs-review", updatedAt: "May 25, 9:00 AM", read: true },
+  { id: "ib-1", title: "Assistant Usage Dashboard: Analyze Last 90 Days", source: "manual", sourceName: "Manual", status: "needs-review", updatedAt: "Jun 2, 9:14 AM", hoursAgo: 0.1, read: false, why: "Analysis complete — 2 files ready for your review.", trigger: "Manual" },
+  { id: "ib-2", title: "Weekly dashboard refresh", source: "automation", sourceName: "Weekly dashboard refresh", taskId: "t1", status: "done", updatedAt: "Jun 1, 10:09 AM", hoursAgo: 1, read: false, why: "Re-ran 8 dashboard queries; summary posted to #data-ops.", trigger: "Schedule", asset: "analytics.weekly_dashboard" },
+  { id: "ib-3", title: "Customer 360 failing: upstream table dropped", source: "zeroops", sourceName: "ZeroOps Autopilot", status: "needs-review", updatedAt: "Jun 1, 8:42 AM", hoursAgo: 2, read: false, why: "main.prod.customer_events dropped at 8:38 AM; 3 downstream jobs blocked.", trigger: "Detection", asset: "main.prod.customer_events" },
+  { id: "ib-4", title: "EDA on ski resort properties with a 6 month forecast", source: "manual", sourceName: "Manual", status: "done", updatedAt: "Jun 1, 7:00 AM", hoursAgo: 4, read: true, why: "Exploratory analysis and forecast notebook generated.", trigger: "Manual" },
+  { id: "ib-5", title: "Ski resorts quality scan", source: "automation", sourceName: "Ski resorts quality scan", taskId: "t2", status: "done", updatedAt: "Jun 1, 9:08 AM", hoursAgo: 6, read: true, why: "3 issues found across 12 tables; no critical drift.", trigger: "Schedule", asset: "main.2026_northeast.ski_resorts" },
+  { id: "ib-6", title: "Sales dashboard data arriving late", source: "zeroops", sourceName: "ZeroOps Autopilot", status: "in-progress", updatedAt: "May 31, 4:30 PM", hoursAgo: 9, read: false, why: "Ingestion running 40–60 min behind SLA for 3 days; investigating.", trigger: "Detection", asset: "ingest.sales_dashboard" },
+  { id: "ib-7", title: "Cluster resorts into groups based on price, size, and snowfall", source: "manual", sourceName: "Manual", status: "done", updatedAt: "May 31, 2:15 PM", hoursAgo: 12, read: true, why: "Clustering complete; 4 resort segments identified.", trigger: "Manual" },
+  { id: "ib-8", title: "Pipeline monitoring", source: "automation", sourceName: "Pipeline monitoring", taskId: "t4", status: "needs-review", updatedAt: "Jun 1, 9:05 AM", hoursAgo: 14, read: false, why: "silver_transform ran 3.4× the rolling average this morning.", trigger: "Schedule", asset: "data_engineering.silver_transform" },
+  { id: "ib-9", title: "etl_marketing_events freshness SLA at risk", source: "zeroops", sourceName: "ZeroOps Autopilot", status: "needs-review", updatedAt: "May 31, 11:20 AM", hoursAgo: 19, read: true, why: "46 minutes from breaching the 24h freshness SLA.", trigger: "Detection", asset: "etl.etl_marketing_events" },
+  { id: "ib-10", title: "Build a revenue attribution model comparing paid vs. organic acquisition channels across Q1 and Q2", source: "manual", sourceName: "Manual", status: "done", updatedAt: "May 29, 3:00 PM", hoursAgo: 60, read: true, why: "Attribution model built across Q1 and Q2 channels.", trigger: "Manual" },
+  { id: "ib-11", title: "Weekly dashboard refresh", source: "automation", sourceName: "Weekly dashboard refresh", taskId: "t1", status: "done", updatedAt: "May 25, 10:08 AM", hoursAgo: 156, read: true, why: "Re-ran 8 dashboard queries; all completed successfully.", trigger: "Schedule", asset: "analytics.weekly_dashboard" },
+  { id: "ib-12", title: "DBR 14 → 17 update available for 4 jobs", source: "zeroops", sourceName: "ZeroOps Autopilot", status: "needs-review", updatedAt: "May 25, 9:00 AM", hoursAgo: 162, read: true, why: "4 jobs reach end-of-support in 30 days; no breaking changes expected.", trigger: "Detection", asset: "4 jobs on DBR 14" },
 ];
 
 const SOURCE_LABELS: Record<InboxSource, string> = {
@@ -1714,6 +1749,17 @@ const SEED_THREAD_ID_MAP: Record<string, string> = {
   "ib-10": "thread-long",
 };
 
+function isClosedFromRecents(
+  thread: InboxThread,
+  closedTabIds: Set<string>,
+  chatThreadIds: Set<string>,
+) {
+  const seedId = SEED_THREAD_ID_MAP[thread.id];
+  if (seedId) return closedTabIds.has(seedId);
+  if (chatThreadIds.has(thread.id)) return closedTabIds.has(thread.id);
+  return false;
+}
+
 const INBOX_PARENT_LABELS: Record<InboxSource, string | null> = {
   automation: "Automations",
   zeroops: "ZeroOps",
@@ -1725,12 +1771,18 @@ function InboxMainView({
   threads,
   setThreads,
   onOpenThread,
+  closedTabIds = new Set(),
 }: {
   state: ReturnType<typeof useGenieChatState>;
   threads: InboxThread[];
   setThreads: React.Dispatch<React.SetStateAction<InboxThread[]>>;
   onOpenThread: (source: InboxSource, taskId?: string) => void;
+  closedTabIds?: Set<string>;
 }) {
+  const chatThreadIds = React.useMemo(
+    () => new Set(state.threads.map((t) => t.id)),
+    [state.threads],
+  );
   const [search, setSearch] = React.useState("");
   const [filterSource, setFilterSource] = React.useState<InboxSource | "all">("all");
   const [filterStatus, setFilterStatus] = React.useState<InboxStatus | "all">("all");
@@ -1755,8 +1807,13 @@ function InboxMainView({
       ? "ZeroOps"
       : null;
     const seedId = SEED_THREAD_ID_MAP[thread.id];
+    const existsInChat = state.threads.some((t) => t.id === thread.id);
     if (seedId) {
       state.handleSelectThread(seedId);
+    } else if (existsInChat) {
+      // Manual chats already live in chat state with their real conversation —
+      // just select them rather than re-injecting generic placeholder steps.
+      state.handleSelectThread(thread.id);
     } else {
       const steps = INBOX_THREAD_STEPS[thread.id] ?? [
         { type: "user" as const, id: `${thread.id}-u`, text: thread.title },
@@ -1871,7 +1928,9 @@ function InboxMainView({
         </div>
 
         {/* Chat count */}
-        <p className="mb-2 text-hint text-text-secondary">{filtered.length} chat{filtered.length !== 1 ? "s" : ""}</p>
+        <div className="mb-2 flex items-center gap-sm">
+          <p className="text-hint text-text-secondary">{filtered.length} chat{filtered.length !== 1 ? "s" : ""}</p>
+        </div>
 
         {/* Chat list */}
         {filtered.length === 0 ? (
@@ -1882,40 +1941,64 @@ function InboxMainView({
           </div>
         ) : (
           <div className="overflow-hidden rounded-md border border-border bg-background-primary">
-            {/* Header row */}
-            <div className="grid grid-cols-[minmax(0,3fr)_120px_140px_120px] items-center border-b border-border bg-background-secondary px-4 py-2">
-              <span className="text-hint font-medium text-text-secondary">Chat</span>
-              <span className="text-hint font-medium text-text-secondary">Source</span>
-              <span className="text-hint font-medium text-text-secondary">Status</span>
-              <span className="text-hint font-medium text-text-secondary">Updated</span>
-            </div>
             {filtered.map((thread) => {
-              const sc = STATUS_CONFIG[thread.status];
               return (
                 <button
                   key={thread.id}
                   type="button"
                   onClick={() => openThread(thread)}
-                  className="grid w-full grid-cols-[minmax(0,3fr)_120px_140px_120px] items-center border-b border-border px-4 py-3 text-left last:border-b-0 hover:bg-background-secondary transition-colors"
+                  className="flex w-full items-start gap-mid border-b border-border px-4 py-3 text-left last:border-b-0 transition-colors hover:bg-background-secondary"
                 >
-                  {/* Thread title */}
-                  <div className="flex min-w-0 items-center gap-sm pr-4">
-                    <span className={cx("h-1.5 w-1.5 shrink-0 rounded-full transition-opacity", thread.read ? "opacity-0" : "bg-blue-500 opacity-100")} />
-                    <span className={cx("min-w-0 truncate text-paragraph", thread.read ? "text-text-primary" : "font-semibold text-text-primary")}>
-                      {thread.title}
+                  {/* Pulsing attention dot — only for unread threads that need review */}
+                  {thread.status === "needs-review" && !thread.read ? (
+                    <span className="relative mt-1 inline-flex size-[14px] shrink-0 items-center justify-center">
+                      <span className="absolute inline-flex size-[10px] animate-ping rounded-full bg-blue-400 opacity-50" />
+                      <span className="relative inline-flex size-[6px] rounded-full bg-blue-600" />
                     </span>
+                  ) : (
+                    <span className="mt-1 size-[14px] shrink-0" />
+                  )}
+
+                  {/* Card body */}
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    {/* Title row */}
+                    <div className="flex items-baseline gap-sm">
+                      <span className={cx("min-w-0 flex-1 truncate text-paragraph", thread.read ? "text-text-primary" : "font-semibold text-text-primary")}>
+                        {thread.title}
+                      </span>
+                      <span className="shrink-0 text-hint text-text-secondary">{thread.updatedAt}</span>
+                    </div>
+
+                    {/* Why-line */}
+                    {thread.why && (
+                      <p className="truncate text-hint text-text-secondary">{thread.why}</p>
+                    )}
+
+                    {/* Metadata chips */}
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-mid gap-y-1">
+                      {thread.trigger && (
+                        <span className="flex items-center gap-xs text-hint text-text-secondary">
+                          <Icon name={thread.trigger === "Schedule" ? "clockIcon" : thread.trigger === "Detection" ? "lightningIcon" : "newChatIcon"} size={12} className="text-text-secondary" />
+                          {thread.trigger}
+                        </span>
+                      )}
+                      {thread.asset && (
+                        <span className="flex min-w-0 items-center gap-xs text-hint text-text-secondary">
+                          <Icon name="tableIcon" size={12} className="shrink-0 text-text-secondary" />
+                          <span className="truncate font-mono">{thread.asset}</span>
+                        </span>
+                      )}
+                      <span className={cx("inline-flex w-fit items-center rounded px-1.5 py-0.5 text-hint font-medium", SOURCE_COLORS[thread.source])}>
+                        {SOURCE_LABELS[thread.source]}
+                      </span>
+                      {isClosedFromRecents(thread, closedTabIds, chatThreadIds) && (
+                        <span className="inline-flex w-fit items-center gap-xs rounded bg-background-secondary px-1.5 py-0.5 text-hint font-medium text-text-secondary">
+                          <Icon name="sidebarClosedIcon" size={12} />
+                          Not in Recents
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  {/* Source */}
-                  <span className={cx("inline-flex w-fit items-center rounded px-2 py-0.5 text-hint font-medium", SOURCE_COLORS[thread.source])}>
-                    {SOURCE_LABELS[thread.source]}
-                  </span>
-                  {/* Status */}
-                  <div className="flex items-center gap-xs">
-                    <span className={cx("h-1.5 w-1.5 shrink-0 rounded-full", sc.dot)} />
-                    <span className={cx("text-hint", sc.text)}>{sc.label}</span>
-                  </div>
-                  {/* Updated */}
-                  <span className="text-hint text-text-secondary">{thread.updatedAt}</span>
                 </button>
               );
             })}
@@ -2355,6 +2438,8 @@ function ChatLeftNav({
   activeMainView,
   onSetMainView,
   inboxUnreadCount = 0,
+  closedTabIds,
+  onCloseTab,
 }: {
   threads: ReturnType<typeof useGenieChatState>["threads"];
   activeThreadId: string | null;
@@ -2368,6 +2453,8 @@ function ChatLeftNav({
   activeMainView: MainView;
   onSetMainView: (view: MainView) => void;
   inboxUnreadCount?: number;
+  closedTabIds?: Set<string>;
+  onCloseTab?: (id: string) => void;
 }) {
   const setCollapsed = onCollapsedChange;
   const [width, setWidth] = React.useState(DEFAULT_NAV_WIDTH);
@@ -2437,6 +2524,16 @@ function ChatLeftNav({
             onClick={() => { onNewChat(); onSetMainView("thread"); setCollapsed(false); }}
           />
         </Tooltip>
+        <Tooltip label="Schedules" align="left">
+          <IconButton
+            aria-label="Schedules"
+            icon={<Icon name="CalendarClockIcon" size={14} />}
+            size="small"
+            tone="neutral"
+            className={activeMainView === "scheduled" ? "!bg-background-tertiary" : ""}
+            onClick={() => { onSetMainView("scheduled"); setCollapsed(false); }}
+          />
+        </Tooltip>
         <Tooltip label="Customizations" align="left">
           <IconButton
             aria-label="Customizations"
@@ -2447,21 +2544,11 @@ function ChatLeftNav({
             onClick={() => { onSetMainView(activeMainView === "customizations" ? "thread" : "customizations"); setCollapsed(false); }}
           />
         </Tooltip>
-        <Tooltip label="Automations" align="left">
-          <IconButton
-            aria-label="Automations"
-            icon={<Icon name="lightningIcon" size={14} />}
-            size="small"
-            tone="neutral"
-            className={activeMainView === "scheduled" ? "!bg-background-tertiary" : ""}
-            onClick={() => { onSetMainView("scheduled"); setCollapsed(false); }}
-          />
-        </Tooltip>
         <Tooltip label="Inbox" align="left">
           <div className="relative">
             <IconButton
               aria-label="Inbox"
-              icon={<Icon name="inboxTrayIcon" size={14} />}
+              icon={<Icon name="syncIcon" size={14} />}
               size="small"
               tone="neutral"
               className={activeMainView === "inbox" ? "!bg-background-tertiary" : ""}
@@ -2541,6 +2628,17 @@ function ChatLeftNav({
           </button>
           <button
             type="button"
+            onClick={() => onSetMainView("scheduled")}
+            className={cx(
+              "flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-paragraph hover:bg-background-secondary",
+              activeMainView === "scheduled" ? "bg-action-default-background-hover font-medium text-text-primary" : "text-text-primary",
+            )}
+          >
+            <Icon name="CalendarClockIcon" size={14} className="shrink-0 text-text-secondary" />
+            Schedules
+          </button>
+          <button
+            type="button"
             onClick={() => onSetMainView(activeMainView === "customizations" ? "thread" : "customizations")}
             className={cx(
               "flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-paragraph hover:bg-background-secondary",
@@ -2552,24 +2650,13 @@ function ChatLeftNav({
           </button>
           <button
             type="button"
-            onClick={() => onSetMainView("scheduled")}
-            className={cx(
-              "flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-paragraph hover:bg-background-secondary",
-              activeMainView === "scheduled" ? "bg-action-default-background-hover font-medium text-text-primary" : "text-text-primary",
-            )}
-          >
-            <Icon name="lightningIcon" size={14} className="shrink-0 text-text-secondary" />
-            Automations
-          </button>
-          <button
-            type="button"
             onClick={() => onSetMainView("inbox")}
             className={cx(
               "flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-paragraph hover:bg-background-secondary",
               activeMainView === "inbox" ? "bg-action-default-background-hover font-medium text-text-primary" : "text-text-primary",
             )}
           >
-            <Icon name="inboxTrayIcon" size={14} className="shrink-0 text-text-secondary" />
+            <Icon name="syncIcon" size={14} className="shrink-0 text-text-secondary" />
             <span className="flex-1">Inbox</span>
             {inboxUnreadCount > 0 && (
               <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-semibold text-white">
@@ -2629,6 +2716,8 @@ function ChatLeftNav({
             reviewedThreadIds={reviewedThreadIds}
             onRenameActiveThread={onRenameActiveThread}
             onRenameThread={onRenameThread}
+            closedTabIds={closedTabIds}
+            onCloseTab={onCloseTab}
           />
         </div>
       </div>
@@ -2744,13 +2833,12 @@ const PYTHON_FILE_LINES = [
 
 function PythonFilePreview({ asset }: { asset: ReviewAsset }) {
   const router = useRouter();
+  const lines = isNewAsset(asset) ? [""] : PYTHON_FILE_LINES;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Toolbar */}
       <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border px-3">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="text-hint text-text-secondary">{asset.name}</span>
-        </div>
+        <div className="flex min-w-0 flex-1 items-center gap-2" />
         <div className="flex shrink-0 items-center gap-2">
           <DefaultButton size="small" leadingIcon={<Icon name="playIcon" size={12} />}>Run</DefaultButton>
           <DefaultButton size="small">Save</DefaultButton>
@@ -2759,7 +2847,7 @@ function PythonFilePreview({ asset }: { asset: ReviewAsset }) {
       </div>
       {/* Code */}
       <div className="min-h-0 flex-1 overflow-y-auto bg-background-primary p-4 font-mono text-[12px] leading-5">
-        {PYTHON_FILE_LINES.map((line, i) => (
+        {lines.map((line, i) => (
           <div key={i} className="flex gap-4">
             <span className="w-6 shrink-0 select-none text-right text-text-secondary opacity-40">{i + 1}</span>
             <span className={cx(
@@ -2785,28 +2873,76 @@ function NotebookPreview({ asset }: { asset: ReviewAsset }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Notebook toolbar */}
-      <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border px-3">
+      <div className="nb-toolbar flex h-9 shrink-0 items-center gap-2 border-b border-border px-3" style={{ containerType: "inline-size" }}>
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <IconButton aria-label="More" icon={<Icon name="overflowIcon" size={14} />} size="small" tone="neutral" />
           <IconButton aria-label="Favorite" icon={<Icon name="starIcon" size={14} />} size="small" tone="neutral" />
           <span className="text-hint text-text-secondary">Python</span>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <DefaultButton size="small" leadingIcon={<Icon name="playIcon" size={12} />}>Run all</DefaultButton>
+          {/* Run all */}
+          <DefaultButton size="small" leadingIcon={<Icon name="playIcon" size={12} />}>
+            <span className="nb-label">Run all</span>
+          </DefaultButton>
+          {/* Compute selector */}
           <DefaultButton size="small">
             <span className="flex items-center gap-1">
               <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-green-500" />
-              Serverless
+              <span className="nb-label">Serverless</span>
               <Icon name="chevronDownIcon" size={10} />
             </span>
           </DefaultButton>
-          <DefaultButton size="small">Schedule</DefaultButton>
-          <DefaultButton size="small">Share</DefaultButton>
-          <PrimaryButton size="small" onClick={() => router.push("/editor")}>View source →</PrimaryButton>
+          {/* Schedule — icon-only when narrow */}
+          <span className="nb-full contents">
+            <DefaultButton size="small">Schedule</DefaultButton>
+          </span>
+          <span className="nb-compact hidden">
+            <Tooltip label="Schedule">
+              <IconButton aria-label="Schedule" icon={<Icon name="CalendarClockIcon" size={14} />} size="small" tone="neutral" className="border border-border" />
+            </Tooltip>
+          </span>
+          {/* Share — icon-only when narrow */}
+          <span className="nb-full contents">
+            <DefaultButton size="small">Share</DefaultButton>
+          </span>
+          <span className="nb-compact hidden">
+            <Tooltip label="Share">
+              <IconButton aria-label="Share" icon={<Icon name="shareIcon" size={14} />} size="small" tone="neutral" className="border border-border" />
+            </Tooltip>
+          </span>
+          {/* View source */}
+          <Tooltip label="View source">
+            <PrimaryButton size="small" onClick={() => router.push("/editor")}>
+              <span className="nb-label">View source </span>→
+            </PrimaryButton>
+          </Tooltip>
         </div>
       </div>
+      <style>{`
+        /* When the preview panel narrows, collapse labeled toolbar buttons to icons. */
+        @container (max-width: 520px) {
+          .nb-toolbar .nb-label { display: none; }
+          .nb-toolbar .nb-full { display: none; }
+          .nb-toolbar .nb-compact { display: inline-flex; }
+        }
+      `}</style>
 
       {/* Cells */}
+      {isNewAsset(asset) ? (
+        <div className="min-h-0 flex-1 overflow-y-auto p-3">
+          <div className="flex flex-col gap-3">
+            {/* Empty code cell */}
+            <div className="shrink-0 overflow-hidden bg-background-primary">
+              <div className="flex h-8 items-center gap-2 border-b border-border px-2">
+                <IconButton aria-label="Run" icon={<Icon name="playIcon" size={12} />} size="small" tone="neutral" className="text-green-600" />
+                <div className="flex-1" />
+                <span className="rounded bg-background-secondary px-1.5 py-0.5 text-hint font-medium text-text-secondary">Python</span>
+              </div>
+              <div className="p-3 font-mono text-[12px] leading-5 text-text-placeholder">Start writing code…</div>
+            </div>
+          </div>
+        </div>
+      ) : (
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         <div className="flex flex-col gap-3">
           {/* Text cell */}
@@ -2828,7 +2964,7 @@ function NotebookPreview({ asset }: { asset: ReviewAsset }) {
           </div>
 
           {/* Code cell 1 — SQL */}
-          <div className="shrink-0 overflow-hidden rounded-md border border-border bg-background-primary">
+          <div className="shrink-0 overflow-hidden bg-background-primary">
             <div className="flex h-8 items-center gap-2 border-b border-border px-2">
               <IconButton aria-label="Run" icon={<Icon name="playIcon" size={12} />} size="small" tone="neutral" className="text-green-600" />
               <span className="text-hint text-text-secondary">✓ 0.8s</span>
@@ -2868,7 +3004,7 @@ function NotebookPreview({ asset }: { asset: ReviewAsset }) {
           </div>
 
           {/* Code cell 2 — Python */}
-          <div className="shrink-0 overflow-hidden rounded-md border border-border bg-background-primary">
+          <div className="shrink-0 overflow-hidden bg-background-primary">
             <div className="flex h-8 items-center gap-2 border-b border-border px-2">
               <IconButton aria-label="Run" icon={<Icon name="playIcon" size={12} />} size="small" tone="neutral" className="text-green-600" />
               <span className="text-hint text-text-secondary">✓ 1.2s</span>
@@ -2908,7 +3044,9 @@ function NotebookPreview({ asset }: { asset: ReviewAsset }) {
             </div>
           </div>
         </div>
-      </div>    </div>
+      </div>
+      )}
+    </div>
   );
 }
 
@@ -3002,7 +3140,7 @@ function DashboardPreview({ activeThreadId }: { activeThreadId?: string | null }
     <div className="relative flex min-h-0 flex-1 flex-col">
       {/* Edit view header */}
       <div className="shrink-0 border-b border-border bg-background-primary">
-        <div className="flex items-center gap-sm px-4 pt-3 pb-2">
+        <div className="db-toolbar flex items-center gap-sm px-4 pt-3 pb-2" style={{ containerType: "inline-size" }}>
           <span className="min-w-0 truncate text-title3 font-semibold text-text-primary">Ski Resort Dashboard</span>
           <button type="button" aria-label="Bookmark" className="shrink-0 text-text-secondary hover:text-text-primary">
             <Icon name="starIcon" size={16} />
@@ -3017,10 +3155,37 @@ function DashboardPreview({ activeThreadId }: { activeThreadId?: string | null }
           <DefaultButton size="small" leadingIcon={<span className="inline-block h-2 w-2 shrink-0 rounded-full bg-green-500" />} menu className="min-w-0 max-w-[120px]">
             <span className="truncate">0 - Shared SQL Warehouse</span>
           </DefaultButton>
-          <DefaultButton size="small" className="shrink-0">Publish</DefaultButton>
-          <DefaultButton size="small" className="shrink-0" onClick={() => router.push("/dashboard/edit")}>Share</DefaultButton>
-          <PrimaryButton size="small" className="shrink-0" onClick={() => router.push(`/dashboard/edit${activeThreadId ? `?thread=${activeThreadId}` : ""}`)}>View source →</PrimaryButton>
+          {/* Publish — icon-only (bordered) when narrow */}
+          <span className="db-full contents">
+            <DefaultButton size="small" className="shrink-0">Publish</DefaultButton>
+          </span>
+          <span className="db-compact hidden shrink-0">
+            <Tooltip label="Publish">
+              <IconButton aria-label="Publish" icon={<Icon name="cloudUploadIcon" size={14} />} size="small" tone="neutral" className="border border-border" />
+            </Tooltip>
+          </span>
+          {/* Share — icon-only (bordered) when narrow */}
+          <span className="db-full contents">
+            <DefaultButton size="small" className="shrink-0" onClick={() => router.push("/dashboard/edit")}>Share</DefaultButton>
+          </span>
+          <span className="db-compact hidden shrink-0">
+            <Tooltip label="Share">
+              <IconButton aria-label="Share" icon={<Icon name="shareIcon" size={14} />} size="small" tone="neutral" className="border border-border" onClick={() => router.push("/dashboard/edit")} />
+            </Tooltip>
+          </span>
+          {/* View source — stays primary, drops label to just the arrow when narrow */}
+          <PrimaryButton size="small" className="shrink-0" onClick={() => router.push(`/dashboard/edit${activeThreadId ? `?thread=${activeThreadId}` : ""}`)}>
+            <span className="db-label">View source </span>→
+          </PrimaryButton>
         </div>
+        <style>{`
+          /* When the preview panel narrows, collapse labeled toolbar buttons to bordered icons. */
+          @container (max-width: 520px) {
+            .db-toolbar .db-label { display: none; }
+            .db-toolbar .db-full { display: none; }
+            .db-toolbar .db-compact { display: inline-flex; }
+          }
+        `}</style>
         {/* Tabs */}
         <div className="flex items-end px-4">
           <button
@@ -3686,7 +3851,7 @@ function ReviewDiffPanel({ assets }: { assets: ReviewAsset[] }) {
   const rejectAll = () => setStatuses(Object.fromEntries(assets.map((a) => [a.id, "rejected"])));
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border bg-background-primary">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background-primary">
       {/* Header */}
       <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
         <span className="flex-1 text-paragraph font-medium text-text-primary">
@@ -3886,7 +4051,6 @@ function PreviewPanel({
   selectedAsset,
   activeThreadId,
   initialWidth = DEFAULT_PREVIEW_WIDTH,
-  initialBrowser = null,
   reviewAssets,
   openAssets,
   setOpenAssets,
@@ -3900,12 +4064,13 @@ function PreviewPanel({
   readOnly = false,
   mcpServer = null,
   scheduledTask = null,
+  onOpenBrowser,
+  onCreateAsset,
 }: {
   onClose: () => void;
   selectedAsset: ReviewAsset | null;
   activeThreadId: string | null;
   initialWidth?: number;
-  initialBrowser?: "workspace" | "schema" | null;
   reviewAssets?: ReviewAsset[];
   openAssets: ReviewAsset[];
   setOpenAssets: (updater: ReviewAsset[] | ((prev: ReviewAsset[]) => ReviewAsset[])) => void;
@@ -3919,6 +4084,8 @@ function PreviewPanel({
   readOnly?: boolean;
   mcpServer?: McpServer | null;
   scheduledTask?: ScheduledTask | null;
+  onOpenBrowser?: (kind: "workspace" | "schema") => void;
+  onCreateAsset?: (kind: ReviewAsset["kind"], name: string) => void;
 }) {
   const [mcpTab, setMcpTab] = React.useState<McpPreviewTab>("Tools");
   const [mcpSearch, setMcpSearch] = React.useState("");
@@ -3963,11 +4130,6 @@ function PreviewPanel({
     });
   };
   const [width, setWidth] = React.useState(initialWidth);
-  const [rightBrowser, setRightBrowser] = React.useState<"workspace" | "schema" | null>(initialBrowser);
-  const workspaceBrowserOpen = rightBrowser === "workspace";
-  const toggleWorkspace = () => setRightBrowser((v) => v === "workspace" ? null : "workspace");
-  const toggleSchema = () => setRightBrowser((v) => v === "schema" ? null : "schema");
-  const [schemaExpanded, setSchemaExpanded] = React.useState<string | null>("ski_conditions");
   const isDragging = React.useRef(false);
   const startX = React.useRef(0);
   const startWidth = React.useRef(initialWidth);
@@ -3997,13 +4159,15 @@ function PreviewPanel({
   }, [width]);
 
   return (
-    <div className="relative flex h-full min-h-0 shrink-0 flex-col overflow-hidden bg-background-primary" style={{ width }}>
+    <div className="relative flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-l border-border bg-background-primary" style={{ width }}>
       {/* Drag handle on left edge */}
       <div
         onMouseDown={handleMouseDown}
-        className="absolute left-0 top-0 h-full w-1 cursor-col-resize z-10"
+        className="absolute left-0 top-0 h-full w-1 cursor-col-resize z-10 hover:bg-action-default-border-focus"
       />
-      {/* Header */}
+      {/* Header — only for scheduled task / MCP / skill views. The default
+          asset view puts its close toggle in the soft tab bar instead. */}
+      {(scheduledTask || mcpServer || skillFile) && (
       <div className="flex h-10 shrink-0 items-center gap-xs pr-3">
         {/* Tabs / skill title */}
         <div className="relative flex min-w-0 flex-1 items-center overflow-hidden">
@@ -4028,21 +4192,7 @@ function PreviewPanel({
           ) : skillFile ? (
             <span className="truncate pl-3 text-paragraph font-medium text-text-primary">{skillFile.replace(".md", "")}</span>
           ) : (
-            (["Assets", "Review"] as PreviewTab[]).map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => setActiveTab(tab)}
-                className={cx(
-                  "flex h-7 shrink-0 items-center justify-center rounded-md px-3 text-paragraph",
-                  activeTab === tab
-                    ? "bg-action-default-background-hover font-medium text-text-primary"
-                    : "text-text-secondary hover:bg-action-default-background-hover",
-                )}
-              >
-                {tab}
-              </button>
-            ))
+            <span className="pl-3" />
           )}
           {/* Fade-out mask */}
           <div className="pointer-events-none absolute right-0 top-0 h-full w-8 bg-gradient-to-r from-transparent to-background-primary" />
@@ -4089,26 +4239,6 @@ function PreviewPanel({
           </div>
         ) : (
           <div className="flex shrink-0 items-center gap-xs">
-            {activeTab === "Assets" && (
-              <>
-                <IconButton
-                  aria-label="Browse workspace files"
-                  icon={<Icon name="folderOutlinedIcon" size={14} />}
-                  size="small"
-                  tone="neutral"
-                  className={rightBrowser === "workspace" ? "!bg-background-tertiary" : ""}
-                  onClick={toggleWorkspace}
-                />
-                <IconButton
-                  aria-label="Browse data catalog"
-                  icon={<span className="inline-flex -scale-x-100"><Icon name="catalogShapesIcon" size={14} /></span>}
-                  size="small"
-                  tone="neutral"
-                  className={rightBrowser === "schema" ? "!bg-background-tertiary" : ""}
-                  onClick={toggleSchema}
-                />
-              </>
-            )}
             <Tooltip label="Close preview panel" align="right">
               <IconButton
                 aria-label="Close preview panel"
@@ -4125,14 +4255,15 @@ function PreviewPanel({
           </div>
         )}
       </div>
+      )}
 
       {/* Pane */}
       <div className="flex min-h-0 flex-1 overflow-hidden">
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden pb-3 pr-3 pl-0">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {scheduledTask ? (
           <ScheduledTaskConfigPanel task={scheduledTask} />
         ) : mcpServer ? (
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border bg-background-primary">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background-primary">
             {mcpTab === "Tools" ? (
               <>
                 {/* Search + count */}
@@ -4193,7 +4324,7 @@ function PreviewPanel({
             )}
           </div>
         ) : skillFile ? (
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border bg-background-primary">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background-primary">
             {skillEditMode ? (
               <textarea
                 className="min-h-0 flex-1 resize-none bg-background-primary px-6 py-5 font-mono text-paragraph text-text-primary outline-none"
@@ -4209,7 +4340,7 @@ function PreviewPanel({
           reviewAssets && reviewAssets.length > 0 && !isReviewed ? (
             <ReviewDiffPanel key={activeThreadId ?? "review"} assets={reviewAssets} />
           ) : (
-          <div className="flex w-full flex-1 flex-col items-center justify-center overflow-clip rounded-md border border-border bg-background-primary">
+          <div className="flex w-full flex-1 flex-col items-center justify-center overflow-clip bg-background-primary">
             <MissingBranchGraphic />
             <div className="flex flex-col items-center gap-2 px-6 pb-6 text-center">
               <p className="text-[18px] font-semibold leading-6 text-text-primary">
@@ -4222,14 +4353,15 @@ function PreviewPanel({
           </div>
           )
         ) : activeTab === "Assets" && openAssets.length > 0 ? (
-          <div className="flex min-h-0 w-full flex-1 overflow-hidden rounded-md border border-border bg-background-primary">
+          <div className="flex min-h-0 w-full flex-1 overflow-hidden bg-background-primary">
             {/* Main asset area */}
             <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
               {/* Figma-style soft tab bar */}
-              <div className="flex h-8 shrink-0 items-center overflow-x-auto bg-background-secondary pr-1">
+              <div className="flex h-8 shrink-0 items-center bg-background-secondary pr-1">
+                <div className="flex h-full min-w-0 flex-1 items-center overflow-x-auto">
                 {openAssets.map((asset) => {
                   const isActive = asset.id === activeAssetId;
-                  const iconName = asset.kind === "notebook" ? "notebookIcon" : asset.kind === "dashboard" ? "dashboardIcon" : "fileCodeIcon";
+                  const iconName = asset.id === DIFF_TAB_ID ? "PlusMinusSquareIcon" : asset.kind === "notebook" ? "notebookIcon" : asset.kind === "dashboard" ? "dashboardIcon" : "fileCodeIcon";
                   return (
                     <button
                       key={asset.id}
@@ -4257,16 +4389,31 @@ function PreviewPanel({
                     </button>
                   );
                 })}
-                {/* Add tab */}
-                <button
-                  type="button"
-                  aria-label="New tab"
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-text-secondary hover:bg-background-tertiary"
-                >
-                  <Icon name="plusIcon" size={14} />
-                </button>
+                </div>
+                {/* Close toggle — kept outside the scroll container so its tooltip isn't clipped */}
+                <Tooltip label="Close preview panel" align="right" side="top">
+                  <IconButton
+                    aria-label="Close preview panel"
+                    icon={<span className="inline-flex rotate-180"><Icon name="sidebarOpenIcon" size={16} /></span>}
+                    size="small"
+                    tone="neutral"
+                    onClick={onClose}
+                  />
+                </Tooltip>
               </div>
-              {activeAsset?.kind === "dashboard" ? (
+              {activeAssetId === DIFF_TAB_ID ? (
+                reviewAssets && reviewAssets.length > 0 ? (
+                  <ReviewDiffPanel key={activeThreadId ?? "review"} assets={reviewAssets} />
+                ) : (
+                  <div className="flex w-full flex-1 flex-col items-center justify-center overflow-clip bg-background-primary">
+                    <MissingBranchGraphic />
+                    <div className="flex flex-col items-center gap-2 px-6 pb-6 text-center">
+                      <p className="text-[18px] font-semibold leading-6 text-text-primary">No changes to display</p>
+                      <p className="text-paragraph text-text-secondary">All the changes made by a thread will display here</p>
+                    </div>
+                  </div>
+                )
+              ) : activeAsset?.kind === "dashboard" ? (
                 <DashboardPreview activeThreadId={activeThreadId} />
               ) : activeAsset?.kind === "file" ? (
                 <PythonFilePreview asset={activeAsset} />
@@ -4274,24 +4421,53 @@ function PreviewPanel({
                 <NotebookPreview asset={activeAsset} />
               ) : null}
             </div>
-            {rightBrowser !== null && <RightBrowserPanel kind={rightBrowser} onClose={() => setRightBrowser(null)} schemaExpanded={schemaExpanded} setSchemaExpanded={setSchemaExpanded} onOpenAsset={(asset) => { setOpenAssets((prev) => prev.find((a) => a.id === asset.id) ? prev : [...prev, asset]); setActiveAssetId(asset.id); setActiveTab("Assets"); }} />}
           </div>
         ) : (
-          <div className="flex min-h-0 w-full flex-1 overflow-hidden rounded-md border border-border bg-background-primary">
+          <div className="relative flex min-h-0 w-full flex-1 overflow-hidden bg-background-secondary">
+            {/* Close toggle — floated top-right since there's no header/tab bar */}
+            <div className="absolute right-1 top-1 z-10">
+              <Tooltip label="Close preview panel" align="right">
+                <IconButton
+                  aria-label="Close preview panel"
+                  icon={<span className="inline-flex rotate-180"><Icon name="sidebarOpenIcon" size={16} /></span>}
+                  size="small"
+                  tone="neutral"
+                  onClick={onClose}
+                />
+              </Tooltip>
+            </div>
             <div className="flex min-w-0 flex-1 flex-col items-center justify-center overflow-clip">
               <EmptyChartGraphic />
-              <div className="flex flex-col items-center gap-2 px-6 pb-6 text-center">
+              <div className="flex max-w-[420px] flex-col items-center gap-2 px-6 pb-6 text-center">
                 <p className="text-[18px] font-semibold leading-6 text-text-primary">
-                  No assets shown
+                  Workspace canvas
                 </p>
-                <DefaultButton
-                  onClick={() => setRightBrowser(rightBrowser === "workspace" ? null : "workspace")}
-                >
-                  Open asset
-                </DefaultButton>
+                <p className="text-paragraph text-text-secondary">
+                  As you work, the files and assets you create and edit open in this space for you to review.
+                </p>
+                <div className="flex items-center gap-sm">
+                  <DefaultButton
+                    onClick={() => onOpenBrowser?.("workspace")}
+                  >
+                    Open asset
+                  </DefaultButton>
+                  <DropdownMenu
+                    variant="rich"
+                    widthMode="content"
+                    side="bottom"
+                    align="start"
+                    items={newAssetMenuItems((kind, name) => onCreateAsset?.(kind, name))}
+                    trigger={({ triggerRef, triggerProps }) => (
+                      <span ref={triggerRef} className="inline-flex">
+                        <DefaultButton {...triggerProps} leadingIcon={<Icon name="plusIcon" size={14} />}>
+                          New
+                        </DefaultButton>
+                      </span>
+                    )}
+                  />
+                </div>
               </div>
             </div>
-            {rightBrowser !== null && activeTab === "Assets" && <RightBrowserPanel kind={rightBrowser} onClose={() => setRightBrowser(null)} schemaExpanded={schemaExpanded} setSchemaExpanded={setSchemaExpanded} onOpenAsset={(asset) => { setOpenAssets((prev) => prev.find((a) => a.id === asset.id) ? prev : [...prev, asset]); setActiveAssetId(asset.id); setActiveTab("Assets"); }} />}
           </div>
         )}
       </div>
@@ -4308,6 +4484,7 @@ export default function ChatPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const state = useGenieChatState();
+  const { topNavHidden, toggleTopNav } = useGenieCode();
   const [navCollapsed, setNavCollapsed] = React.useState(false);
 
   const initialPrompt = searchParams.get("prompt");
@@ -4322,6 +4499,10 @@ export default function ChatPage() {
   React.useEffect(() => {
     if (isNew) {
       handleNewChatRef.current();
+      // Open the preview panel by default on a fresh chat so it's clear
+      // Genie Code works on assets.
+      setInitialPreviewWidth(computePreviewWidth());
+      setPreviewOpen(true);
     } else if (initialThread) {
       handleSelectThreadRef.current(initialThread);
     }
@@ -4331,10 +4512,24 @@ export default function ChatPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [previewOpen, setPreviewOpen] = React.useState(false);
-  const [initialBrowser, setInitialBrowser] = React.useState<"workspace" | "schema" | null>(null);
+  // Page-level browser column (Workspace / Catalog) — opens as its own column
+  // to the LEFT of the preview panel, driven by the far-right icon rail.
+  const [pageBrowser, setPageBrowser] = React.useState<"workspace" | "schema" | null>(null);
+  const [pageSchemaExpanded, setPageSchemaExpanded] = React.useState<string | null>("ski_conditions");
   const [selectedAsset, setSelectedAsset] = React.useState<ReviewAsset | null>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [initialPreviewWidth, setInitialPreviewWidth] = React.useState(DEFAULT_PREVIEW_WIDTH);
+
+  // Preview should open at ~50% of the CHAT pane (not the whole container),
+  // so it doesn't squeeze the chat. Subtract the left thread nav and the
+  // far-right icon rail from the container width, then take half.
+  const computePreviewWidth = React.useCallback(() => {
+    const RIGHT_RAIL_WIDTH = 36; // w-9
+    const container = containerRef.current?.offsetWidth ?? DEFAULT_PREVIEW_WIDTH * 2;
+    const navWidth = navCollapsed ? 36 : DEFAULT_NAV_WIDTH;
+    const chatArea = Math.max(0, container - navWidth - RIGHT_RAIL_WIDTH);
+    return Math.round(chatArea / 2);
+  }, [navCollapsed]);
 
   // Per-thread panel state: keyed by threadId
   const [threadOpenAssets, setThreadOpenAssets] = React.useState<Record<string, ReviewAsset[]>>({});
@@ -4342,7 +4537,10 @@ export default function ChatPage() {
   const [threadActiveTab, setThreadActiveTab] = React.useState<Record<string, PreviewTab>>({});
   const [reviewedThreadIds, setReviewedThreadIds] = React.useState<Set<string>>(new Set());
 
-  const threadId = state.activeThreadId ?? "__none__";
+  // Each new-chat session gets a fresh key so its preview/asset state never
+  // carries over from a previous new chat. Bumped whenever we enter a new chat.
+  const [newChatSeq, setNewChatSeq] = React.useState(0);
+  const threadId = state.activeThreadId ?? `__none__-${newChatSeq}`;
   const openAssets = threadOpenAssets[threadId] ?? [];
   const activeAssetId = threadActiveAssetId[threadId] ?? null;
   const activeTab = threadActiveTab[threadId] ?? "Assets";
@@ -4366,12 +4564,25 @@ export default function ChatPage() {
     setThreadActiveTab((prev) => ({ ...prev, [threadId]: tab }));
   }, [threadId]);
 
+  // Start a fresh preview session for a new chat so asset/tab state never
+  // carries over. Wraps the core new-chat action; used by every entry point.
+  const startNewChat = React.useCallback(() => {
+    setNewChatSeq((n) => n + 1);
+    state.handleNewChat();
+  }, [state]);
+
   const reviewAssets = React.useMemo(() => {
     if (state.runStatus !== "done") return undefined;
     if (state.activeThreadId === "thread-dashboard") return ASSISTANT_DASHBOARD_REVIEW_ASSETS;
     const summary = state.steps.find((s) => s.type === "assets-summary") as { assets: ReviewAsset[] } | undefined;
     return summary?.assets;
   }, [state.steps, state.runStatus, state.activeThreadId]);
+
+  // Threads where the user has explicitly closed/hidden the preview pane — we
+  // respect that and don't auto-reopen assets when they navigate back.
+  const [previewDismissedThreads, setPreviewDismissedThreads] = React.useState<Set<string>>(new Set());
+  // Threads we've already auto-opened assets for (so we only do it once per visit).
+  const autoOpenedThreadsRef = React.useRef<Set<string>>(new Set());
 
   const assetClickRef = React.useRef(false);
   const manualOpenRef = React.useRef(false);
@@ -4381,6 +4592,53 @@ export default function ChatPage() {
   const [mainView, setMainView] = React.useState<MainView>("thread");
   const [inboxThreads, setInboxThreads] = React.useState<InboxThread[]>(INBOX_THREADS);
   const inboxUnreadCount = inboxThreads.filter((t) => !t.read).length;
+
+  // When navigating to a thread that produced assets, open them in the preview
+  // automatically — unless the user previously dismissed the pane for it.
+  React.useEffect(() => {
+    const tid = state.activeThreadId;
+    if (!tid) return;
+    if (mainView !== "thread") return;
+    if (!reviewAssets || reviewAssets.length === 0) return;
+    if (previewDismissedThreads.has(tid)) return;
+    if (autoOpenedThreadsRef.current.has(tid)) return;
+    autoOpenedThreadsRef.current.add(tid);
+    setThreadOpenAssets((prev) => {
+      const existing = prev[tid] ?? [];
+      const merged = [...existing];
+      for (const a of reviewAssets) if (!merged.find((m) => m.id === a.id)) merged.push(a);
+      return { ...prev, [tid]: merged };
+    });
+    setThreadActiveAssetId((prev) => ({ ...prev, [tid]: prev[tid] ?? reviewAssets[0]!.id }));
+    setThreadActiveTab((prev) => ({ ...prev, [tid]: prev[tid] ?? "Assets" }));
+    setInitialPreviewWidth(computePreviewWidth());
+    setPreviewOpen(true);
+  }, [state.activeThreadId, reviewAssets, mainView, previewDismissedThreads, computePreviewWidth]);
+
+  // Every manually-created chat (New button or a suggested prompt) also lands in the
+  // inbox at the top. Detect new chats by their `thread-<timestamp>` id and mirror
+  // them into the inbox so the inbox holds all threads.
+  React.useEffect(() => {
+    const manual = state.threads.filter((t) => /^thread-\d+$/.test(t.id));
+    if (manual.length === 0) return;
+    setInboxThreads((prev) => {
+      const known = new Set(prev.map((t) => t.id));
+      const fresh = manual
+        .filter((t) => !known.has(t.id))
+        .map<InboxThread>((t) => ({
+          id: t.id,
+          title: t.label,
+          source: "manual",
+          sourceName: "Manual",
+          status: "in-progress",
+          updatedAt: "now",
+          hoursAgo: 0,
+          read: false,
+          trigger: "Manual",
+        }));
+      return fresh.length > 0 ? [...fresh, ...prev] : prev;
+    });
+  }, [state.threads]);
   const [customizationsTab, setCustomizationsTab] = React.useState<CustomizationsTab>("skills");
   const [selectedSkillFile, setSelectedSkillFile] = React.useState<string | null>(null);
   const [skillDialogFile, setSkillDialogFile] = React.useState<string | null>(null);
@@ -4437,33 +4695,61 @@ export default function ChatPage() {
     router.push(`/editor?skill=${encodeURIComponent(ASSISTANT_INSTRUCTIONS_FILE)}`);
   }, [router]);
 
-  // Auto-switch to Review tab when assets become available, unless opened via asset click or manual toggle
-  React.useEffect(() => {
-    if (reviewAssets && reviewAssets.length > 0 && previewOpen) {
-      if (!assetClickRef.current && !manualOpenRef.current) setActiveTab("Review");
-      assetClickRef.current = false;
-      manualOpenRef.current = false;
-    }
-  }, [reviewAssets, previewOpen]);
 
   const handleAssetClick = React.useCallback((asset: ReviewAsset) => {
     assetClickRef.current = true;
     setSelectedAsset(asset);
-    if (containerRef.current) {
-      setInitialPreviewWidth(Math.round(containerRef.current.offsetWidth / 2));
-    }
+    setInitialPreviewWidth(computePreviewWidth());
     setPreviewOpen(true);
     setActiveTab("Assets");
-  }, [setActiveTab]);
+  }, [setActiveTab, computePreviewWidth]);
 
   const handleTogglePreview = React.useCallback(() => {
-    if (!previewOpen && containerRef.current) {
-      setInitialPreviewWidth(Math.round(containerRef.current.offsetWidth / 2));
+    if (!previewOpen) {
+      setInitialPreviewWidth(computePreviewWidth());
       setActiveTab("Assets");
       manualOpenRef.current = true;
+      // Re-opening clears the "dismissed" flag for the current thread.
+      if (state.activeThreadId) {
+        setPreviewDismissedThreads((prev) => {
+          if (!prev.has(state.activeThreadId!)) return prev;
+          const next = new Set(prev);
+          next.delete(state.activeThreadId!);
+          return next;
+        });
+      }
+    } else if (state.activeThreadId) {
+      // Collapsing marks it dismissed for this thread.
+      setPreviewDismissedThreads((prev) => new Set(prev).add(state.activeThreadId!));
     }
     setPreviewOpen((v) => !v);
-  }, [previewOpen, setActiveTab]);
+  }, [previewOpen, setActiveTab, computePreviewWidth, state.activeThreadId]);
+
+  // Creates a new empty asset (from the rail's "New" menu) and opens it as a
+  // tab in the preview area.
+  const newAssetCounterRef = React.useRef(0);
+  const handleCreateAsset = React.useCallback(
+    (kind: ReviewAsset["kind"], name: string) => {
+      const id = `${NEW_ASSET_PREFIX}${++newAssetCounterRef.current}`;
+      const asset: ReviewAsset = { id, name, kind };
+      setOpenAssets((prev) => [...prev, asset]);
+      setActiveAssetId(id);
+      setActiveTab("Assets");
+      if (!previewOpen) setInitialPreviewWidth(computePreviewWidth());
+      setPreviewOpen(true);
+    },
+    [previewOpen, setOpenAssets, setActiveAssetId, setActiveTab, computePreviewWidth],
+  );
+
+  // Opens the changes/diff view as a soft tab (from the review drawer's diff button).
+  const handleOpenDiff = React.useCallback(() => {
+    const diffAsset: ReviewAsset = { id: DIFF_TAB_ID, name: "Changes", kind: "file" };
+    setOpenAssets((prev) => prev.find((a) => a.id === DIFF_TAB_ID) ? prev : [...prev, diffAsset]);
+    setActiveAssetId(DIFF_TAB_ID);
+    setActiveTab("Assets");
+    if (!previewOpen) setInitialPreviewWidth(computePreviewWidth());
+    setPreviewOpen(true);
+  }, [previewOpen, setOpenAssets, setActiveAssetId, setActiveTab, computePreviewWidth]);
 
   return (
     <main className="relative flex h-full min-h-0 w-full p-0">
@@ -4472,7 +4758,7 @@ export default function ChatPage() {
           threads={state.threads}
           activeThreadId={state.activeThreadId}
           onSelect={state.handleSelectThread}
-          onNewChat={state.handleNewChat}
+          onNewChat={startNewChat}
           collapsed={navCollapsed}
           onCollapsedChange={setNavCollapsed}
           reviewedThreadIds={reviewedThreadIds}
@@ -4481,6 +4767,13 @@ export default function ChatPage() {
           activeMainView={mainView}
           onSetMainView={handleSetMainView}
           inboxUnreadCount={inboxUnreadCount}
+          closedTabIds={state.closedTabIds}
+          onCloseTab={(id) => {
+            const wasActive = state.activeThreadId === id && mainView === "thread";
+            state.closeTab(id);
+            // Closing the active tab drops you to the new-chat composer.
+            if (wasActive) handleSetMainView("thread");
+          }}
         />
 
         {mainView === "customizations" ? (
@@ -4506,6 +4799,7 @@ export default function ChatPage() {
             state={state}
             threads={inboxThreads}
             setThreads={setInboxThreads}
+            closedTabIds={state.closedTabIds}
             onOpenThread={(source, taskId) => {
               handleSetMainView("thread");
               if (source === "automation" && taskId) {
@@ -4533,7 +4827,9 @@ export default function ChatPage() {
             hideThreadToggle
             hideMoreOptions={state.activeThreadId === null}
             previewOpen={previewOpen}
+            onTogglePreview={handleTogglePreview}
             onAssetClick={handleAssetClick}
+            onOpenDiff={handleOpenDiff}
             onFullScreen={() => { sessionStorage.setItem("openGeniePanel", "1"); router.back(); }}
             reviewed={isReviewed}
             onReviewed={handleReviewed}
@@ -4565,56 +4861,23 @@ export default function ChatPage() {
           />
         )}
 
-        {/* Right rail — shown when preview panel is closed */}
-        {mainView !== "customizations" && mainView !== "scheduled" && mainView !== "inbox" && !previewOpen && (
-          <div className="flex h-full w-9 shrink-0 flex-col items-center border-l border-border py-2 gap-sm">
-            <Tooltip label="Open preview panel" align="right">
-              <IconButton
-                aria-label="Open preview panel"
-                icon={<span className="inline-flex scale-x-[-1]"><Icon name="sidebarClosedIcon" size={16} /></span>}
-                size="small"
-                tone="neutral"
-                onClick={handleTogglePreview}
-              />
-            </Tooltip>
-            <Tooltip label="Workspace" align="right">
-              <IconButton
-                aria-label="Open workspace browser"
-                icon={<Icon name="folderOutlinedIcon" size={14} />}
-                size="small"
-                tone="neutral"
-                onClick={() => {
-                  setInitialBrowser("workspace");
-                  setActiveTab("Assets");
-                  if (containerRef.current) setInitialPreviewWidth(Math.round(containerRef.current.offsetWidth / 2));
-                  setPreviewOpen(true);
-                }}
-              />
-            </Tooltip>
-            <Tooltip label="Catalog" align="right">
-              <IconButton
-                aria-label="Open catalog browser"
-                icon={<span className="inline-flex -scale-x-100"><Icon name="catalogShapesIcon" size={14} /></span>}
-                size="small"
-                tone="neutral"
-                onClick={() => {
-                  setInitialBrowser("schema");
-                  setActiveTab("Assets");
-                  if (containerRef.current) setInitialPreviewWidth(Math.round(containerRef.current.offsetWidth / 2));
-                  setPreviewOpen(true);
-                }}
-              />
-            </Tooltip>
-          </div>
-        )}
-
         {mainView !== "customizations" && (previewOpen || (mainView === "scheduled" && selectedTaskId)) && (
           <PreviewPanel
-            onClose={() => { setPreviewOpen(false); setSelectedSkillFile(null); setSelectedMcpServerId(null); setSelectedTaskId(null); setInitialBrowser(null); }}
+            onClose={() => {
+              setPreviewOpen(false);
+              setSelectedSkillFile(null);
+              setSelectedMcpServerId(null);
+              setSelectedTaskId(null);
+              // Remember that the user dismissed the pane for this thread.
+              if (state.activeThreadId) {
+                setPreviewDismissedThreads((prev) => new Set(prev).add(state.activeThreadId!));
+              }
+            }}
             selectedAsset={selectedAsset}
             activeThreadId={state.activeThreadId}
             initialWidth={initialPreviewWidth}
-            initialBrowser={initialBrowser}
+            onOpenBrowser={(kind) => setPageBrowser(kind)}
+            onCreateAsset={handleCreateAsset}
             reviewAssets={reviewAssets}
             openAssets={openAssets}
             setOpenAssets={setOpenAssets}
@@ -4629,6 +4892,78 @@ export default function ChatPage() {
             mcpServer={null}
             scheduledTask={mainView === "scheduled" ? (SCHEDULED_TASKS.find((t) => t.id === selectedTaskId) ?? null) : null}
           />
+        )}
+
+        {/* Browser column — sits between the preview area and the right rail */}
+        {mainView !== "customizations" && mainView !== "scheduled" && mainView !== "inbox" && pageBrowser !== null && (
+          <RightBrowserPanel
+            kind={pageBrowser}
+            onClose={() => setPageBrowser(null)}
+            schemaExpanded={pageSchemaExpanded}
+            setSchemaExpanded={setPageSchemaExpanded}
+            onOpenAsset={(asset) => {
+              setOpenAssets((prev) => prev.find((a) => a.id === asset.id) ? prev : [...prev, asset]);
+              setActiveAssetId(asset.id);
+              setActiveTab("Assets");
+              if (!previewOpen) setInitialPreviewWidth(computePreviewWidth());
+              setPreviewOpen(true);
+            }}
+          />
+        )}
+
+        {/* Right icon rail — always visible on the far right */}
+        {mainView !== "customizations" && mainView !== "scheduled" && mainView !== "inbox" && (
+          <div className="flex h-full w-9 shrink-0 flex-col items-center border-l border-border py-2 gap-sm">
+            <Tooltip label={topNavHidden ? "Show top nav" : "Hide top nav"} align="right">
+              <IconButton
+                aria-label={topNavHidden ? "Show top nav" : "Hide top nav"}
+                icon={<Icon name={topNavHidden ? "chevronDownIcon" : "chevronUpIcon"} size={16} />}
+                size="small"
+                tone="neutral"
+                onClick={toggleTopNav}
+              />
+            </Tooltip>
+            <Tooltip label="Workspace" align="right">
+              <IconButton
+                aria-label="Open workspace browser"
+                icon={<Icon name="folderOutlinedIcon" size={14} />}
+                size="small"
+                tone="neutral"
+                className={pageBrowser === "workspace" ? "!bg-background-tertiary" : ""}
+                onClick={() => setPageBrowser((v) => v === "workspace" ? null : "workspace")}
+              />
+            </Tooltip>
+            <Tooltip label="Catalog" align="right">
+              <IconButton
+                aria-label="Open catalog browser"
+                icon={<span className="inline-flex -scale-x-100"><Icon name="catalogShapesIcon" size={14} /></span>}
+                size="small"
+                tone="neutral"
+                className={pageBrowser === "schema" ? "!bg-background-tertiary" : ""}
+                onClick={() => setPageBrowser((v) => v === "schema" ? null : "schema")}
+              />
+            </Tooltip>
+            <DropdownMenu
+              variant="rich"
+              widthMode="content"
+              side="left"
+              align="start"
+              items={newAssetMenuItems(handleCreateAsset)}
+              trigger={({ triggerRef, triggerProps }) => (
+                <span ref={triggerRef} className="inline-flex">
+                  <Tooltip label="New" align="right">
+                    <IconButton
+                      {...triggerProps}
+                      aria-label="New"
+                      icon={<Icon name="plusIcon" size={16} />}
+                      size="small"
+                      tone="neutral"
+                    />
+                  </Tooltip>
+                </span>
+              )}
+            />
+          </div>
         )}
       </div>
 

@@ -3,7 +3,9 @@
 import * as React from "react";
 import { Icon } from "@/components/icons";
 import { DefaultButton } from "@/components/DefaultButton";
+import { DropdownMenu, type DropdownMenuItem } from "@/components/DropdownMenu";
 import { PrimaryButton } from "@/components/PrimaryButton";
+import { Tooltip } from "@/components/Tooltip/Tooltip";
 import { AssetRow } from "./messages/AssetRow";
 import type { ReviewAsset, RunStatus } from "./types";
 
@@ -17,12 +19,14 @@ function ReviewPanel({
   onRejectAll,
   onAcceptAll,
   onAssetClick,
+  onOpenDiff,
 }: {
   assets: ReviewAsset[];
   reviewed?: boolean;
   onRejectAll?: () => void;
   onAcceptAll?: () => void;
   onAssetClick?: (asset: ReviewAsset) => void;
+  onOpenDiff?: () => void;
 }) {
   const [open, setOpen] = React.useState(true);
   const label = `${assets.length} asset${assets.length !== 1 ? "s" : ""}`;
@@ -47,6 +51,18 @@ function ReviewPanel({
           {label}
         </button>
         <div className="flex-1" />
+        {onOpenDiff && (
+          <Tooltip content="View changes">
+            <button
+              type="button"
+              aria-label="View changes"
+              onClick={onOpenDiff}
+              className="flex h-6 w-6 items-center justify-center rounded-sm text-text-secondary hover:bg-background-tertiary hover:text-text-primary"
+            >
+              <Icon name="PlusMinusSquareIcon" size={16} />
+            </button>
+          </Tooltip>
+        )}
         {!reviewed && (
           <>
             <DefaultButton size="small" onClick={handleReject}>Reject All</DefaultButton>
@@ -82,11 +98,17 @@ export type PromptBarProps = {
   onRejectAll?: () => void;
   onAcceptAll?: () => void;
   onAssetClick?: (asset: ReviewAsset) => void;
+  /** Opens the changes/diff view (from the review drawer's diff button). */
+  onOpenDiff?: () => void;
   /** Whether the current thread has already been reviewed (hides accept/reject buttons). */
   reviewed?: boolean;
   /** Called when the user accepts or rejects — so the parent can mark thread as reviewed. */
   onReviewed?: () => void;
   size?: "compact" | "full";
+  /** Focus the input on mount (e.g. when landing on a new chat). */
+  autoFocus?: boolean;
+  /** Show the "Always review the accuracy of responses." disclaimer below the input. */
+  showDisclaimer?: boolean;
 };
 
 export function PromptBar({
@@ -99,12 +121,64 @@ export function PromptBar({
   onRejectAll,
   onAcceptAll,
   onAssetClick,
+  onOpenDiff,
   reviewed = false,
   onReviewed,
   size = "compact",
+  autoFocus = false,
+  showDisclaimer = true,
 }: PromptBarProps) {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const isRunning = runStatus === "running";
+
+  // Model quality tier switcher (defaults to Auto).
+  const [modelTier, setModelTier] = React.useState<"auto" | "fast" | "advanced">("auto");
+  const modelTierLabel = modelTier === "auto" ? "Auto" : modelTier === "fast" ? "Fast" : "Advanced";
+  const modelTierItems: DropdownMenuItem[] = [
+    {
+      id: "tier-title",
+      label: <span className="text-hint font-semibold text-text-secondary">Model quality tier</span>,
+      disabled: true,
+    },
+    {
+      id: "auto",
+      label: (
+        <span className="flex items-center gap-sm">
+          Auto
+          <span className="rounded-sm bg-background-secondary px-1.5 py-0.5 text-hint font-medium text-text-secondary">Recommended</span>
+        </span>
+      ),
+      description: "Adapts speed and intelligence per task",
+      separatorAbove: true,
+      leadingIcon: modelTier === "auto"
+        ? <Icon name="checkIcon" size={16} className="text-text-primary" />
+        : <span className="inline-block size-4" />,
+      onSelect: () => setModelTier("auto"),
+    },
+    {
+      id: "fast",
+      label: "Fast",
+      description: "More efficient for most tasks",
+      separatorAbove: true,
+      leadingIcon: modelTier === "fast"
+        ? <Icon name="checkIcon" size={16} className="text-text-primary" />
+        : <span className="inline-block size-4" />,
+      onSelect: () => setModelTier("fast"),
+    },
+    {
+      id: "advanced",
+      label: "Advanced",
+      description: "Highest quality for complex tasks",
+      leadingIcon: modelTier === "advanced"
+        ? <Icon name="checkIcon" size={16} className="text-text-primary" />
+        : <span className="inline-block size-4" />,
+      onSelect: () => setModelTier("advanced"),
+    },
+  ];
+
+  React.useEffect(() => {
+    if (autoFocus) inputRef.current?.focus();
+  }, [autoFocus]);
   const hasReview = reviewAssets && reviewAssets.length > 0;
 
   const placeholder = isRunning
@@ -129,6 +203,7 @@ export function PromptBar({
             onRejectAll={() => { onRejectAll?.(); onReviewed?.(); }}
             onAcceptAll={() => { onAcceptAll?.(); onReviewed?.(); }}
             onAssetClick={onAssetClick}
+            onOpenDiff={onOpenDiff}
           />
         )}
 
@@ -173,13 +248,25 @@ export function PromptBar({
 
             {/* Right: Agent mode + send/stop */}
             <div className="flex items-center gap-sm">
-              <button
-                type="button"
-                className="flex items-center gap-xs text-paragraph text-text-secondary hover:text-text-primary"
-              >
-                Agent
-                <Icon name="chevronDownIcon" size={12} />
-              </button>
+              <DropdownMenu
+                variant="rich"
+                widthMode="content"
+                side="top"
+                align="end"
+                items={modelTierItems}
+                trigger={({ triggerRef, triggerProps }) => (
+                  <span ref={triggerRef} className="inline-flex">
+                    <button
+                      {...triggerProps}
+                      type="button"
+                      className="flex items-center gap-xs text-paragraph text-text-secondary hover:text-text-primary"
+                    >
+                      {modelTierLabel}
+                      <Icon name="chevronDownIcon" size={12} />
+                    </button>
+                  </span>
+                )}
+              />
 
               {isRunning ? (
                 <button
@@ -207,9 +294,11 @@ export function PromptBar({
       </div>
 
       {/* Disclaimer */}
-      <p className="text-center text-hint text-text-secondary">
-        Always review the accuracy of responses.
-      </p>
+      {showDisclaimer && (
+        <p className="text-center text-hint text-text-secondary">
+          Always review the accuracy of responses.
+        </p>
+      )}
     </div>
   );
 }

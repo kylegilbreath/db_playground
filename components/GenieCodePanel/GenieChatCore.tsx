@@ -46,6 +46,98 @@ export const GENIE_EXAMPLE_PROMPTS = [
   "Find data",
 ];
 
+// Starter prompt categories shown below the prompt bar on the empty state.
+// Each category expands into a list of tappable starter prompts.
+export type GenieStarterCategory = {
+  id: string;
+  label: string;
+  icon: string;
+  /** Tailwind text color class used to tint the pill icon. */
+  iconColor: string;
+  prompts: string[];
+};
+
+export const GENIE_STARTER_CATEGORIES: GenieStarterCategory[] = [
+  {
+    id: "explore",
+    label: "Explore & clean data",
+    icon: "databaseOutlinedIcon",
+    iconColor: "text-text-secondary",
+    prompts: [
+      "Profile my key tables and flag data quality issues",
+      "Suggest joins across my tables and explain the relationships",
+      "Help me design silver and gold layers from my raw data",
+      "Fix schema issues and standardize column types in this table",
+      "Write and optimize a query using Unity Catalog and Delta best practices",
+    ],
+  },
+  {
+    id: "ml",
+    label: "ML & analytics",
+    icon: "modelsIcon",
+    iconColor: "text-text-secondary",
+    prompts: [
+      "Help me design features for a churn prediction model",
+      "Recommend a model and write a training and evaluation notebook",
+      "Interpret my model's metrics and suggest ways to improve them",
+      "Track this experiment in MLflow and register the best model",
+      "Set up model serving so I can call this model from a Job",
+    ],
+  },
+  {
+    id: "dashboards",
+    label: "Dashboards & reporting",
+    icon: "dashboardIcon",
+    iconColor: "text-text-secondary",
+    prompts: [
+      "Help me define the key metrics for my business area",
+      "Design a Lakeview dashboard from my analytics tables",
+      "Create a metric view so my team can reuse consistent definitions",
+      "Add filters and shape the layout so business users can self-serve",
+      "Turn this analysis into a shareable, presentation-ready report",
+    ],
+  },
+  {
+    id: "engineering",
+    label: "Engineering & ops",
+    icon: "PipelineIcon",
+    iconColor: "text-text-secondary",
+    prompts: [
+      "Help me structure a Lakeflow declarative pipeline for this data",
+      "Design a Job to run this workload as a batch or streaming pipeline",
+      "Debug why my pipeline run failed and suggest a fix",
+      "Advise on monitoring and guardrails for my production pipelines",
+      "Add data quality checks and alerting to my pipeline",
+    ],
+  },
+  {
+    id: "skill",
+    label: "Create a skill",
+    icon: "WrenchIcon",
+    iconColor: "text-text-secondary",
+    prompts: [
+      "Help me build a skill that summarizes weekly business performance",
+      "Create a skill that answers questions about our customer accounts",
+      "Help me build a skill for tracking project status and blockers",
+      "Create a skill that generates executive-ready meeting summaries",
+      "Help me build a skill that monitors operational metrics and alerts me to changes",
+    ],
+  },
+  {
+    id: "schedule",
+    label: "Schedule a task",
+    icon: "CalendarClockIcon",
+    iconColor: "text-text-secondary",
+    prompts: [
+      "Provide a weekly report on important KPIs and metrics",
+      "Create a morning digest to help me prepare for my meetings each day",
+      "Send me a daily report of top movers and decliners",
+      "Monitor my emails daily for important messages",
+      "Draft a status update for my projects at the end of each week",
+    ],
+  },
+];
+
 function cx(...parts: Array<string | undefined | false>) {
   return parts.filter(Boolean).join(" ");
 }
@@ -58,6 +150,9 @@ export function useGenieChatState() {
   const [text, setText] = React.useState("");
   const [threads, setThreads] = React.useState<GenieThread[]>(SEED_THREADS);
   const [activeThreadId, setActiveThreadId] = React.useState<string | null>("thread-dashboard");
+  // Threads "closed" out of the Recents tab strip. They still exist in the inbox;
+  // they're just hidden from the ephemeral left-pane tab list until reopened.
+  const [closedTabIds, setClosedTabIds] = React.useState<Set<string>>(new Set());
   const [steps, setSteps] = React.useState<ChatStep[]>(ASSISTANT_DASHBOARD_STEPS);
   const [runStatus, setRunStatus] = React.useState<RunStatus>("done");
   const timersRef = React.useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -142,6 +237,29 @@ export function useGenieChatState() {
     setActiveThreadId(id);
     setRunStatus(threadRunStatusRef.current.get(id) ?? "idle");
     setSteps(threadStepsRef.current.get(id) ?? []);
+    // Opening a thread pins it back into the Recents tab strip.
+    setClosedTabIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  }, []);
+
+  // Close a thread out of the Recents tab strip (browser-tab style). The thread
+  // still lives in the inbox. If it was the active tab, drop to the new-chat composer.
+  const closeTab = React.useCallback((id: string) => {
+    setClosedTabIds((prev) => new Set(prev).add(id));
+    setActiveThreadId((current) => {
+      if (current !== id) return current;
+      timersRef.current.forEach(clearTimeout);
+      timersRef.current = [];
+      pendingStepsRef.current = null;
+      setSteps([]);
+      setRunStatus("idle");
+      setText("");
+      return null;
+    });
   }, []);
 
   const handleSubmit = React.useCallback((promptOverride?: string, runHint?: string) => {
@@ -220,6 +338,12 @@ export function useGenieChatState() {
     setActiveThreadId(thread.id);
     setSteps(initialSteps);
     setRunStatus("done");
+    setClosedTabIds((prev) => {
+      if (!prev.has(thread.id)) return prev;
+      const next = new Set(prev);
+      next.delete(thread.id);
+      return next;
+    });
   }, []);
 
   return {
@@ -241,6 +365,8 @@ export function useGenieChatState() {
     lockedThreadIds,
     hasAssets,
     timersRef,
+    closedTabIds,
+    closeTab,
   };
 }
 
@@ -265,6 +391,10 @@ function GenieChatEmptyState({
   const gap = size === "full" ? "gap-4" : "gap-3";
   const maxW = size === "full" ? "max-w-[680px]" : "max-w-[400px]";
 
+  // Which starter category is currently expanded (null = none).
+  const [activeCategory, setActiveCategory] = React.useState<string | null>(null);
+  const openCategory = GENIE_STARTER_CATEGORIES.find((c) => c.id === activeCategory) ?? null;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-8">
       <div className={cx("flex w-full flex-col items-center", maxW, size === "full" ? "gap-8" : "gap-6")}>
@@ -272,21 +402,53 @@ function GenieChatEmptyState({
           <div className="animate-[fadeUp_0.5s_ease-out_both]">
             <GenieChatIcon size={iconSize} animationKey={animationKey} />
           </div>
-          <div className="flex flex-col items-center gap-1 animate-[fadeUp_0.5s_ease-out_0.1s_both]">
-            <h2 className="text-heading-m font-semibold text-text-primary">Genie Code</h2>
-            <p className="text-paragraph text-text-secondary">Run multi-step data and AI tasks</p>
+          <div className="-mt-[60px] flex flex-col items-center gap-1 animate-[fadeUp_0.5s_ease-out_0.1s_both]">
+            <h2 className="text-title2 font-semibold text-text-primary">What can I help you build?</h2>
           </div>
         </div>
-        <div className="flex w-full flex-wrap items-center justify-center gap-2 animate-[fadeUp_0.5s_ease-out_0.2s_both]">
-          {GENIE_EXAMPLE_PROMPTS.map((prompt) => (
-            <DefaultButton key={prompt} radius="full" onClick={() => onSubmit(prompt)} className="border-transparent bg-background-secondary hover:bg-background-tertiary">
-              {prompt}
-            </DefaultButton>
-          ))}
-        </div>
         <div className="w-full animate-[fadeUp_0.5s_ease-out_0.3s_both]">
-          <PromptBar value={text} onValueChange={onTextChange} onSubmit={onSubmit} size={size} />
+          <PromptBar value={text} onValueChange={onTextChange} onSubmit={onSubmit} size={size} autoFocus={size === "full"} showDisclaimer={false} />
         </div>
+        {/* Category pills — hidden while a category is expanded */}
+        {!openCategory && (
+          <div className="flex w-full flex-wrap items-center justify-center gap-2 animate-[fadeUp_0.3s_ease-out_both]">
+            {GENIE_STARTER_CATEGORIES.map((category) => (
+              <DefaultButton
+                key={category.id}
+                radius="full"
+                onClick={() => setActiveCategory(category.id)}
+                leadingIcon={<Icon name={category.icon} size={16} className={category.iconColor} />}
+                className="bg-background-primary"
+              >
+                {category.label}
+              </DefaultButton>
+            ))}
+          </div>
+        )}
+        {/* Expanded starter prompts — replaces the pills for the active category */}
+        {openCategory && (
+          <div className="w-full animate-[fadeUp_0.3s_ease-out_both] rounded-lg border border-border bg-background-primary p-md shadow-[0px_2px_16px_0px_rgba(0,0,0,0.08)]">
+            <div className="mb-1 flex items-center justify-between">
+              <div className="flex items-center gap-sm">
+                <Icon name={openCategory.icon} size={16} className={openCategory.iconColor} />
+                <span className="text-paragraph text-text-secondary">{openCategory.label}</span>
+              </div>
+              <IconButton aria-label="Close" onClick={() => setActiveCategory(null)} icon={<Icon name="closeIcon" size={16} />} />
+            </div>
+            <div className="flex flex-col divide-y divide-border">
+              {openCategory.prompts.map((prompt) => (
+                <button
+                  key={prompt}
+                  type="button"
+                  onClick={() => onSubmit(prompt)}
+                  className="flex items-center px-1 py-mid text-left text-paragraph text-text-primary transition-colors hover:text-action-default-text-hover"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -307,7 +469,7 @@ function ThreadStatusIcon({ status }: { status: ThreadStatus }) {
     );
   }
   if (status === "attention") {
-    return <Icon name="branchCheckIn" size={14} className="shrink-0 text-text-secondary" />;
+    return <Icon name="PlusMinusSquareIcon" size={14} className="shrink-0 text-text-secondary" />;
   }
   if (status === "review") {
     return <Icon name="BracketsCheckIcon" size={14} className="shrink-0 text-text-secondary" />;
@@ -381,6 +543,8 @@ export function GenieChatThreadList({
   reviewedThreadIds = new Set(),
   onRenameActiveThread,
   onRenameThread,
+  closedTabIds = new Set(),
+  onCloseTab,
 }: {
   threads: GenieThread[];
   activeThreadId: string | null;
@@ -388,6 +552,8 @@ export function GenieChatThreadList({
   reviewedThreadIds?: Set<string>;
   onRenameActiveThread?: () => void;
   onRenameThread?: (id: string, newLabel: string) => void;
+  closedTabIds?: Set<string>;
+  onCloseTab?: (id: string) => void;
 }) {
   const [hoveredId, setHoveredId] = React.useState<string | null>(null);
   const [menuOpenId, setMenuOpenId] = React.useState<string | null>(null);
@@ -404,7 +570,9 @@ export function GenieChatThreadList({
     });
   };
 
-  const groups = groupThreads(threads, pinnedIds);
+  // Hide closed tabs from the strip — unless pinned, which always persists.
+  const visibleThreads = threads.filter((t) => pinnedIds.has(t.id) || !closedTabIds.has(t.id));
+  const groups = groupThreads(visibleThreads, pinnedIds);
   return (
     <div className="flex flex-col gap-1 px-1">
       {groups.map((group) => (
@@ -457,7 +625,6 @@ export function GenieChatThreadList({
                     )}
                     {(isHovered || isMenuOpen) ? (
                       <span className="flex shrink-0 items-center gap-xs">
-                        {t.time && <span className="text-hint text-text-secondary">{t.time}</span>}
                         <button
                           ref={(el) => { if (el) menuButtonRefs.current.set(t.id, el); }}
                           type="button"
@@ -466,6 +633,19 @@ export function GenieChatThreadList({
                         >
                           <Icon name="overflowIcon" size={14} />
                         </button>
+                        {/* Close thread — Recents only; pinned tabs persist */}
+                        {!pinnedIds.has(t.id) && onCloseTab && (
+                          <Tip label="Close thread">
+                            <button
+                              type="button"
+                              aria-label="Close thread"
+                              onClick={(e) => { e.stopPropagation(); onCloseTab(t.id); }}
+                              className="flex h-5 w-5 items-center justify-center rounded-sm text-text-secondary hover:bg-action-default-background-press hover:text-text-primary"
+                            >
+                              <Icon name="closeSmallIcon" size={14} />
+                            </button>
+                          </Tip>
+                        )}
                       </span>
                     ) : (
                       hasIcon
@@ -617,6 +797,9 @@ export type GenieChatBodyProps = {
   onToggleNav?: () => void;
   /** Whether the right preview panel is currently open (controls icon state). */
   previewOpen?: boolean;
+  /** Called to open/collapse the right preview panel. When provided, a toggle
+   *  button is shown in the header next to the compute/status control. */
+  onTogglePreview?: () => void;
   /** Called when the user clicks an asset chip in the chat. */
   onAssetClick?: (asset: ReviewAsset) => void;
   /** Controlled thread sidebar open state (optional — uncontrolled if omitted). */
@@ -633,6 +816,8 @@ export type GenieChatBodyProps = {
   onFocusTitleInputReady?: (focusFn: () => void) => void;
   /** Called when the user clicks the "Open file" button in the header. */
   onOpenFile?: () => void;
+  /** Opens the changes/diff view (from the review drawer's diff button). */
+  onOpenDiff?: () => void;
   /** Hide the three-dot more options menu (e.g. on new/empty chat). */
   hideMoreOptions?: boolean;
   /** Called when the user clicks the parent breadcrumb link in a locked run thread header. */
@@ -1146,14 +1331,10 @@ const MORE_OPTIONS_ITEMS = [
 export function MoreOptionsMenu({
   onClose,
   onTogglePanel,
-  onFullScreen,
-  isFullScreen,
   onOpenSettings,
 }: {
   onClose: () => void;
   onTogglePanel?: () => void;
-  onFullScreen?: () => void;
-  isFullScreen?: boolean;
   onOpenSettings?: () => void;
 }) {
   const ref = React.useRef<HTMLDivElement>(null);
@@ -1172,21 +1353,6 @@ export function MoreOptionsMenu({
       ref={ref}
       className="absolute right-2 top-9 z-50 min-w-[220px] overflow-hidden rounded border border-border bg-background-primary py-1 shadow-[0px_2px_16px_0px_rgba(0,0,0,0.08)]"
     >
-      {/* Top actions */}
-      <div className="pb-1">
-        <button
-          type="button"
-          onClick={() => { onFullScreen?.(); onClose(); }}
-          className="flex w-full items-center justify-between px-2 py-1 text-left text-paragraph text-text-primary hover:bg-background-secondary"
-        >
-          <span className="flex items-center gap-xs">
-            <Icon name={isFullScreen ? "arrowsCollapseIcon" : "arrowsExpandIcon"} size={14} className="text-text-secondary" />
-            {isFullScreen ? "Minimize chat" : "Maximize chat"}
-          </span>
-          <span className="text-hint text-text-secondary">⌥⌘M</span>
-        </button>
-      </div>
-      <div className="mb-1 border-t border-border" />
       {MORE_OPTIONS_ITEMS.map(({ icon, label }) => (
         <button
           key={label}
@@ -1213,6 +1379,7 @@ export function GenieChatBody({
   onFullScreen,
   onToggleNav,
   previewOpen = false,
+  onTogglePreview,
   onAssetClick,
   threadSidebarOpen: threadSidebarOpenProp,
   onThreadSidebarChange,
@@ -1221,6 +1388,7 @@ export function GenieChatBody({
   onReviewed,
   onFocusTitleInputReady,
   onOpenFile,
+  onOpenDiff,
   hideMoreOptions = false,
   onNavigateToParent,
 }: GenieChatBodyProps) {
@@ -1301,18 +1469,6 @@ export function GenieChatBody({
               </div>
             </div>
           )}
-          {size === "full" && onFullScreen && (
-            <Tip label="Minimize to side panel" align="left">
-              <IconButton
-                aria-label="Minimize to side panel"
-                icon={<Icon name="arrowsCollapseIcon" size={14} />}
-                tone="neutral"
-                size="small"
-                className="shrink-0"
-                onClick={onFullScreen}
-              />
-            </Tip>
-          )}
           {size === "full" && activeThreadId === null ? (
             <span className="min-w-0 flex-1" />
           ) : size === "full" && activeThreadId && activeThreadTitle && !state.lockedThreadIds.has(activeThreadId) ? (
@@ -1356,6 +1512,33 @@ export function GenieChatBody({
               tone="neutral"
             />
           </Tip>
+          {!hideMoreOptions && <div className="relative">
+            <IconButton
+              aria-label="More options"
+              icon={<Icon name="overflowIcon" size={16} />}
+              size="small"
+              tone="neutral"
+              onClick={() => setMoreMenuOpen((v) => !v)}
+            />
+            {moreMenuOpen && (
+              <MoreOptionsMenu
+                onClose={() => setMoreMenuOpen(false)}
+                onTogglePanel={onClosePanel}
+                onOpenSettings={() => setSettingsOpen(true)}
+              />
+            )}
+          </div>}
+          {onTogglePreview && !previewOpen && (
+            <Tip label="Open preview panel">
+              <IconButton
+                aria-label="Open preview panel"
+                icon={<Icon name="sidebarClosedIcon" size={16} />}
+                size="small"
+                tone="neutral"
+                onClick={onTogglePreview}
+              />
+            </Tip>
+          )}
           {size === "compact" && (
             <Tip label="New chat">
               <IconButton
@@ -1379,24 +1562,6 @@ export function GenieChatBody({
               />
             </Tip>
           )}
-          {!hideMoreOptions && <div className="relative">
-            <IconButton
-              aria-label="More options"
-              icon={<Icon name="overflowIcon" size={14} />}
-              size="small"
-              tone="neutral"
-              onClick={() => setMoreMenuOpen((v) => !v)}
-            />
-            {moreMenuOpen && (
-              <MoreOptionsMenu
-                onClose={() => setMoreMenuOpen(false)}
-                onTogglePanel={onClosePanel}
-                onFullScreen={onFullScreen}
-                isFullScreen={size === "full"}
-                onOpenSettings={() => setSettingsOpen(true)}
-              />
-            )}
-          </div>}
           {onOpenFile && !previewOpen && (
             <Tip label="Open file">
               <IconButton
@@ -1458,6 +1623,7 @@ export function GenieChatBody({
                   reviewed={reviewed}
                   onReviewed={onReviewed}
                   onAssetClick={onAssetClick}
+                  onOpenDiff={onOpenDiff}
                 />
               </div>
             </div>
