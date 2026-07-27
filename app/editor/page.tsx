@@ -25,28 +25,69 @@ import { ASSISTANT_INSTRUCTIONS_FILE, ASSISTANT_INSTRUCTIONS_MARKDOWN } from "@/
 // Notebook toolbar
 // ---------------------------------------------------------------------------
 
-function NotebookToolbar() {
+type AssetKind = "notebook" | "file" | "dag";
+
+function NotebookToolbar({ assetKind }: { assetKind: AssetKind }) {
   return (
     <div className="flex h-9 shrink-0 items-center border-b border-border bg-background-primary px-3">
-      {/* Left: panel + undo/redo + star */}
-      <div className="flex items-center gap-xs">
-        <IconButton icon={<Icon name="sidebarIcon" size={14} />} aria-label="Toggle panel" size="small" tone="neutral" />
-        <IconButton icon={<Icon name="undoIcon" size={14} />} aria-label="Undo" size="small" tone="neutral" />
-        <IconButton icon={<Icon name="redoIcon" size={14} />} aria-label="Redo" size="small" tone="neutral" />
-        <IconButton icon={<Icon name="starIcon" size={14} />} aria-label="Favorite" size="small" tone="neutral" />
-      </div>
+      {/* Left: varies by asset type */}
+      {assetKind === "notebook" ? (
+        <div className="flex items-center gap-sm">
+          <IconButton icon={<Icon name="overflowIcon" size={14} />} aria-label="More options" size="small" tone="neutral" />
+          <IconButton icon={<Icon name="starIcon" size={14} />} aria-label="Favorite" size="small" tone="neutral" />
+          <DefaultButton size="small" menu>Python</DefaultButton>
+          <button type="button" className="text-hint text-text-secondary underline decoration-dotted underline-offset-2 hover:text-text-primary">
+            5h ago
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-xs">
+          <IconButton icon={<Icon name="sidebarIcon" size={14} />} aria-label="Toggle panel" size="small" tone="neutral" />
+          <IconButton icon={<Icon name="undoIcon" size={14} />} aria-label="Undo" size="small" tone="neutral" />
+          <IconButton icon={<Icon name="redoIcon" size={14} />} aria-label="Redo" size="small" tone="neutral" />
+          <IconButton icon={<Icon name="starIcon" size={14} />} aria-label="Favorite" size="small" tone="neutral" />
+        </div>
+      )}
 
       <div className="flex-1" />
 
-      {/* Right: chat + overflow + run status + schedule + share */}
+      {/* Right: actions vary by asset type */}
       <div className="flex items-center gap-xs">
         <IconButton icon={<Icon name="speechBubbleIcon" size={14} />} aria-label="Comments" size="small" tone="neutral" />
-        <IconButton icon={<Icon name="overflowIcon" size={14} />} aria-label="More options" size="small" tone="neutral" />
-        <button type="button" className="flex items-center justify-center rounded-sm border border-border p-1 hover:bg-background-secondary">
-          <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
-        </button>
-        <IconButton icon={<Icon name="calendarIcon" size={14} />} aria-label="Schedule" size="small" tone="neutral" />
-        <IconButton icon={<Icon name="uploadIcon" size={14} />} aria-label="Share" size="small" tone="neutral" />
+        {/* Notebook keeps its overflow menu on the left; other assets show it here */}
+        {assetKind !== "notebook" && (
+          <IconButton icon={<Icon name="overflowIcon" size={14} />} aria-label="More options" size="small" tone="neutral" />
+        )}
+
+        {assetKind === "notebook" && (
+          <>
+            {/* Compute selector */}
+            <button type="button" className="flex items-center justify-center rounded-sm border border-border p-1 hover:bg-background-secondary">
+              <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+            </button>
+            <IconButton icon={<Icon name="calendarIcon" size={14} />} aria-label="Schedule" size="small" tone="neutral" />
+            <PrimaryButton size="small" leadingIcon={<Icon name="uploadIcon" size={14} />}>Share</PrimaryButton>
+          </>
+        )}
+
+        {assetKind === "file" && (
+          <>
+            <IconButton icon={<Icon name="BranchIcon" size={14} />} aria-label="Version history" size="small" tone="neutral" />
+            <DefaultButton size="small">Save</DefaultButton>
+            <PrimaryButton size="small" leadingIcon={<Icon name="uploadIcon" size={14} />}>Share</PrimaryButton>
+          </>
+        )}
+
+        {assetKind === "dag" && (
+          <>
+            {/* Compute selector */}
+            <button type="button" className="flex items-center justify-center rounded-sm border border-border p-1 hover:bg-background-secondary">
+              <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+            </button>
+            <DefaultButton size="small" leadingIcon={<Icon name="playIcon" size={12} />}>Run pipeline</DefaultButton>
+            <PrimaryButton size="small" leadingIcon={<Icon name="uploadIcon" size={14} />}>Share</PrimaryButton>
+          </>
+        )}
       </div>
     </div>
   );
@@ -955,7 +996,13 @@ export default function EditorPage() {
       {/* Notebook area */}
       <div className="flex min-w-0 flex-1 flex-col">
         <TabBar tabs={tabs} activeId={activeTabId} onSelect={setActiveTabId} onClose={handleCloseTab} />
-        <NotebookToolbar />
+        <NotebookToolbar
+          assetKind={
+            activeTabId === "tab-vdp" ? "dag"
+            : activeTabId === "tab-py" || activeTabId === "tab-skill" ? "file"
+            : "notebook"
+          }
+        />
 
         {activeTabId === "tab-skill" && skillFile ? (
           <SkillFileView skillFile={skillFile} />

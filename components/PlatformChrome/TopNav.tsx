@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { DropdownMenu } from "@/components/DropdownMenu";
 import { IconButton } from "@/components/IconButton";
@@ -9,7 +10,6 @@ import { TertiaryButton } from "@/components/TertiaryButton";
 import { Icon } from "@/components/icons";
 
 import { Avatar } from "./Avatar";
-import { DatabricksLockup } from "./DatabricksLockup";
 import { getAppSwitcherItems, getAvatarMenuItems, getWorkspaceSelectorItems } from "./menuItems";
 
 function cx(...parts: Array<string | undefined | false>) {
@@ -84,9 +84,6 @@ export function TopNav({
   onGenieCodeClick,
 }: TopNavProps) {
   const router = useRouter();
-  const pathname = usePathname();
-  const homeHref =
-    pathname.startsWith("/one") || pathname.startsWith("/databricks-one") ? "/one" : "/";
   const isControlled = collapsedProp !== undefined;
   const [uncontrolledCollapsed, setUncontrolledCollapsed] =
     React.useState(defaultCollapsed);
@@ -235,14 +232,16 @@ export function TopNav({
             ) : null}
           </div>
         ) : null}
-        <button
-          type="button"
-          className="rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-default-border-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background-primary"
-          onClick={() => router.push(homeHref)}
-          aria-label="Home"
+        {/* Workspace label — links to Home. TODO: swap logo for the real "E2 Dogfood" asset. */}
+        <Link
+          href="/"
+          aria-label="E2 Dogfood — go to Home"
+          className="flex items-center gap-sm rounded-md px-sm py-1 hover:bg-action-default-background-hover"
         >
-          <DatabricksLockup />
-        </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logos/Databricks.svg" alt="" className="block size-5 shrink-0" />
+          <span className="truncate text-paragraph font-medium text-text-primary">E2 Dogfood</span>
+        </Link>
       </div>
 
       {/* Center: Search */}
