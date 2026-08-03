@@ -4439,9 +4439,6 @@ function PreviewPanel({
             <div className="flex min-w-0 flex-1 flex-col items-center justify-center overflow-clip">
               <EmptyChartGraphic />
               <div className="flex max-w-[420px] flex-col items-center gap-2 px-6 pb-6 text-center">
-                <p className="text-[18px] font-semibold leading-6 text-text-primary">
-                  Workspace canvas
-                </p>
                 <p className="text-paragraph text-text-secondary">
                   As you work, the files and assets you create and edit open in this space for you to review.
                 </p>
@@ -4541,6 +4538,40 @@ export default function ChatPage() {
   // carries over from a previous new chat. Bumped whenever we enter a new chat.
   const [newChatSeq, setNewChatSeq] = React.useState(0);
   const threadId = state.activeThreadId ?? `__none__-${newChatSeq}`;
+
+  // When the empty state becomes a real thread (submitting a prompt turns
+  // activeThreadId from null into a thread-<id>), carry any assets the user
+  // staged in the empty-state preview into the new thread so they stay open.
+  // New files produced by the thread then add on top of these.
+  const prevThreadKeyRef = React.useRef(threadId);
+  React.useEffect(() => {
+    const prevKey = prevThreadKeyRef.current;
+    prevThreadKeyRef.current = threadId;
+    // Only migrate on the empty-state -> real-thread transition.
+    if (prevKey === threadId) return;
+    if (!prevKey.startsWith("__none__-")) return;
+    if (threadId.startsWith("__none__-")) return;
+    const staged = threadOpenAssets[prevKey];
+    if (!staged || staged.length === 0) return;
+    setThreadOpenAssets((prev) => {
+      const existing = prev[threadId] ?? [];
+      const merged = [...existing];
+      for (const a of staged) if (!merged.find((m) => m.id === a.id)) merged.push(a);
+      const next = { ...prev, [threadId]: merged };
+      delete next[prevKey];
+      return next;
+    });
+    setThreadActiveAssetId((prev) => ({
+      ...prev,
+      [threadId]: prev[threadId] ?? prev[prevKey] ?? null,
+    }));
+    setThreadActiveTab((prev) => ({
+      ...prev,
+      [threadId]: prev[threadId] ?? prev[prevKey] ?? "Assets",
+    }));
+    setPreviewOpen(true);
+  }, [threadId, threadOpenAssets]);
+
   const openAssets = threadOpenAssets[threadId] ?? [];
   const activeAssetId = threadActiveAssetId[threadId] ?? null;
   const activeTab = threadActiveTab[threadId] ?? "Assets";

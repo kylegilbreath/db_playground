@@ -395,6 +395,30 @@ function GenieChatEmptyState({
   const [activeCategory, setActiveCategory] = React.useState<string | null>(null);
   const openCategory = GENIE_STARTER_CATEGORIES.find((c) => c.id === activeCategory) ?? null;
 
+  // Anchor for the overlay: the pill row. The panel is pinned to the top edge
+  // of the row and rendered downward, covering the pills while leaving the
+  // prompt input above visible.
+  const pillsRef = React.useRef<HTMLDivElement>(null);
+
+  // Close the overlay on Escape or an outside click.
+  React.useEffect(() => {
+    if (!openCategory) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setActiveCategory(null);
+    };
+    const onDown = (e: MouseEvent) => {
+      if (pillsRef.current && !pillsRef.current.contains(e.target as Node)) {
+        setActiveCategory(null);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onDown);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onDown);
+    };
+  }, [openCategory]);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-8">
       <div className={cx("flex w-full flex-col items-center", maxW, size === "full" ? "gap-8" : "gap-6")}>
@@ -409,8 +433,10 @@ function GenieChatEmptyState({
         <div className="w-full animate-[fadeUp_0.5s_ease-out_0.3s_both]">
           <PromptBar value={text} onValueChange={onTextChange} onSubmit={onSubmit} size={size} autoFocus={size === "full"} showDisclaimer={false} />
         </div>
-        {/* Category pills — hidden while a category is expanded */}
-        {!openCategory && (
+        {/* Category pills — always rendered so opening a category never shifts
+            the page layout. The expanded panel is an absolute overlay pinned to
+            this row (top by default, flipping below if space above is tight). */}
+        <div ref={pillsRef} className="relative w-full">
           <div className="flex w-full flex-wrap items-center justify-center gap-2 animate-[fadeUp_0.3s_ease-out_both]">
             {GENIE_STARTER_CATEGORIES.map((category) => (
               <DefaultButton
@@ -424,31 +450,35 @@ function GenieChatEmptyState({
               </DefaultButton>
             ))}
           </div>
-        )}
-        {/* Expanded starter prompts — replaces the pills for the active category */}
-        {openCategory && (
-          <div className="w-full animate-[fadeUp_0.3s_ease-out_both] rounded-lg border border-border bg-background-primary p-md shadow-[0px_2px_16px_0px_rgba(0,0,0,0.08)]">
-            <div className="mb-1 flex items-center justify-between">
-              <div className="flex items-center gap-sm">
-                <Icon name={openCategory.icon} size={16} className={openCategory.iconColor} />
-                <span className="text-paragraph text-text-secondary">{openCategory.label}</span>
+          {/* Expanded starter prompts — floats on top of the pills without
+              affecting layout. Anchored to the top of the pill row and rendered
+              downward, so it covers the buttons but leaves the input visible. */}
+          {openCategory && (
+            <div
+              className="absolute left-0 right-0 top-0 z-40 animate-[fadeUp_0.2s_ease-out_both] rounded-lg border border-border bg-background-primary p-md shadow-[0px_8px_24px_0px_rgba(0,0,0,0.16)]"
+            >
+              <div className="mb-1 flex items-center justify-between">
+                <div className="flex items-center gap-sm">
+                  <Icon name={openCategory.icon} size={16} className={openCategory.iconColor} />
+                  <span className="text-paragraph text-text-secondary">{openCategory.label}</span>
+                </div>
+                <IconButton aria-label="Close" onClick={() => setActiveCategory(null)} icon={<Icon name="closeIcon" size={16} />} />
               </div>
-              <IconButton aria-label="Close" onClick={() => setActiveCategory(null)} icon={<Icon name="closeIcon" size={16} />} />
+              <div className="flex flex-col divide-y divide-border">
+                {openCategory.prompts.map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => onSubmit(prompt)}
+                    className="flex items-center px-1 py-mid text-left text-paragraph text-text-primary transition-colors hover:text-action-default-text-hover"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="flex flex-col divide-y divide-border">
-              {openCategory.prompts.map((prompt) => (
-                <button
-                  key={prompt}
-                  type="button"
-                  onClick={() => onSubmit(prompt)}
-                  className="flex items-center px-1 py-mid text-left text-paragraph text-text-primary transition-colors hover:text-action-default-text-hover"
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
